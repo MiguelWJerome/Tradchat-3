@@ -2,21 +2,6 @@
 // This file handles all animations, modal interactions, and visual effects
 
 /**
- * switchToSignupModal()
- * Called when user clicks "Sign up" link in login modal.
- * Closes login modal and opens signup modal.
- */
-function switchToSignupModal() {
-  // Close login modal
-  closeLoginModal();
-  
-  // Open signup modal after a short delay to ensure smooth transition
-  setTimeout(function() {
-    openSignupModal();
-  }, 100);
-}
-
-/**
  * closeLoginModal()
  * Called when the user clicks the "Log In" button inside the modal.
  * Step 1: Add the "fade out" CSS class to the overlay so it fades away.
@@ -110,4 +95,19 @@ function openSignupModal() {
 
   // Add the blurred class to the home page so it dims
   homePage.classList.add("home-page-blurred");
+}
+
+/**
+ * switchToSignupModal()
+ * Called when user clicks "Sign up" link in login modal.
+ * Closes login modal and opens signup modal.
+ */
+function switchToSignupModal() {
+  // Close login modal
+  closeLoginModal();
+  
+  // Open signup modal after a short delay to ensure smooth transition
+  setTimeout(function() {
+    openSignupModal();
+  }, 100);
 }

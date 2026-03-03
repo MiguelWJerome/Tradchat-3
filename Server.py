@@ -1,68 +1,97 @@
+from sqlite3.dbapi2 import Cursor
 from flask import Flask, render_template, render_template_string, redirect, request, flash
 from flask_socketio import SocketIO
 from werkzeug.utils import secure_filename
 import sqlite3
 import os
+import shutil
 import secrets
 from threading import Thread, Event
 from queue import Queue
 
 
-# The central line for all DB tasks
-db_queue = Queue()
-
-def db_sql(sql, cursor_obj):
-    """
-    Intakes your global cursor and the SQL string.
-    Blocks until the background worker 'buzzes' back with data.
-    """
+def db_sql(sql, db_string, chat_room=False):
     event = Event()
     package = {
-        'cursor': cursor_obj,
         'sql': sql,
         'result': None,
-        'event': event
+        'event': event,
+        'request-filled': False
     }
 
-    # Post the request to the worker thread
-    db_queue.put(package)
+    if chat_room:
+        room_dict[db_string]['queue'].put(package)
+    else:
+        if db_string == "accounts":
+            accounts_queue.put(package)
+        elif db_string == "rooms":
+            rooms_queue.put(package)
+    print('I love you')
 
-    # Wait here (like a Promise) until the worker hits 'event.set()'
-    event.wait()
+    if not package['request-filled']:
+        event.wait()
 
-    # The worker will have filled package['result']
+    print('I hate you')
+
     data = package['result']
+    print(data)
     
-    # Logic: If it's a list (query results), return it. 
-    # If it's empty/None (an insert/update), return True.
-    if data:
-        return data
-    return True
+    return data
 
 
-def db_worker():
+def db_worker(queue, db_file_path):
+    print(db_file_path)
+    conn = sqlite3.connect(db_file_path)
+    cursor = conn.cursor()
     while True:
         # This line 'sleeps' the thread until something is put in the queue
-        package = db_queue.get()
+        package = queue.get()
         
         # 1. Execute the SQL
-        package['cursor'].execute(package['sql'])
+        try:
+            cursor.execute(package['sql'])
         
-        # 2. Check for results
-        res = package['cursor'].fetchall()
+            # 2. Check for results
+            res = cursor.fetchall()
+
+            print(package['sql'])
+
+            # 3. Handle Commits (Systems logic: No results usually means a Write)
+            if not remove_go_spaces(package['sql'].lower()).startswith('select'):
+                print('hello')
+                package['result'] = True
+                conn.commit()
+
+            else:
+                package['result'] = res
+                
+            # 4. The "Buzzer" - wakes up your main function
         
-        # 3. Handle Commits (Systems logic: No results usually means a Write)
-        if not res:
-            package['cursor'].execute("COMMIT;")
-            package['result'] = True
-        else:
-            package['result'] = res
-            
-        # 4. The "Buzzer" - wakes up your main function
-        package['event'].set()
+        except Exception as e:
+            print(f"SQL Error: {e}")
+            package['result'] = False
+        finally:
+            package['event'].set() # THE BUZZER MUST ALWAYS FIRE
         
         # 5. Mark task as done in the queue
-        db_queue.task_done()
+        queue.task_done()
+        print('I love you more than shakepeaeare')
+
+
+room_dict = {}
+
+#make room databases dict
+for file in os.listdir("rooms"):
+    if file.endswith(".db"):
+        file_path = os.path.join("rooms", file)
+        file_queue = Queue() 
+
+        room_dict[file] = {
+            'file_path': file_path,
+            'queue': file_queue
+        }
+
+        Thread(target=db_worker, args=(file_queue, file_path)).start()
 
 
 def remove_go_spaces(text):
@@ -81,16 +110,18 @@ Server = SocketIO(app)
 accounts_db_exists = os.path.exists("accounts.db")
 rooms_db_exists = os.path.exists("rooms.db")
 
-# make basic databases
-accounts_db = sqlite3.connect("accounts.db")
-accounts = accounts_db.cursor()
+accounts_queue = Queue()
+rooms_queue = Queue()
 
-rooms_db = sqlite3.connect("rooms.db")
-rooms = rooms_db.cursor()
+Thread(target=db_worker, args=(accounts_queue, 'accounts.db')).start()
+Thread(target=db_worker, args=(rooms_queue, 'rooms.db')).start()
+
 
 # Create tables if databases didn't exist
 if not accounts_db_exists:
-    accounts.execute('''
+    accounts_db = sqlite3.connect("accounts.db")
+    accounts_cursor = accounts_db.cursor()
+    accounts_cursor.execute('''
         CREATE TABLE accounts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL,
@@ -103,9 +134,12 @@ if not accounts_db_exists:
             theme TEXT NOT NULL
         );
     ''')
+    accounts_db.close()
 
 if not rooms_db_exists:
-    rooms.execute('''
+    rooms_db = sqlite3.connect("rooms.db")
+    rooms_cursor = rooms_db.cursor()
+    rooms_cursor.execute('''
         CREATE TABLE rooms (
             roomid INTEGER PRIMARY KEY AUTOINCREMENT,
             roomname TEXT NOT NULL,
@@ -113,11 +147,16 @@ if not rooms_db_exists:
             invites TEXT
         );
     ''')
+    rooms_db.close()
 
 
 @app.route('/')
 def index():
     return render_template('welcome.html')
+
+@app.route('/home/')
+def home():
+    return render_template('home.html')
 
 
 # Configure upload settings
@@ -173,14 +212,33 @@ def upload_file():
 
 def Recv(message):
     msg = eval(message)
-    if msg[0] == 'Create Account':
+    print(msg)
+    if msg[0] == 'Log In':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+
+        queryResult = db_sql(f"SELECT password FROM accounts WHERE username = '{username}';", 'accounts', chat_room=False)
+
+        if queryResult:
+            if remove_go_spaces(queryResult[0][0].lower()) == remove_go_spaces(password.lower()):
+                Server.send(str(['Log In Results', username, 'Success']))
+
+            else:
+                Server.send(str(['Log In Results', username, 'Wrong Password']))
+    
+        else:
+            Server.send(str(['Log In Results', username, 'Wrong Usermane']))
+
+
+    elif msg[0] == 'Create Account':
         data = msg[1]
         
         username = data['username']
 
         # Check if username already exists (case-insensitive and no spaces)
         clean_username = remove_go_spaces(username.lower())
-        queryResult = db_sql("SELECT username FROM accounts;", accounts)
+        queryResult = db_sql("SELECT username FROM accounts;", 'accounts', chat_room=False)
         existing_usernames = [remove_go_spaces(row[0].lower()) for row in queryResult]
 
         if clean_username in existing_usernames:
@@ -194,20 +252,20 @@ def Recv(message):
         dob = data['dob']
         gender = data['gender']
 
+        print('qwerty')
+
 
         # Username available - create account
-        db_sql(f"""
-        INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme)
-        VALUES ('{username}', '{password}', '{first_name}', '{last_name}', '{email}', '{dob}', '{gender}', 'classic');
-        """, accounts)
+        db_sql(f"""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme) VALUES ('{username}', '{password}', '{first_name}', '{last_name}', '{email}', '{dob}', '{gender}', 'classic');""", 'accounts', chat_room=False)
+
+        shutil.copyfile(f'static/graphics/default{gender.capitalize()}.png', f'static/profile-pictures/{username}.png')
         
         Server.send(str(['Create Account Results', data['username'], 'Success']))
 
 @Server.on('message')
 def recv(message):
-    Thread(Recv, args=(message,)).start()
+    Thread(target=Recv, args=(message,)).start()
 
 
 if __name__ == "__main__":
-    Thread(target=db_worker).start()
     Server.run(app, host='localhost', port=80, debug=True)

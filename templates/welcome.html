@@ -50,32 +50,36 @@
       <!-- The heading inside the modal -->
       <h2 class="login-modal-heading">Welcome Back!</h2>
 
-      <!-- Username input field -->
-      <div class="login-modal-field-group">
-        <label class="login-modal-label" for="username-input">Username</label>
-        <input
-          type="text"
-          id="username-input"
-          class="login-modal-input"
-          placeholder="Username"
-        />
-      </div>
+      <form>
+        <!-- Username input field -->
+        <div class="login-modal-field-group">
+          <label class="login-modal-label" for="username-input">Username</label>
+          <input
+            type="text"
+            id="username-input"
+            class="login-modal-input"
+            placeholder="Username"
+            required
+          />
+        </div>
 
-      <!-- Password input field -->
-      <div class="login-modal-field-group">
-        <label class="login-modal-label" for="password-input">Password</label>
-        <input
-          type="password"
-          id="password-input"
-          class="login-modal-input"
-          placeholder="••••••••"
-        />
-      </div>
+        <!-- Password input field -->
+        <div class="login-modal-field-group">
+          <label class="login-modal-label" for="password-input">Password</label>
+          <input
+            type="password"
+            id="password-input"
+            class="login-modal-input"
+            required
+          />
+        </div>
+        <input type="submit" style="display: none;" id="login-submit">
+      </form>
 
       <!-- The main Log In button. Uses .btn-soft for a friendly rounded look -->
       <button
         class="btn-soft login-modal-submit-button"
-        onclick="LogInPressed()"
+        onclick="loginPressed()"
       >
         Log In
       </button>
@@ -114,90 +118,100 @@
       <!-- The heading inside the modal -->
       <h2 class="signup-modal-heading">We are Glad You are Here!</h2>
 
-      <!-- First row: First Name and Last Name -->
-      <div class="signup-modal-row">
-        <div class="signup-modal-field-group">
-          <label class="signup-modal-label" for="firstname-input">First Name</label>
+      <form>
+        <!-- First row: First Name and Last Name -->
+        <div class="signup-modal-row">
+          <div class="signup-modal-field-group">
+            <label class="signup-modal-label" for="firstname-input">First Name</label>
+            <input
+              type="text"
+              id="firstname-input"
+              class="signup-modal-input"
+              placeholder="First Name"
+              required
+            />
+          </div>
+          <div class="signup-modal-field-group">
+            <label class="signup-modal-label" for="lastname-input">Last Name</label>
+            <input
+              type="text"
+              id="lastname-input"
+              class="signup-modal-input"
+              placeholder="Last Name"
+              required
+            />
+          </div>
+
+        </div>
+
+        <!-- Second row: Email and Date of Birth -->
+        <div class="signup-modal-row">
+          <div class="signup-modal-field-group">
+            <label class="signup-modal-label" for="signup-email-input">Email</label>
+            <input
+              type="email"
+              id="signup-email-input"
+              class="signup-modal-input"
+              placeholder="Email"
+              required
+            />
+          </div>
+          <div class="signup-modal-field-group">
+            <label class="signup-modal-label" for="dob-input">Date of Birth</label>
+            <input
+              type="date"
+              id="dob-input"
+              class="signup-modal-input"
+              required
+            />
+          </div>
+        </div>
+
+        <!-- Full width: Username -->
+        <div class="signup-modal-field-group signup-modal-full-width">
+          <label class="signup-modal-label" for="signup-username-input">Username</label>
           <input
             type="text"
-            id="firstname-input"
+            id="signup-username-input"
             class="signup-modal-input"
-            placeholder="First Name"
+            placeholder="Username"
+            required
           />
         </div>
-        <div class="signup-modal-field-group">
-          <label class="signup-modal-label" for="lastname-input">Last Name</label>
+
+        <!-- Full width: Password -->
+        <div class="signup-modal-field-group signup-modal-full-width">
+          <label class="signup-modal-label" for="signup-password-input">Password</label>
           <input
-            type="text"
-            id="lastname-input"
+            type="password"
+            id="signup-password-input"
             class="signup-modal-input"
-            placeholder="Last Name"
+            placeholder="Password"
+            required
           />
         </div>
-      </div>
 
-      <!-- Second row: Email and Date of Birth -->
-      <div class="signup-modal-row">
-        <div class="signup-modal-field-group">
-          <label class="signup-modal-label" for="signup-email-input">Email</label>
-          <input
-            type="email"
-            id="signup-email-input"
-            class="signup-modal-input"
-            placeholder="Email"
-          />
+        <!-- Gender selection -->
+        <div class="signup-modal-field-group signup-modal-full-width">
+          <label class="signup-modal-label">Gender</label>
+          <div class="signup-modal-gender-group">
+            <label class="signup-modal-radio-label">
+              <input type="radio" name="gender" value="male" class="signup-modal-radio" required>
+              <span class="signup-modal-radio-text">Male</span>
+            </label>
+            <label class="signup-modal-radio-label">
+              <input type="radio" name="gender" value="female" class="signup-modal-radio" required>
+              <span class="signup-modal-radio-text">Female</span>
+            </label>
+          </div>
         </div>
-        <div class="signup-modal-field-group">
-          <label class="signup-modal-label" for="dob-input">Date of Birth</label>
-          <input
-            type="date"
-            id="dob-input"
-            class="signup-modal-input"
-          />
-        </div>
-      </div>
-
-      <!-- Gender selection -->
-      <div class="signup-modal-field-group signup-modal-full-width">
-        <label class="signup-modal-label">Gender</label>
-        <div class="signup-modal-gender-group">
-          <label class="signup-modal-radio-label">
-            <input type="radio" name="gender" value="male" class="signup-modal-radio">
-            <span class="signup-modal-radio-text">Male</span>
-          </label>
-          <label class="signup-modal-radio-label">
-            <input type="radio" name="gender" value="female" class="signup-modal-radio">
-            <span class="signup-modal-radio-text">Female</span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Full width: Username -->
-      <div class="signup-modal-field-group signup-modal-full-width">
-        <label class="signup-modal-label" for="signup-username-input">Username</label>
-        <input
-          type="text"
-          id="signup-username-input"
-          class="signup-modal-input"
-          placeholder="Username"
-        />
-      </div>
-
-      <!-- Full width: Password -->
-      <div class="signup-modal-field-group signup-modal-full-width">
-        <label class="signup-modal-label" for="signup-password-input">Password</label>
-        <input
-          type="password"
-          id="signup-password-input"
-          class="signup-modal-input"
-          placeholder="Password"
-        />
-      </div>
+        <input type="submit" style="display: none;" id="signup-submit">
+      </form>
 
       <!-- The main Submit button -->
       <button
         class="signup-modal-submit-button"
-        onclick="SignUpPressed()"
+        onclick="signUpPressed()"
       >
         Sign Up
       </button>

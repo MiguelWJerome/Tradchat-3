@@ -1,0 +1,337 @@
+/*
+  =========================================================================
+  home_mobile.css — MOBILE styles (max-width: 768px)
+  TradChat — Home Page
+  =========================================================================
+
+  MOBILE DESIGN STRATEGY
+  ----------------------
+  On mobile we shift from the two-column desktop layout to a single-column
+  stack. The sidebar becomes a bottom sheet / drawer that slides up when the
+  user taps the "Chats" icon in the bottom navigation bar.
+
+  All desktop elements are preserved and re-mapped:
+  • Topbar         → stays at top (slimmer)
+  • Navbar         → becomes a horizontal scroll row below topbar
+  • Sidebar tray   → moves into a bottom drawer
+  • Sidebar search → inside the drawer
+  • Chat feed      → full-width main area
+  • Input bar      → pinned to bottom above nav bar
+  • Bottom nav bar → new mobile-only icon bar for quick switching
+  =========================================================================
+
+  TABLE OF CONTENTS
+  -----------------
+  1.  Base / Reset overrides for mobile
+  2.  App Shell        — full viewport
+  3.  Top Bar          — slimmed down
+  4.  Nav Bar          — horizontal scroll tabs
+  5.  Main Content     — single column, no sidebar
+  6.  Chat Panel       — full width
+      6a. Header
+      6b. Feed
+      6c. Input Bar
+  7.  Bottom Nav Bar   — mobile-only quick access bar
+  8.  Sidebar Drawer   — slide-up sheet for Messenger / Groups / Search
+      8a. Drawer overlay
+      8b. Drawer panel
+      8c. Tray inside drawer
+      8d. Search inside drawer
+      8e. Conversation list inside drawer
+  9.  Emoji Picker     — repositioned for mobile
+  10. Animations       — drawer slide + overlay fade
+  =========================================================================
+*/
+
+/* =========================================================================
+   1. BASE / RESET FOR MOBILE
+   Ensure the body takes full mobile viewport without overflow.
+   ========================================================================= */
+html, body {
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;  /* remove blue flash on tap */
+}
+
+/* =========================================================================
+   2. APP SHELL
+   Full viewport column; no outer window frame styling (no box-shadow/border)
+   because on mobile we ARE the window.
+   ========================================================================= */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  min-height: 100svh;           /* svh = small viewport height (respects browser chrome) */
+  border: none;
+  box-shadow: none;
+  background: var(--color-light);
+}
+
+/* =========================================================================
+   3. TOP BAR — slim on mobile
+   ========================================================================= */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: linear-gradient(180deg, #ddd9d3 0%, #c9c4bd 100%);
+  border-bottom: 2px solid var(--color-dark);
+  position: sticky;
+  top: 0;
+  z-index: 200;                 /* stays above content while scrolling */
+}
+
+.topbar__close { width: 28px; height: 28px; font-size: 0.8rem; }
+
+.topbar__logo  { font-size: 1.5rem; letter-spacing: 0.05em; }
+
+.topbar__profile { width: 32px; height: 32px; }
+
+/* =========================================================================
+   4. NAV BAR — horizontal scrolling tabs (same tabs, compact spacing)
+   ========================================================================= */
+.navbar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  background: var(--color-light);
+  border-bottom: 2px solid var(--color-dark);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;     /* momentum scrolling on iOS */
+  position: sticky;
+  top: 48px;                             /* stick just below topbar */
+  z-index: 190;
+}
+.navbar::-webkit-scrollbar { display: none; }
+
+.nav-tab {
+  font-size: 0.7rem;
+  padding: 5px 14px;
+  min-width: unset;
+  white-space: nowrap;
+}
+
+/* =========================================================================
+   5. MAIN CONTENT — single column (sidebar hidden; accessible via drawer)
+   ========================================================================= */
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Desktop sidebar is HIDDEN on mobile — it becomes a drawer (see §8) */
+.sidebar { display: none; }
+
+/* =========================================================================
+   6. CHAT PANEL — full width on mobile
+   ========================================================================= */
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  background: var(--color-light);
+  position: relative;
+}
+
+/* ---- 6a. Room Header ---- */
+.chat-panel__header {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1.5px solid var(--color-border);
+  background: var(--color-panel);
+  gap: 8px;
+}
+
+.room-title { font-size: 1.15rem; letter-spacing: 0.08em; }
+.room-title__arrow { font-size: 0.7rem; margin-left: auto; }
+
+/* ---- 6b. Message Feed ---- */
+.chat-panel__feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 12px;
+  padding-bottom: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Message bubbles slightly narrower text for small screens */
+.message__bubble { max-width: 80%; }
+.message__text   { font-size: 0.82rem; }
+
+/* ---- 6c. Input Bar ---- */
+.chat-panel__inputbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 2px solid var(--color-dark);
+  background: var(--color-panel);
+  /* Push it above the bottom nav bar */
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+
+.inputbar__text {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+}
+
+/* Smaller icon buttons on mobile */
+.icon-btn   { width: 30px; height: 30px; }
+.send-btn   { width: 36px; height: 36px; }
+
+/* =========================================================================
+   7. BOTTOM NAV BAR — mobile-only quick-access bar
+   Replaces the desktop sidebar tray.
+   Buttons: [☰ Chats] [👥 Groups] [➕ Invite]
+   ========================================================================= */
+.bottom-nav {
+  display: flex;             /* shown only on mobile */
+  align-items: stretch;
+  background: var(--color-panel);
+  border-top: 2px solid var(--color-dark);
+  /* Respect iPhone home-bar notch */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bottom-nav__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 0;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-dark);
+  transition: background var(--transition);
+  border-right: 1px solid var(--color-border);
+}
+.bottom-nav__item:last-child { border-right: none; }
+.bottom-nav__item:hover,
+.bottom-nav__item.active {
+  background: var(--color-dark);
+  color: var(--color-light);
+}
+
+/* =========================================================================
+   8. SIDEBAR DRAWER
+   The sidebar content lives inside a bottom sheet that slides up when the
+   user taps "Chats" in the bottom nav.
+   ========================================================================= */
+
+/* ---- 8a. Dimmed overlay behind the drawer ---- */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 26, 23, 0.45);
+  z-index: 300;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.drawer-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ---- 8b. Drawer panel (the white sheet) ---- */
+.sidebar-drawer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 400;
+  background: var(--color-panel);
+  border-top: 2px solid var(--color-dark);
+  border-radius: 14px 14px 0 0;    /* rounded top corners like a bottom sheet */
+  max-height: 80svh;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);     /* starts hidden below viewport */
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  overflow: hidden;
+}
+.sidebar-drawer.open {
+  transform: translateY(0);        /* slides into view */
+}
+
+/* Drag handle pill at top of drawer */
+.drawer-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--color-medium);
+  border-radius: 99px;
+  margin: 10px auto 6px;
+  flex-shrink: 0;
+}
+
+/* Drawer section title */
+.drawer-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  padding: 4px 14px 10px;
+  border-bottom: 1.5px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+/* ---- 8c. Tray inside the drawer ---- */
+/* Reuse .sidebar__tray styles; just override display for three equal columns */
+.sidebar-drawer .sidebar__tray {
+  display: flex;
+  flex-direction: row;
+  border-bottom: 1.5px solid var(--color-border);
+  flex-shrink: 0;
+}
+.sidebar-drawer .tray-item { padding: 14px 6px; }
+.sidebar-drawer .tray-item svg { width: 32px; height: 32px; }
+.sidebar-drawer .tray-item__label { font-size: 0.65rem; }
+
+/* ---- 8d. Search inside drawer ---- */
+.sidebar-drawer .sidebar__search { margin: 10px 12px; }
+
+/* ---- 8e. Conversation list inside drawer ---- */
+.sidebar-drawer .sidebar__list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* =========================================================================
+   9. EMOJI PICKER — repositioned on mobile
+   ========================================================================= */
+.emoji-picker {
+  bottom: auto;
+  top: 50%;                     /* vertically centered on mobile */
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  max-width: 320px;
+  z-index: 500;
+}
+
+/* =========================================================================
+   10. ANIMATIONS
+   ========================================================================= */
+
+/* Drawer open — used on .sidebar-drawer (translateY handled above via classes) */
+
+/* Feed message fade-in unchanged — inherited from base styles */
