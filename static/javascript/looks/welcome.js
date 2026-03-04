@@ -149,3 +149,35 @@ function togglePasswordVisibility(inputId, button) {
     button.textContent = '👁'; // Eye with slash icon
   }
 }
+
+/**
+ * Prevent form submission on Enter key
+ * Stops forms from submitting when user presses Enter
+ */
+document.addEventListener('DOMContentLoaded', function() {
+  // Prevent login form submission on Enter
+  const loginForm = document.getElementById('login-form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', function(e) {
+      e.preventDefault(); // Stop form submission
+      // Call the login function manually
+      const loginButton = document.querySelector('.login-modal-submit-button');
+      if (loginButton) {
+        loginButton.click();
+      }
+    });
+  }
+  
+  // Prevent signup form submission on Enter
+  const signupForm = document.querySelector('#signup-modal-overlay form');
+  if (signupForm) {
+    signupForm.addEventListener('submit', function(e) {
+      e.preventDefault(); // Stop form submission
+      // Call the signup function manually
+      const signupButton = document.querySelector('.signup-modal-submit-button');
+      if (signupButton) {
+        signupButton.click();
+      }
+    });
+  }
+});

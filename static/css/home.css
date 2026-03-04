@@ -32,14 +32,12 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 1100px;          /* cap width like a window */
   min-height: 100vh;
-  margin: 0 auto;
-  border: 3px solid var(--color-dark);   /* thick outer window frame */
-  background: var(--color-light);
-
-  /* Slight drop shadow gives the "floating window" feel */
-  box-shadow: 6px 6px 0px var(--color-dark);
+  margin: 20px;
+  padding: 20px;
+  border: none;
+  background: transparent;
+  border-radius: 16px;
 }
 
 /* =========================================================================
@@ -108,7 +106,7 @@
   align-items: center;
   gap: 10px;
   padding: 12px 18px;
-  background: var(--color-light);
+  background: var(--color-dark);
   border-bottom: 2px solid var(--color-dark);
   overflow-x: auto;             /* allow scroll if tabs overflow */
   scrollbar-width: none;        /* hide scrollbar on Firefox */
@@ -137,6 +135,7 @@
   display: flex;
   flex: 1;                      /* fill remaining vertical space */
   overflow: hidden;             /* clips children; each child scrolls independently */
+  gap: 20px;                   /* spacing between sidebar and chat panel */
 }
 
 /* =========================================================================
@@ -151,6 +150,8 @@
   border-right: 2px solid var(--color-dark);
   background: var(--color-panel);
   flex-shrink: 0;
+  border-radius: 12px;
+  padding: 12px;
 }
 
 /* ---- 5a. Tray ---- */
@@ -210,7 +211,7 @@
   width: 100%;
   padding: 7px 36px 7px 12px;
   border: 2px solid var(--color-dark);
-  border-radius: var(--radius-soft);   /* pill shape matching wireframe */
+  border-radius: 16px;           /* more rounded search bar */
   background: var(--color-light);
   font-family: var(--font-body);
   font-size: 0.8rem;
@@ -291,6 +292,8 @@
   overflow: hidden;
   background: var(--color-light);
   position: relative;          /* anchor for emoji picker */
+  border-radius: 12px;
+  padding: 12px;
 }
 
 /* ---- 6a. Room Header ---- */
@@ -361,7 +364,7 @@
   max-width: 60%;
   background: var(--color-panel);
   border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-card);
+  border-radius: 16px;           /* more rounded like wireframe */
   padding: 8px 12px;
 }
 .message.own .message__bubble {
@@ -401,7 +404,7 @@
   flex: 1;
   padding: 9px 14px;
   border: 2px solid var(--color-dark);
-  border-radius: var(--radius-soft);   /* pill shape */
+  border-radius: 16px;           /* more rounded input field */
   background: var(--color-light);
   font-family: var(--font-body);
   font-size: 0.85rem;
@@ -480,7 +483,7 @@
   padding: 10px;
   background: var(--color-panel);
   border: 2px solid var(--color-dark);
-  border-radius: var(--radius-card);
+  border-radius: 16px;           /* more rounded emoji picker */
   display: none;              /* hidden; looks/home.js sets display:grid */
   grid-template-columns: repeat(8, 1fr);
   gap: 4px;
@@ -521,5 +524,5 @@
 /* Brand selection highlight */
 ::selection {
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-light);
 }

@@ -18,6 +18,7 @@
     =====================================================================
   -->
   <link rel="stylesheet" href="/static/css/home.css"        media="screen and (min-width: 769px)" />
+  <link rel="stylesheet" href="/static/css/home_mobile.css"  media="screen and (max-width: 768px)" />
 </head>
 
 <body>
@@ -31,12 +32,12 @@
   =================================================================== -->
   <style>
     :root {
-      --color-light  : #F0EDE8;   /* warm off-white parchment */
+      --color-light  : #E8E4DC;   /* warmer light beige instead of white */
       --color-medium : #B8AFA4;   /* muted taupe              */
       --color-dark   : #1C1A17;   /* near-black ink           */
 
       --color-accent : #C0392B;   /* classic trading-floor red accent */
-      --color-panel  : #E6E2DC;   /* slightly darker than light for panels */
+      --color-panel  : #DAD4CA;   /* warmer panel background */
       --color-border : #9E9589;   /* border / divider tone    */
 
       --font-display : 'Bebas Neue', sans-serif;
@@ -52,7 +53,8 @@
     /* ---- Universal Reset ---- */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: var(--color-light);
+      background: url('/static/graphics/Mass.jpg') center/cover;
+      background-attachment: fixed;
       color: var(--color-dark);
       font-family: var(--font-body);
       min-height: 100vh;
@@ -132,6 +134,7 @@
       <button class="btn-bubbly nav-tab"         data-section="events"  >Events</button>
       <button class="btn-bubbly nav-tab"         data-section="news"    >News</button>
       <button class="btn-bubbly nav-tab"         data-section="policy"  >Policy</button>
+      <button class="btn-bubbly nav-tab"         data-section="logout"  >Log Out</button>
     </nav>
 
     <!-- =================================================================

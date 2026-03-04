@@ -2,9 +2,12 @@ cl = io()
 
 cl.connect('http://'+document.domain+':'+location.port)
 
+if (typeof(localStorage['username']) !== 'undefined' && typeof(localStorage['password']) !== 'undefined') {
+    cl.send(JSON.stringify(['Secret Log In', {username: localStorage['username'], password: localStorage['password']}]));
+}
+
 function recv(message) {
     msg = eval(message)
-    
     
     if (msg[0] === 'Log In Results') {
         hideLoadingOverlay()

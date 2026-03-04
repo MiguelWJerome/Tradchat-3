@@ -63,9 +63,12 @@ html, body {
   width: 100%;
   max-width: 100%;
   min-height: 100svh;           /* svh = small viewport height (respects browser chrome) */
+  margin: 10px;
+  padding: 10px;
   border: none;
   box-shadow: none;
-  background: var(--color-light);
+  background: transparent;
+  border-radius: 12px;
 }
 
 /* =========================================================================
@@ -97,7 +100,7 @@ html, body {
   align-items: center;
   gap: 7px;
   padding: 8px 12px;
-  background: var(--color-light);
+  background: var(--color-dark);
   border-bottom: 2px solid var(--color-dark);
   overflow-x: auto;
   scrollbar-width: none;
@@ -137,6 +140,8 @@ html, body {
   overflow: hidden;
   background: var(--color-light);
   position: relative;
+  border-radius: 12px;
+  padding: 8px;
 }
 
 /* ---- 6a. Room Header ---- */

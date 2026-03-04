@@ -352,13 +352,9 @@
 
       if (convo.active) $item.addClass("active");
 
-      // Clicking a conversation item highlights it (UI only — real switching needs routing)
+      // Clicking a conversation item switches to that room
       $item.on("click", function () {
-        $(".convo-item").removeClass("active");
-        $item.addClass("active");
-        // On mobile, close the drawer after selecting a conversation
-        if (isMobile()) closeDrawer();
-        console.log("[looks/home] Conversation selected:", convo.id);
+        switchToRoom(convo.id, convo.name);
       });
 
       $sidebarList.append($item);
@@ -470,7 +466,7 @@
    * activateTab($tab)
    * -----------------
    * Moves the .active class to the clicked nav tab.
-   * Also updates the room header title to match the selected tab.
+   * NOTE: This no longer changes the room banner - banner is controlled by room selection.
    *
    * @param {jQuery} $tab — the clicked .nav-tab element
    */
@@ -479,10 +475,46 @@
     $tab.addClass("active");
 
     var section = $tab.data("section");
-    var label   = $tab.text().toUpperCase();
-    $(".room-title").text(label);
-
     console.log("[looks/home] Tab switched to:", section);
+  }
+
+  /**
+   * switchToRoom(roomId, roomName)
+   * ------------------------------
+   * Switches to a specific room and updates the room banner accordingly.
+   * This should be called when clicking on conversation items in the sidebar.
+   *
+   * @param {string} roomId — the room ID (e.g., "mainroom", "oil-desk")
+   * @param {string} roomName — the display name for the room (e.g., "Mainroom", "Oil Desk")
+   */
+  function switchToRoom(roomId, roomName) {
+    // Update the room banner
+    $(".room-title").text(roomName.toUpperCase());
+    
+    // Update sidebar active state
+    $(".convo-item").removeClass("active");
+    $(".convo-item[data-room='" + roomId + "']").addClass("active");
+    
+    // Clear current chat feed and show loading state
+    $chatFeed.empty();
+    $chatFeed.append(
+      $("<div>").css({
+        textAlign: "center",
+        padding: "20px",
+        opacity: "0.5",
+        fontSize: "0.85rem"
+      }).text("Loading " + roomName + "...")
+    );
+    
+    // Load room history via network layer
+    if (window.HomeNetwork && HomeNetwork.loadRoom) {
+      HomeNetwork.loadRoom(roomId);
+    }
+    
+    console.log("[looks/home] Switched to room:", roomId, roomName);
+    
+    // On mobile, close the drawer after selecting a room
+    if (isMobile()) closeDrawer();
   }
 
   /* ---------------------------------------------------------------------------
@@ -735,6 +767,7 @@
     updateSidebarPreview   : updateSidebarPreview,
     showOfflineBanner      : showOfflineBanner,
     hideOfflineBanner      : hideOfflineBanner,
+    switchToRoom           : switchToRoom,
   };
 
 })(); // End IIFE

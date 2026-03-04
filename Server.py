@@ -8,7 +8,7 @@ import shutil
 import secrets
 from threading import Thread, Lock
 
-def db_sql(sql, db_string, params=[],chat_room=False):
+def db_sql(sql, db_string, params=[], chat_room=False):
     # The 'with' statement handles the "waiting" and "releasing" for you!
     lock = None
     db_path = None
@@ -108,7 +108,27 @@ if not rooms_db_exists:
 
 @app.route('/')
 def index():
-    return render_template('welcome.html')
+    try:
+        username = request.form['username']
+        password = request.form['password']
+
+        account_password = db_sql("SELECT password FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+
+        if account_password:
+            if remove_go_spaces(account_password[0][0].lower()) == remove_go_spaces(password.lower()):
+                session['username'] = username
+                session['password'] = password
+
+                return redirect('/home/')
+
+            else:
+                raise werkzeug.exceptions.BadRequestKeyError('Lets get him directed back to the welcome page')
+
+        else:
+            raise werkzeug.exceptions.BadRequestKeyError('Lets get him directed back to the welcome page')
+
+    except werkzeug.exceptions.BadRequestKeyError:
+        return render_template('welcome.html')
 
 @app.route('/computer-log-into-server/', methods=['POST'])
 def computer_log_into_server():
@@ -134,6 +154,11 @@ def computer_log_into_server():
     except werkzeug.exceptions.BadRequestKeyError:
         return redirect('/')
 
+@app.route('/logout/')
+def logout():
+    session.pop('username', None)
+    session.pop('password', None)
+    return render_template('logout.html')
 
 
 @app.route('/home/')
@@ -231,6 +256,22 @@ def Recv(message):
         else:
             Server.send(str(['Log In Results', username, 'Wrong Username']))
 
+    elif msg[0] == 'Secret Log In':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+
+        queryResult = db_sql("""SELECT password FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)
+
+        if queryResult:
+            if remove_go_spaces(queryResult[0][0].lower()) == remove_go_spaces(password.lower()):
+                Server.send(str(['Log In Results', username, 'Success', password]))
+
+            else:
+                return
+    
+        else:
+            return
 
     elif msg[0] == 'Create Account':
         data = msg[1]
