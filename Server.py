@@ -1,82 +1,43 @@
-from sqlite3.dbapi2 import Cursor
-from flask import Flask, render_template, render_template_string, redirect, request, flash
+from flask import Flask, render_template, render_template_string, redirect, request, flash, session 
 from flask_socketio import SocketIO
 from werkzeug.utils import secure_filename
+import werkzeug
 import sqlite3
 import os
 import shutil
 import secrets
-from threading import Thread, Event
-from queue import Queue
+from threading import Thread, Lock
 
-
-def db_sql(sql, db_string, chat_room=False):
-    event = Event()
-    package = {
-        'sql': sql,
-        'result': None,
-        'event': event,
-        'request-filled': False
-    }
-
+def db_sql(sql, db_string, params=[],chat_room=False):
+    # The 'with' statement handles the "waiting" and "releasing" for you!
+    lock = None
+    db_path = None
     if chat_room:
-        room_dict[db_string]['queue'].put(package)
+        lock = room_dict[db_string]['lock']
+        db_path = room_dict[db_string]['file_path']
     else:
         if db_string == "accounts":
-            accounts_queue.put(package)
+            lock = accounts_lock
+            db_path = 'accounts.db'
         elif db_string == "rooms":
-            rooms_queue.put(package)
-    print('I love you')
-
-    if not package['request-filled']:
-        event.wait()
-
-    print('I hate you')
-
-    data = package['result']
-    print(data)
+            lock = rooms_lock
+            db_path = 'rooms.db'
     
-    return data
+    with lock:
+        conn = sqlite3.connect(db_path)
 
-
-def db_worker(queue, db_file_path):
-    print(db_file_path)
-    conn = sqlite3.connect(db_file_path)
-    cursor = conn.cursor()
-    while True:
-        # This line 'sleeps' the thread until something is put in the queue
-        package = queue.get()
+        cursor = conn.cursor()
         
-        # 1. Execute the SQL
-        try:
-            cursor.execute(package['sql'])
+        cursor.execute(sql, params)
         
-            # 2. Check for results
-            res = cursor.fetchall()
-
-            print(package['sql'])
-
-            # 3. Handle Commits (Systems logic: No results usually means a Write)
-            if not remove_go_spaces(package['sql'].lower()).startswith('select'):
-                print('hello')
-                package['result'] = True
-                conn.commit()
-
-            else:
-                package['result'] = res
-                
-            # 4. The "Buzzer" - wakes up your main function
-        
-        except Exception as e:
-            print(f"SQL Error: {e}")
-            package['result'] = False
-        finally:
-            package['event'].set() # THE BUZZER MUST ALWAYS FIRE
-        
-        # 5. Mark task as done in the queue
-        queue.task_done()
-        print('I love you more than shakepeaeare')
-
+        if remove_go_spaces(sql.lower()).startswith("select"):
+            result = cursor.fetchall()
+        else:
+            conn.commit()
+            result = True
+            
+        conn.close()
+        return result
 
 room_dict = {}
 
@@ -84,14 +45,12 @@ room_dict = {}
 for file in os.listdir("rooms"):
     if file.endswith(".db"):
         file_path = os.path.join("rooms", file)
-        file_queue = Queue() 
+        file_lock = Lock() 
 
         room_dict[file] = {
             'file_path': file_path,
-            'queue': file_queue
+            'queue': file_lock
         }
-
-        Thread(target=db_worker, args=(file_queue, file_path)).start()
 
 
 def remove_go_spaces(text):
@@ -110,11 +69,8 @@ Server = SocketIO(app)
 accounts_db_exists = os.path.exists("accounts.db")
 rooms_db_exists = os.path.exists("rooms.db")
 
-accounts_queue = Queue()
-rooms_queue = Queue()
-
-Thread(target=db_worker, args=(accounts_queue, 'accounts.db')).start()
-Thread(target=db_worker, args=(rooms_queue, 'rooms.db')).start()
+accounts_lock = Lock()
+rooms_lock = Lock()
 
 
 # Create tables if databases didn't exist
@@ -154,9 +110,54 @@ if not rooms_db_exists:
 def index():
     return render_template('welcome.html')
 
+@app.route('/computer-log-into-server/', methods=['POST'])
+def computer_log_into_server():
+    try:
+        username = request.form['username']
+        password = request.form['password']
+
+        account_password = db_sql("SELECT password FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+
+        if account_password:
+            if remove_go_spaces(account_password[0][0].lower()) == remove_go_spaces(password.lower()):
+                session['username'] = username
+                session['password'] = password
+
+                return redirect('/home/')
+
+            else:
+                raise werkzeug.exceptions.BadRequestKeyError('Lets get him directed back to the welcome page')
+
+        else:
+            raise werkzeug.exceptions.BadRequestKeyError('Lets get him directed back to the welcome page')
+
+    except werkzeug.exceptions.BadRequestKeyError:
+        return redirect('/')
+
+
+
 @app.route('/home/')
 def home():
-    return render_template('home.html')
+    try:
+        username = session['username']
+        password = session['password']
+
+        account_password = db_sql("SELECT password FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+
+        if account_password:
+            if remove_go_spaces(account_password[0][0].lower()) == remove_go_spaces(password.lower()):
+
+                return render_template('home.html')
+
+            else:
+                raise KeyError('Why do people try to hack accounts?')
+
+        else:
+            raise KeyError('Why do people try to hack accounts?')
+
+    except KeyError:
+        return redirect('/')
+
 
 
 # Configure upload settings
@@ -218,17 +219,17 @@ def Recv(message):
         username = data['username']
         password = data['password']
 
-        queryResult = db_sql(f"SELECT password FROM accounts WHERE username = '{username}';", 'accounts', chat_room=False)
+        queryResult = db_sql("""SELECT password FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)
 
         if queryResult:
             if remove_go_spaces(queryResult[0][0].lower()) == remove_go_spaces(password.lower()):
-                Server.send(str(['Log In Results', username, 'Success']))
+                Server.send(str(['Log In Results', username, 'Success', password]))
 
             else:
                 Server.send(str(['Log In Results', username, 'Wrong Password']))
     
         else:
-            Server.send(str(['Log In Results', username, 'Wrong Usermane']))
+            Server.send(str(['Log In Results', username, 'Wrong Username']))
 
 
     elif msg[0] == 'Create Account':
@@ -252,11 +253,8 @@ def Recv(message):
         dob = data['dob']
         gender = data['gender']
 
-        print('qwerty')
-
-
         # Username available - create account
-        db_sql(f"""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme) VALUES ('{username}', '{password}', '{first_name}', '{last_name}', '{email}', '{dob}', '{gender}', 'classic');""", 'accounts', chat_room=False)
+        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic'], chat_room=False)
 
         shutil.copyfile(f'static/graphics/default{gender.capitalize()}.png', f'static/profile-pictures/{username}.png')
         

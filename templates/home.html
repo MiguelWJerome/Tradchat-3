@@ -286,16 +286,16 @@
   </div><!-- /app-shell -->
 
   <!-- ===================================================================
-    JAVASCRIPT IMPORTS — loaded in the exact order specified in the brief
-    1. socketio.js    — real-time socket layer
-    2. jquery.js      — DOM utilities
-    3. tradchat.js    — core app logic
+    JAVASCRIPT IMPORTS — tradchat.js first, then other local files
+    1. tradchat.js    — core app logic and Alert function
+    2. socketio.js    — real-time socket layer
+    3. jquery.js      — DOM utilities
     4. network/home.js  — data fetching / socket events for this page
     5. looks/home.js    — UI interactions / animations for this page
   =================================================================== -->
+  <script src="/static/javascript/tradchat.js"           defer></script>
   <script src="/static/javascript/socketio.js"           defer></script>
   <script src="/static/javascript/jquery.js"             defer></script>
-  <script src="/static/javascript/tradchat.js"           defer></script>
   <script src="/static/javascript/network/home.js"       defer></script>
   <script src="/static/javascript/looks/home.js"         defer></script>
 

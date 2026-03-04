@@ -2,6 +2,24 @@
 // This file handles all animations, modal interactions, and visual effects
 
 /**
+ * showLoadingOverlay()
+ * Shows the loading overlay to prevent user action while waiting for server response
+ */
+function showLoadingOverlay() {
+  var loadingOverlay = document.getElementById("loading-overlay");
+  loadingOverlay.style.display = "flex";
+}
+
+/**
+ * hideLoadingOverlay()
+ * Hides the loading overlay when server response is received
+ */
+function hideLoadingOverlay() {
+  var loadingOverlay = document.getElementById("loading-overlay");
+  loadingOverlay.style.display = "none";
+}
+
+/**
  * closeLoginModal()
  * Called when the user clicks the "Log In" button inside the modal.
  * Step 1: Add the "fade out" CSS class to the overlay so it fades away.
@@ -110,4 +128,24 @@ function switchToSignupModal() {
   setTimeout(function() {
     openSignupModal();
   }, 100);
+}
+
+/**
+ * togglePasswordVisibility()
+ * Toggles password visibility between password and text
+ * @param {string} inputId - ID of the password input field
+ * @param {HTMLElement} button - The toggle button element
+ */
+function togglePasswordVisibility(inputId, button) {
+  const passwordInput = document.getElementById(inputId);
+  
+  if (passwordInput.type === 'password') {
+    // Show password - change to text
+    passwordInput.type = 'text';
+    button.textContent = '👁'; // Eye icon
+  } else {
+    // Hide password - change to password
+    passwordInput.type = 'password';
+    button.textContent = '👁'; // Eye with slash icon
+  }
 }
