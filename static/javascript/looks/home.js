@@ -88,7 +88,10 @@
       $uploadBtn,     // file upload button
       $sidebarList,   // the <ul> conversation list
       $searchInput,   // the search input in the sidebar
-      $navTabs;       // all .nav-tab buttons
+      $navTabs,       // all .nav-tab buttons
+      $hamburgerToggle, // hamburger menu button
+      $navbar,        // the navbar element
+      $mainContent;   // main content area
 
   /* ---------------------------------------------------------------------------
      SECTION 4 — INITIALISATION
@@ -98,16 +101,19 @@
     console.log("[looks/home] DOM ready — initialising UI.");
 
     // Cache DOM references
-    $chatFeed    = $("#chat-feed");
-    $chatInput   = $("#chat-input");
-    $sendBtn     = $("#send-btn");
-    $emojiBtn    = $("#emoji-btn");
-    $emojiPicker = $("#emoji-picker");
-    $gifBtn      = $("#gif-btn");
-    $uploadBtn   = $("#upload-btn");
-    $sidebarList = $("#sidebar-list");
-    $searchInput = $(".search-input");
-    $navTabs     = $(".nav-tab");
+    $chatFeed      = $("#chat-feed");
+    $chatInput     = $("#chat-input");
+    $sendBtn       = $("#send-btn");
+    $emojiBtn      = $("#emoji-btn");
+    $emojiPicker   = $("#emoji-picker");
+    $gifBtn        = $("#gif-btn");
+    $uploadBtn     = $("#upload-btn");
+    $sidebarList   = $("#sidebar-list");
+    $searchInput   = $(".search-input");
+    $navTabs       = $(".nav-tab");
+    $hamburgerToggle = $("#hamburger-toggle");
+    $navbar        = $(".navbar");
+    $mainContent   = $(".main-content");
 
     // Build the emoji picker grid
     buildEmojiPicker();
@@ -128,7 +134,35 @@
   });
 
   /* ---------------------------------------------------------------------------
-     SECTION 5 — EMOJI PICKER
+     SECTION 5 — HAMBURGER MENU TOGGLE
+  --------------------------------------------------------------------------- */
+
+  /**
+   * toggleNavbar()
+   * ---------------
+   * Toggles the visibility of the navbar and adjusts the main content position.
+   * When the navbar is hidden, the main content moves up to fill the space.
+   */
+  function toggleNavbar() {
+    var isCollapsed = $navbar.hasClass("collapsed");
+    
+    if (isCollapsed) {
+      // Show navbar
+      $navbar.removeClass("collapsed");
+      $mainContent.removeClass("navbar-collapsed");
+      $hamburgerToggle.removeClass("active");
+    } else {
+      // Hide navbar
+      $navbar.addClass("collapsed");
+      $mainContent.addClass("navbar-collapsed");
+      $hamburgerToggle.addClass("active");
+    }
+    
+    console.log("[looks/home] Navbar toggled:", isCollapsed ? "shown" : "hidden");
+  }
+
+  /* ---------------------------------------------------------------------------
+     SECTION 6 — EMOJI PICKER
   --------------------------------------------------------------------------- */
 
   /**
@@ -676,6 +710,9 @@
   --------------------------------------------------------------------------- */
 
   function attachEvents() {
+
+    // ---- Hamburger menu toggle ----
+    $hamburgerToggle.on("click", toggleNavbar);
 
     // ---- Send button click ----
     $sendBtn.on("click", handleSend);

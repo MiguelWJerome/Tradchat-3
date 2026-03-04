@@ -104,11 +104,16 @@
       TOP BAR — logo + user profile icon
     ================================================================= -->
     <header class="topbar">
-      <!-- Close / logo mark on the left -->
+      <!-- Logo on the left -->
       <div class="topbar__left">
-        <!-- Decorative ✕ mark referencing the wireframe's top-left circle-X -->
-        <button class="topbar__close btn-sharp" aria-label="Close application">✕</button>
+        <img src="/static/logo.png" alt="TRADCHAT Logo" class="topbar__logo-img">
         <span class="topbar__logo">TRADCHAT</span>
+        <!-- Hamburger menu toggle -->
+        <button class="hamburger-toggle" id="hamburger-toggle" aria-label="Toggle menu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
       </div>
 
       <!-- User avatar icon on the right -->

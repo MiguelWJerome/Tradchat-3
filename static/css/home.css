@@ -33,11 +33,11 @@
   flex-direction: column;
   width: 100%;
   min-height: 100vh;
-  margin: 20px;
-  padding: 20px;
+  margin: 0;
+  padding: 0;
   border: none;
   background: transparent;
-  border-radius: 16px;
+  border-radius: 0;
 }
 
 /* =========================================================================
@@ -66,15 +66,13 @@
   gap: 12px;
 }
 
-/* The ✕ close button in the top-left */
-.topbar__close {
-  width: 32px;
-  height: 32px;
+/* The ✕ close button in the top-left - now replaced with logo */
+.topbar__logo-img {
+  width: 64px;
+  height: 64px;
   border-radius: 50%;         /* circle button matching wireframe */
-  font-size: 0.9rem;
-  font-weight: 700;
-  padding: 0;
-  border-width: 2px;
+  object-fit: cover;
+  border: none;
 }
 
 /* TRADCHAT wordmark — Bebas Neue gives the bold trading-floor energy */
@@ -82,7 +80,7 @@
   font-family: var(--font-display);
   font-size: 1.9rem;
   letter-spacing: 0.06em;
-  text-decoration: underline;      /* matches the wireframe underline */
+  text-decoration: none;      /* removed underline */
   user-select: none;
 }
 
@@ -106,10 +104,14 @@
   align-items: center;
   gap: 10px;
   padding: 12px 18px;
-  background: var(--color-dark);
+  background: rgba(216, 212, 202, 0.95);
   border-bottom: 2px solid var(--color-dark);
   overflow-x: auto;             /* allow scroll if tabs overflow */
   scrollbar-width: none;        /* hide scrollbar on Firefox */
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  transform-origin: top;
+  animation: foldDown 0.5s ease-out;
 }
 .navbar::-webkit-scrollbar { display: none; }
 
@@ -127,6 +129,78 @@
   color: var(--color-light);
 }
 
+/* Hamburger menu toggle */
+.hamburger-toggle {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 12px;
+  position: relative;
+  z-index: 1000; /* Ensure it stays above other elements */
+}
+
+.hamburger-toggle span {
+  width: 100%;
+  height: 3px;
+  background: var(--color-dark);
+  border-radius: 2px;
+  transition: all 0.3s ease;
+  transform-origin: center;
+}
+
+/* Hamburger animation when active */
+.hamburger-toggle.active span:nth-child(1) {
+  transform: rotate(45deg) translate(6px, 6px);
+}
+
+.hamburger-toggle.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-toggle.active span:nth-child(3) {
+  transform: rotate(-45deg) translate(6px, -6px);
+}
+
+/* Navbar collapsed state */
+.navbar.collapsed {
+  transform: scaleY(0);
+  opacity: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Main content adjustment when navbar is collapsed */
+.main-content.navbar-collapsed {
+  margin-top: -60px; /* Move up to fill navbar space */
+  padding-top: 20px; /* Maintain internal padding */
+  height: calc(100vh - 20px); /* Fill remaining vertical space */
+  transition: all 0.3s ease;
+}
+
+.main-content:not(.navbar-collapsed) {
+  margin-top: 0;
+  height: calc(100vh - 140px); /* Normal height with navbar visible */
+  transition: all 0.3s ease;
+}
+
+/* When navbar is collapsed, make sidebar and chat panel expand */
+.navbar-collapsed .sidebar {
+  width: 280px; /* Slightly wider when more space available */
+}
+
+.navbar-collapsed .chat-panel {
+  flex: 1; /* Take up remaining horizontal space */
+}
+
 /* =========================================================================
    4. MAIN CONTENT
    A two-column flex row: sidebar (fixed width) | chat panel (flex grow)
@@ -136,6 +210,9 @@
   flex: 1;                      /* fill remaining vertical space */
   overflow: hidden;             /* clips children; each child scrolls independently */
   gap: 20px;                   /* spacing between sidebar and chat panel */
+  padding: 20px;
+  height: calc(100vh - 140px); /* Account for topbar + navbar height */
+  transition: all 0.3s ease;
 }
 
 /* =========================================================================
@@ -148,10 +225,12 @@
   width: 240px;                 /* fixed sidebar width */
   min-width: 180px;
   border-right: 2px solid var(--color-dark);
-  background: var(--color-panel);
+  background: rgba(218, 212, 202, 0.85);
   flex-shrink: 0;
   border-radius: 12px;
   padding: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
 /* ---- 5a. Tray ---- */
@@ -290,10 +369,12 @@
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  background: var(--color-light);
+  background: rgba(232, 228, 220, 0.85);
   position: relative;          /* anchor for emoji picker */
   border-radius: 12px;
   padding: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
 /* ---- 6a. Room Header ---- */
