@@ -1,0 +1,5 @@
+{
+    'color_dark': '#3B2A1A',
+    'color_medium': '#C47A6B',
+    'color_light': '#F5ECD8'
+}

@@ -1,0 +1,1 @@
+{'dark': '#7F0000', 'main': '#DAA520', 'light': '#F5F5DC'}

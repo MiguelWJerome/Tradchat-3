@@ -7,6 +7,7 @@ import os
 import shutil
 import secrets
 from threading import Thread, Lock
+import ast
 
 def db_sql(sql, db_string, params=[], chat_room=False):
     # The 'with' statement handles the "waiting" and "releasing" for you!
@@ -172,7 +173,17 @@ def home():
         if account_password:
             if remove_go_spaces(account_password[0][0].lower()) == remove_go_spaces(password.lower()):
 
-                return render_template('home.html')
+                theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+                if theme:
+                    theme = theme[0][0]
+                else:
+                    theme = 'classic'
+
+                colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
+                colors = ast.literal_eval(colorsFile.read())
+                colorsFile.close()
+
+                return render_template('home.html', theme=theme, color_dark=colors['color_dark'], color_medium=colors['color_medium'], color_light=colors['color_light'])
 
             else:
                 raise KeyError('Why do people try to hack accounts?')
@@ -237,7 +248,7 @@ def upload_file():
 
 
 def Recv(message):
-    msg = eval(message)
+    msg = ast.literal_eval(message)
     print(msg)
     if msg[0] == 'Log In':
         data = msg[1]
