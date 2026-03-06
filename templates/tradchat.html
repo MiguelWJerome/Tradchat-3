@@ -10,12 +10,18 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/static/logo.png" />
+    
     <!-- CSS -->
     {% block styles %}{% endblock %}
     
+    <!-- Base TradChat CSS -->
+    <link rel="stylesheet" href="/static/css/tradchat.css" />
+    
     <style>
     :root {
-      --color-light  : {{ color_ligth }};   
+      --color-light  : {{ color_light }};   
       --color-medium : {{ color_medium }};   
       --color-dark   : {{ color_dark }};   
 
@@ -23,7 +29,7 @@
       --color-panel  : #DAD4CA;   /* warmer panel background */
       --color-border : #9E9589;   /* border / divider tone    */
 
-      --font-display : 'Bebas Neue', sans-serif;
+      --font-display : 'Playfair Display', sans-serif;
       --font-body    : 'DM Sans',   sans-serif;
 
       --radius-soft  : 999px;     /* pill / bubbly shape     */
@@ -36,7 +42,7 @@
     /* ---- Universal Reset ---- */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: url('/static/themes/{{ theme }}.jpg') center/cover;
+      background: url('/static/themes/{{ theme }}/background.jpg') center/cover;
       background-attachment: fixed;
       color: var(--color-dark);
       font-family: var(--font-body);
@@ -80,37 +86,27 @@
 </head>
 <body>
   <div class="app-shell">
-    <!-- TOP BAR -->
-    <header class="topbar">
-      <div class="topbar__left">
-        <img src="/static/logo.png" alt="TRADCHAT Logo" class="topbar__logo-img">
-        <span class="topbar__logo">TRADCHAT</span>
-        <button class="hamburger-toggle" id="hamburger-toggle" aria-label="Toggle menu">
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
+    <!-- NAV BAR -->
+    {% block navbar %}
+    <nav class="navbar">
+      <!-- Left side: Logo + brand name -->
+      <div class="navbar-brand">
+        <!-- Logo image -->
+        <img class="navbar-logo-img" src="/static/logo.png" alt="TradChat Logo" width="38" height="38">
+        <span class="navbar-brand-name">TradChat</span>
       </div>
-      <div class="topbar__right">
-        <button class="topbar__profile btn-sharp" aria-label="User profile">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+
+      <!-- Right side: Profile account section -->
+      <div class="navbar-button-group">
+        <!-- Profile account with settings -->
+        <button class="navbar-profile-button" onclick="openProfileModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="8" r="4"/>
             <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
           </svg>
+          <span>Profile</span>
         </button>
       </div>
-    </header>
-
-    <!-- NAV BAR -->
-    {% block navbar %}
-    <nav class="navbar" aria-label="Main navigation">
-      <button class="btn-bubbly nav-tab active" data-section="mainroom">Mainroom</button>
-      <button class="btn-bubbly nav-tab"         data-section="members" >Members</button>
-      <button class="btn-bubbly nav-tab"         data-section="games"   >Games</button>
-      <button class="btn-bubbly nav-tab"         data-section="events"  >Events</button>
-      <button class="btn-bubbly nav-tab"         data-section="news"    >News</button>
-      <button class="btn-bubbly nav-tab"         data-section="policy"  >Policy</button>
-      <button class="btn-bubbly nav-tab"         data-section="logout"  >Log Out</button>
     </nav>
     {% endblock %}
 

@@ -1,5 +1,5 @@
 {
-    'color_dark': '#3B2A1A',
+    'color_dark': '#7e0808',
     'color_medium': '#C47A6B',
-    'color_light': '#F5ECD8'
+    'color_light': '#ffc67b'
 }

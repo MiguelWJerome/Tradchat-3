@@ -3,8 +3,16 @@
 {% block title %}TradChat — Home{% endblock %}
 
 {% block styles %}
-<link rel="stylesheet" href="/static/css/home.css"        media="screen and (min-width: 769px)" />
-<link rel="stylesheet" href="/static/css/home_mobile.css"  media="screen and (max-width: 768px)" />
+  <!-- Google Fonts: Distinctive pairing — "Bebas Neue" display + "DM Sans" body -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/static/logo.png" />
+
+  <link rel="stylesheet" href="/static/css/home.css"        media="screen and (min-width: 769px)" />
+  <link rel="stylesheet" href="/static/css/home_mobile.css"  media="screen and (max-width: 768px)" />
 {% endblock %}
 
 {% block content %}
@@ -93,8 +101,6 @@
         <!-- Room header — the arrow-chevron label shown in wireframe -->
         <div class="chat-panel__header">
           <h2 class="room-title">MAINROOM</h2>
-          <!-- The wireframe shows a right-pointing arrow/chevron at the end -->
-          <span class="room-title__arrow" aria-hidden="true">▶</span>
         </div>
 
         <!-- Scrollable message feed -->

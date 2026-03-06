@@ -6,42 +6,24 @@
 
   TABLE OF CONTENTS
   -----------------
-  1.  App Shell        — outer window frame
-  2.  Top Bar          — logo + profile button
-  3.  Nav Bar          — horizontal tab row
-  4.  Main Content     — flex row containing sidebar + chat
-  5.  Sidebar          — left panel
-      5a. Tray         — Messenger / Open Groups / Invite Groups icons
-      5b. Search       — search input row
-      5c. List         — conversation list
-  6.  Chat Panel       — right panel
-      6a. Header       — room title + arrow
-      6b. Feed         — scrollable messages
-      6c. Input Bar    — text input + icons + send button
-  7.  Emoji Picker     — popover overlay
-  8.  Utility          — scrollbar, selection colour, etc.
+  1.  Top Bar          — logo + profile button
+  2.  Main Content     — flex row containing sidebar + chat
+  3.  Sidebar          — left panel
+      3a. Tray         — Messenger / Open Groups / Invite Groups icons
+      3b. Search       — search input row
+      3c. List         — conversation list
+  4.  Chat Panel       — right panel
+      4a. Header       — room title + arrow
+      4b. Feed         — scrollable messages
+      4c. Input Bar    — text input + icons + send button
+  5.  Emoji Picker     — popover overlay
+  6.  Utility          — scrollbar, selection colour, etc.
   =========================================================================
 */
 
-/* =========================================================================
-   1. APP SHELL
-   The outermost wrapper that mimics a desktop window with a thick border.
-   Max-width keeps it from sprawling on ultra-wide screens.
-   ========================================================================= */
-.app-shell {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  border-radius: 0;
-}
 
 /* =========================================================================
-   2. TOP BAR
+   1. TOP BAR
    Single horizontal strip: [✕  TRADCHAT]  ——————————  [👤]
    Uses a gradient for a subtle metallic / satin sheen.
    ========================================================================= */
@@ -95,114 +77,38 @@
   justify-content: center;
 }
 
-/* =========================================================================
-   3. NAV BAR
-   A horizontal row of pill-shaped (.btn-bubbly) tabs.
-   ========================================================================= */
-.navbar {
+/* Account wrapper box */
+.topbar__right {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 18px;
-  background: rgba(216, 212, 202, 0.95);
-  border-bottom: 2px solid var(--color-dark);
-  overflow-x: auto;             /* allow scroll if tabs overflow */
-  scrollbar-width: none;        /* hide scrollbar on Firefox */
-  backdrop-filter: blur(10px);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  transform-origin: top;
-  animation: foldDown 0.5s ease-out;
-}
-.navbar::-webkit-scrollbar { display: none; }
-
-/* Individual navigation tab */
-.nav-tab {
-  white-space: nowrap;
-  min-width: 90px;
-  font-size: 0.75rem;
-  padding: 7px 18px;
+  background: var(--color-light);
+  border-radius: 12px;
+  padding: 8px 16px;
+  gap: 12px;  /* Space for another icon */
+  border: 2px solid var(--color-dark);
 }
 
-/* Active tab has the filled dark style */
-.nav-tab.active {
-  background: var(--color-dark);
-  color: var(--color-light);
-}
-
-/* Hamburger menu toggle */
-.hamburger-toggle {
+/* Make the account icon fill its container and be circular */
+.topbar__profile {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  padding: 0;
   display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  width: 24px;
-  height: 24px;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
-  cursor: pointer;
-  padding: 0;
-  margin-left: 12px;
-  position: relative;
-  z-index: 1000; /* Ensure it stays above other elements */
 }
 
-.hamburger-toggle span {
-  width: 100%;
-  height: 3px;
-  background: var(--color-dark);
-  border-radius: 2px;
-  transition: all 0.3s ease;
-  transform-origin: center;
-}
-
-/* Hamburger animation when active */
-.hamburger-toggle.active span:nth-child(1) {
-  transform: rotate(45deg) translate(6px, 6px);
-}
-
-.hamburger-toggle.active span:nth-child(2) {
-  opacity: 0;
-}
-
-.hamburger-toggle.active span:nth-child(3) {
-  transform: rotate(-45deg) translate(6px, -6px);
-}
-
-/* Navbar collapsed state */
-.navbar.collapsed {
-  transform: scaleY(0);
-  opacity: 0;
-  height: 0;
-  padding: 0;
-  margin: 0;
-  overflow: hidden;
-  min-height: 0;
-}
-
-/* Main content adjustment when navbar is collapsed */
-.main-content.navbar-collapsed {
-  margin-top: -60px; /* Move up to fill navbar space */
-  padding-top: 20px; /* Maintain internal padding */
-  height: calc(100vh - 20px); /* Fill remaining vertical space */
-  transition: all 0.3s ease;
-}
-
-.main-content:not(.navbar-collapsed) {
-  margin-top: 0;
-  height: calc(100vh - 140px); /* Normal height with navbar visible */
-  transition: all 0.3s ease;
-}
-
-/* When navbar is collapsed, make sidebar and chat panel expand */
-.navbar-collapsed .sidebar {
-  width: 280px; /* Slightly wider when more space available */
-}
-
-.navbar-collapsed .chat-panel {
-  flex: 1; /* Take up remaining horizontal space */
+.topbar__profile svg {
+  width: 34px;  /* Much bigger, almost fills container */
+  height: 34px;
+  stroke-width: 2.5;
 }
 
 /* =========================================================================
-   4. MAIN CONTENT
+   2. MAIN CONTENT
    A two-column flex row: sidebar (fixed width) | chat panel (flex grow)
    ========================================================================= */
 .main-content {
@@ -216,7 +122,7 @@
 }
 
 /* =========================================================================
-   5. SIDEBAR
+   3. SIDEBAR
    Left column with tray icons, search bar, and conversation list.
    ========================================================================= */
 .sidebar {
@@ -233,7 +139,7 @@
   box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
-/* ---- 5a. Tray ---- */
+/* ---- 3a. Tray ---- */
 /* Icon tray at the top of the sidebar (Messenger | Open Groups | Invite Groups) */
 .sidebar__tray {
   display: flex;
@@ -278,7 +184,7 @@
   align-self: stretch;
 }
 
-/* ---- 5b. Search ---- */
+/* ---- 3b. Search ---- */
 .sidebar__search {
   position: relative;
   display: flex;
@@ -320,7 +226,7 @@
 }
 .search-btn:hover { color: var(--color-accent); }
 
-/* ---- 5c. Conversation list ---- */
+/* ---- 3c. Conversation list ---- */
 .sidebar__list {
   list-style: none;
   flex: 1;
@@ -343,8 +249,8 @@
 
 /* Avatar circle inside each list item */
 .convo-item__avatar {
-  width: 32px;
-  height: 32px;
+  width: 42px;  /* 32px * 1.3 ≈ 42px */
+  height: 42px; /* 32px * 1.3 ≈ 42px */
   border-radius: 50%;
   background: var(--color-medium);
   display: flex;
@@ -361,7 +267,7 @@
 .convo-item__preview { font-size: 0.68rem; color: var(--color-border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* =========================================================================
-   6. CHAT PANEL
+   4. CHAT PANEL
    Main right column: room header, scrollable feed, input bar.
    ========================================================================= */
 .chat-panel {
@@ -377,7 +283,7 @@
   box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
-/* ---- 6a. Room Header ---- */
+/* ---- 4a. Room Header ---- */
 /* The arrow-badge banner at the top of the chat area */
 .chat-panel__header {
   display: flex;
@@ -385,9 +291,11 @@
   justify-content: space-between;
   padding: 12px 20px;
   border-bottom: 1.5px solid var(--color-border);
+  width: 50%;
+  border-radius: 20px;
 
   /* Clip-path chevron / arrow on the right (mirrors wireframe arrow label) */
-  background: var(--color-panel);
+  background: var(--color-medium);
 }
 
 .room-title {
@@ -404,7 +312,7 @@
   margin-left: auto;
 }
 
-/* ---- 6b. Message Feed ---- */
+/* ---- 4b. Message Feed ---- */
 .chat-panel__feed {
   flex: 1;
   overflow-y: auto;
@@ -423,12 +331,26 @@
 }
 
 /* Own messages pushed to right */
-.message.own { flex-direction: row-reverse; }
+.message.own { 
+  flex-direction: row-reverse; 
+}
+
+/* Content wrapper for name + bubble */
+.message__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 60%;
+}
+
+.message.own .message__content {
+  align-items: flex-end;
+}
 
 /* Avatar beside each message */
 .message__avatar {
-  width: 30px;
-  height: 30px;
+  width: 39px;  /* 30px * 1.3 = 39px */
+  height: 39px; /* 30px * 1.3 = 39px */
   border-radius: 50%;
   background: var(--color-medium);
   display: flex;
@@ -440,13 +362,14 @@
   border: 1.5px solid var(--color-dark);
 }
 
-/* Bubble wrapping name + text */
+/* Bubble wrapping text only (name is outside) */
 .message__bubble {
-  max-width: 60%;
-  background: var(--color-panel);
-  border: 1.5px solid var(--color-border);
+  background: var(--color-dark);
+  border: 1.5px solid var(--color-dark);
   border-radius: 16px;           /* more rounded like wireframe */
   padding: 8px 12px;
+  color: var(--color-light);
+  display: inline-block;
 }
 .message.own .message__bubble {
   background: var(--color-dark);
@@ -455,14 +378,20 @@
 }
 
 .message__name {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  margin-bottom: 3px;
   opacity: 0.7;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.05);
 }
-.message__text { font-size: 0.85rem; line-height: 1.45; }
+
+.message.own .message__name {
+  text-align: right;
+}
+.message__text { font-size: 1.1rem; line-height: 1.45; font-weight: 600; }
 
 /* Fade-in for new messages */
 @keyframes msgFadeIn {
@@ -470,7 +399,7 @@
   to   { opacity: 1; transform: translateY(0);   }
 }
 
-/* ---- 6c. Input Bar ---- */
+/* ---- 4c. Input Bar ---- */
 .chat-panel__inputbar {
   display: flex;
   align-items: center;
@@ -483,21 +412,22 @@
 /* Main text input field */
 .inputbar__text {
   flex: 1;
-  padding: 9px 14px;
+  padding: 14px 18px;  /* Taller: 9px → 14px */
   border: 2px solid var(--color-dark);
   border-radius: 16px;           /* more rounded input field */
-  background: var(--color-light);
+  background: transparent;  /* Removed color-light background */
   font-family: var(--font-body);
-  font-size: 0.85rem;
+  font-size: 1rem;  /* Bigger text: 0.85rem → 1rem */
   color: var(--color-dark);
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition);
+  height: 50px;  /* Explicit height for taller input */
 }
 .inputbar__text:focus {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 2px rgba(192,57,43,0.15);
 }
-.inputbar__text::placeholder { color: var(--color-medium); }
+.inputbar__text::placeholder { color: #000; }  /* Black placeholder text */
 
 /* Icon group (emoji, gif, upload) */
 .inputbar__icons {
@@ -516,6 +446,12 @@
   justify-content: center;
   font-size: 0.65rem;
   font-weight: 700;
+}
+
+.icon-btn svg {
+  width: 24px;  /* Much bigger icons */
+  height: 24px;
+  stroke-width: 2.5;
 }
 
 /* GIF text badge */
@@ -544,6 +480,12 @@
   margin-left: 4px;
   transition: background var(--transition), transform 0.1s ease;
 }
+
+.send-btn svg {
+  width: 26px;  /* Much bigger paper airplane */
+  height: 26px;
+  stroke-width: 2.5;
+}
 .send-btn:hover {
   background: var(--color-accent);
   border-color: var(--color-accent);
@@ -552,7 +494,7 @@
 .send-btn:active { transform: scale(0.97); }
 
 /* =========================================================================
-   7. EMOJI PICKER
+   5. EMOJI PICKER
    A popover grid of emoji buttons anchored above the input bar.
    Hidden by default; toggled by looks/home.js.
    ========================================================================= */
@@ -587,7 +529,7 @@
 .emoji-btn:hover { background: var(--color-medium); }
 
 /* =========================================================================
-   8. UTILITY
+   6. UTILITY
    Custom scrollbar, text selection colour, etc.
    ========================================================================= */
 
