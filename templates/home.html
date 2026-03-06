@@ -70,6 +70,27 @@
           </button>
         </div>
 
+        <!-- Sidebar action buttons -->
+        <div class="sidebar__actions">
+          <!-- Back to Mainroom button -->
+          <button class="sidebar-action-btn back-btn" id="back-to-mainroom">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"/>
+              <line x1="9" y1="12" x2="21" y2="12"/>
+            </svg>
+            <span>Back to Mainroom</span>
+          </button>
+          
+          <!-- Create button -->
+          <button class="sidebar-action-btn create-btn" id="create-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            <span>Create</span>
+          </button>
+        </div>
+
         <!-- Search bar below the tray -->
         <div class="sidebar__search">
           <input
@@ -111,50 +132,32 @@
         <!-- Bottom input bar -->
         <div class="chat-panel__inputbar">
 
-          <!-- Text input -->
-          <input
-            type="text"
-            class="inputbar__text"
-            id="chat-input"
-            placeholder="Say something..."
-            aria-label="Message input"
-          />
+          <!-- Text input with nested icons -->
+          <div class="input-wrapper">
+            <input
+              type="text"
+              class="inputbar__text"
+              id="chat-input"
+              placeholder="Say something..."
+              aria-label="Message input"
+            />
 
-          <!-- Accessory icon buttons -->
-          <div class="inputbar__icons">
+            <!-- Accessory icon buttons positioned inside input -->
+            <div class="inputbar__icons">
 
-            <!-- Emoji picker trigger -->
-            <button class="icon-btn btn-sharp" aria-label="Insert emoji" id="emoji-btn">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                <line x1="9"  y1="9"  x2="9.01"  y2="9"/>
-                <line x1="15" y1="9"  x2="15.01" y2="9"/>
-              </svg>
-            </button>
+              <!-- Emoji picker trigger -->
+              <i class="fa-solid fa-face-grin clickable-icon" id="emoji-btn" aria-label="Insert emoji"></i>
 
-            <!-- GIF button -->
-            <button class="icon-btn btn-sharp" aria-label="Insert GIF" id="gif-btn">
-              <span class="gif-label">GIF</span>
-            </button>
+              <!-- GIF button -->
+              <i class="fa-solid fa-gift clickable-icon" id="gif-btn" aria-label="Insert GIF"></i>
 
-            <!-- Attachment / upload button -->
-            <button class="icon-btn btn-sharp" aria-label="Upload file" id="upload-btn">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <polyline points="16 16 12 12 8 16"/>
-                <line x1="12" y1="12" x2="12" y2="21"/>
-                <path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/>
-              </svg>
-            </button>
+              <!-- Attachment / upload button -->
+              <i class="fa-solid fa-file-arrow-up clickable-icon" id="upload-btn" aria-label="Upload file"></i>
+            </div>
           </div>
 
           <!-- Send button — separated visually as in wireframe -->
-          <button class="send-btn btn-sharp" id="send-btn" aria-label="Send message">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="22" y1="2"  x2="11" y2="13"/>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-            </svg>
-          </button>
+          <i class="fa-solid fa-paper-plane clickable-icon send-icon" id="send-btn" aria-label="Send message"></i>
         </div>
 
         <!-- Simple emoji picker popover (hidden by default, toggled by JS) -->

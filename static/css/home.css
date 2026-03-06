@@ -132,11 +132,55 @@
   min-width: 180px;
   border-right: 2px solid var(--color-dark);
   background: rgba(218, 212, 202, 0.85);
-  flex-shrink: 0;
-  border-radius: 12px;
-  padding: 12px;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  border-radius: 20px;          /* rounded corners */
+  overflow: hidden;             /* clip children content */
+  transition: all 0.3s ease;
+}
+
+/* ---- 3a. Sidebar Action Buttons ---- */
+.sidebar__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1.5px solid var(--color-border);
+}
+
+.sidebar-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  background: white;
+  border: 1.5px solid var(--color-border);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-dark);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sidebar-action-btn:hover {
+  background-color: var(--color-light);
+  border-color: var(--color-medium);
+}
+
+.back-btn {
+  color: #2c2416;
+}
+
+.create-btn {
+  background-color: #2c2416;
+  color: white;
+  border-color: #2c2416;
+}
+
+.create-btn:hover {
+  background-color: #3a301f;
+  border-color: #3a301f;
 }
 
 /* ---- 3a. Tray ---- */
@@ -145,6 +189,7 @@
   display: flex;
   align-items: stretch;
   border-bottom: 1.5px solid var(--color-border);
+  padding: 16px 0;
 }
 
 /* Each icon+label button */
@@ -155,7 +200,7 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 12px 6px;
+  padding: 16px 8px;
   border: none;                 /* tray items share outer border, not individual borders */
   border-radius: 0;
   font-size: 0.62rem;
@@ -189,24 +234,23 @@
   position: relative;
   display: flex;
   align-items: center;
-  margin: 10px;
+  margin: 16px;
 }
 
 .search-input {
   width: 100%;
-  padding: 7px 36px 7px 12px;
-  border: 2px solid var(--color-dark);
-  border-radius: 16px;           /* more rounded search bar */
-  background: var(--color-light);
+  padding: 12px 14px;
+  border: 1.5px solid var(--color-medium);
+  border-radius: 12px;
+  background-color: #fafafa;
   font-family: var(--font-body);
-  font-size: 0.8rem;
+  font-size: 14px;
   color: var(--color-dark);
   outline: none;
-  transition: border-color var(--transition), box-shadow var(--transition);
+  transition: border-color var(--transition);
 }
 .search-input:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px rgba(192,57,43,0.15);
 }
 .search-input::placeholder { color: var(--color-medium); }
 
@@ -409,10 +453,18 @@
   background: var(--color-panel);
 }
 
+/* Input wrapper for positioning icons inside */
+.input-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
 /* Main text input field */
 .inputbar__text {
-  flex: 1;
-  padding: 14px 18px;  /* Taller: 9px → 14px */
+  width: 100%;
+  padding: 14px 140px 14px 18px;  /* Right padding makes space for internal buttons */
   border: 2px solid var(--color-dark);
   border-radius: 16px;           /* more rounded input field */
   background: transparent;  /* Removed color-light background */
@@ -433,38 +485,94 @@
 .inputbar__icons {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;  /* Slightly more spacing */
+  position: absolute;  /* Position inside the input field */
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 /* Square icon buttons in the input bar */
 .icon-btn {
-  width: 34px;
-  height: 34px;
+  width: 38px;  /* Slightly larger */
+  height: 38px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.65rem;
   font-weight: 700;
+  background: rgba(44, 36, 22, 0.08);  /* Subtle background */
+  border: 1.5px solid var(--color-dark);
+  transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.icon-btn:hover {
+  background: var(--color-dark);
+  color: var(--color-light);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(44, 36, 22, 0.2);
+}
+
+.icon-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(44, 36, 22, 0.2);
 }
 
 .icon-btn svg {
-  width: 24px;  /* Much bigger icons */
-  height: 24px;
-  stroke-width: 2.5;
+  width: 28px;  /* Much larger icons */
+  height: 28px;
+  stroke-width: 1.8;
+  transition: stroke-width 0.2s ease;
 }
 
-/* GIF text badge */
-.gif-label {
-  font-family: var(--font-body);
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  border: 1.5px solid currentColor;
-  padding: 1px 3px;
-  line-height: 1;
-  border-radius: 2px;
+.icon-btn i {
+  font-size: 20px;  /* FontAwesome icon size */
+  transition: transform 0.2s ease;
 }
+
+.icon-btn:hover i {
+  transform: scale(1.1);  /* Slight scale on hover */
+}
+
+.icon-btn:hover svg {
+  stroke-width: 1.8;  /* Slightly thinner on hover */
+}
+
+/* Clickable icon styling */
+.clickable-icon {
+  font-size: 20px;
+  cursor: pointer;
+  padding: 8px;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--color-dark);
+}
+
+.clickable-icon:hover {
+  transform: scale(1.1);
+}
+
+/* Send icon - 0.85 times original size */
+.send-icon {
+  font-size: 34px;  /* 0.85 × 40px = 34px */
+  cursor: pointer;
+  color: var(--color-dark);
+  transition: all var(--transition);
+  padding: 8px;
+  margin-left: 8px;  /* Extra left margin */
+}
+
+.send-icon:hover {
+  transform: scale(1.05);
+}
+
 
 /* Send button — slightly larger and visually separated */
 .send-btn {

@@ -206,4 +206,97 @@
     }
   }
 
+  /**
+   * =========================================================================
+   * MOBILE ENHANCEMENTS
+   * Mobile-specific functionality for better mobile experience
+   * =========================================================================
+   */
+
+  // Check if we're on mobile (max-width: 768px)
+  function isMobile() {
+    return window.innerWidth <= 768;
+  }
+
+  /**
+   * convertInputToTextarea()
+   * ------------------------
+   * Converts the chat input from <input> to <textarea> on mobile devices
+   * for better typing experience and multi-line support.
+   */
+  function convertInputToTextarea() {
+    if (!isMobile()) return;
+
+    var $input = $("#chat-input");
+    
+    if (!$input.length || $input.prop("tagName") === "TEXTAREA") {
+      return; // Already converted or not found
+    }
+
+    // Get current input attributes
+    var currentClass = $input.attr("class");
+    var currentId = $input.attr("id");
+    var currentPlaceholder = $input.attr("placeholder");
+    var currentAriaLabel = $input.attr("aria-label");
+    var currentValue = $input.val();
+
+    // Create textarea with same attributes
+    var $textarea = $("<textarea>")
+      .attr("class", currentClass)
+      .attr("id", currentId)
+      .attr("placeholder", currentPlaceholder)
+      .attr("aria-label", currentAriaLabel)
+      .val(currentValue)
+      .css({
+        resize: "none",
+        overflowY: "auto",
+        minHeight: "50px",
+        maxHeight: "120px",
+        lineHeight: "1.4"
+      });
+
+    // Replace input with textarea
+    $input.replaceWith($textarea);
+
+    // Auto-resize textarea based on content
+    $textarea.on("input", function() {
+      this.style.height = "auto";
+      this.style.height = Math.min(this.scrollHeight, 120) + "px";
+    });
+
+    console.log("[home.js] Converted input to textarea for mobile");
+  }
+
+  /**
+   * handleMobileSubmit()
+   * --------------------
+   * Handles form submission on mobile to ensure textarea works properly
+   */
+  function handleMobileSubmit() {
+    $(document).on("keydown", "#chat-input", function(e) {
+      // Send message on Enter (without Shift) on mobile
+      if (e.key === "Enter" && !e.shiftKey && isMobile()) {
+        e.preventDefault();
+        
+        // Trigger send button click or existing send logic
+        $("#send-btn").click();
+      }
+    });
+  }
+
+  // Initialize mobile enhancements when DOM is ready
+  $(document).ready(function () {
+    if (isMobile()) {
+      convertInputToTextarea();
+      handleMobileSubmit();
+    }
+
+    // Handle window resize (e.g., device rotation)
+    $(window).on("resize", function() {
+      if (isMobile()) {
+        convertInputToTextarea();
+      }
+    });
+  });
+
 })(); // End IIFE

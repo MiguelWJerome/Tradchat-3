@@ -247,7 +247,7 @@ def upload_file():
 
 
 
-def Recv(message):
+def Recv(message, sid):
     msg = ast.literal_eval(message)
     print(msg)
     if msg[0] == 'Log In':
@@ -259,13 +259,13 @@ def Recv(message):
 
         if queryResult:
             if remove_go_spaces(queryResult[0][0].lower()) == remove_go_spaces(password.lower()):
-                Server.send(str(['Log In Results', username, 'Success', password]))
+                Server.send(str(['Log In Results', username, 'Success', password]), room=sid)
 
             else:
-                Server.send(str(['Log In Results', username, 'Wrong Password']))
+                Server.send(str(['Log In Results', username, 'Wrong Password']), room=sid)
     
         else:
-            Server.send(str(['Log In Results', username, 'Wrong Username']))
+            Server.send(str(['Log In Results', username, 'Wrong Username']), room=sid)
 
     elif msg[0] == 'Secret Log In':
         data = msg[1]
@@ -276,7 +276,7 @@ def Recv(message):
 
         if queryResult:
             if remove_go_spaces(queryResult[0][0].lower()) == remove_go_spaces(password.lower()):
-                Server.send(str(['Log In Results', username, 'Success', password]))
+                Server.send(str(['Log In Results', username, 'Success', password]), room=sid)
 
             else:
                 return
@@ -295,7 +295,7 @@ def Recv(message):
         existing_usernames = [remove_go_spaces(row[0].lower()) for row in queryResult]
 
         if clean_username in existing_usernames:
-            Server.send(str(['Create Account Results', data['username'], 'Username Exists']))
+            Server.send(str(['Create Account Results', data['username'], 'Username Exists']), room=sid)
             return
 
         password = data['password']
@@ -310,11 +310,12 @@ def Recv(message):
 
         shutil.copyfile(f'static/graphics/default{gender.capitalize()}.png', f'static/profile-pictures/{username}.png')
         
-        Server.send(str(['Create Account Results', data['username'], 'Success']))
+        Server.send(str(['Create Account Results', data['username'], 'Success']), room=sid)
 
 @Server.on('message')
 def recv(message):
-    Thread(target=Recv, args=(message,)).start()
+    Thread(target=Recv, args=(message, request.sid)).start()
+
 
 
 if __name__ == "__main__":

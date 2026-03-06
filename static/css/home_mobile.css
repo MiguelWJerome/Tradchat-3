@@ -1,342 +1,663 @@
 /*
   =========================================================================
-  home_mobile.css — MOBILE styles (max-width: 768px)
+  home_mobile.css — MOBILE styles (max-width: 768px) - DESKTOP STYLES
   TradChat — Home Page
   =========================================================================
 
-  MOBILE DESIGN STRATEGY
-  ----------------------
-  On mobile we shift from the two-column desktop layout to a single-column
-  stack. The sidebar becomes a bottom sheet / drawer that slides up when the
-  user taps the "Chats" icon in the bottom navigation bar.
-
-  All desktop elements are preserved and re-mapped:
-  • Topbar         → stays at top (slimmer)
-  • Navbar         → becomes a horizontal scroll row below topbar
-  • Sidebar tray   → moves into a bottom drawer
-  • Sidebar search → inside the drawer
-  • Chat feed      → full-width main area
-  • Input bar      → pinned to bottom above nav bar
-  • Bottom nav bar → new mobile-only icon bar for quick switching
-  =========================================================================
-
-  TABLE OF CONTENTS
-  -----------------
-  1.  Base / Reset overrides for mobile
-  2.  App Shell        — full viewport
-  3.  Top Bar          — slimmed down
-  4.  Nav Bar          — horizontal scroll tabs
-  5.  Main Content     — single column, no sidebar
-  6.  Chat Panel       — full width
-      6a. Header
-      6b. Feed
-      6c. Input Bar
-  7.  Bottom Nav Bar   — mobile-only quick access bar
-  8.  Sidebar Drawer   — slide-up sheet for Messenger / Groups / Search
-      8a. Drawer overlay
-      8b. Drawer panel
-      8c. Tray inside drawer
-      8d. Search inside drawer
-      8e. Conversation list inside drawer
-  9.  Emoji Picker     — repositioned for mobile
-  10. Animations       — drawer slide + overlay fade
+  This file uses desktop styles from home.css but keeps mobile-specific
+  message feed styling for better mobile experience.
   =========================================================================
 */
 
 /* =========================================================================
-   1. BASE / RESET FOR MOBILE
-   Ensure the body takes full mobile viewport without overflow.
-   ========================================================================= */
-html, body {
-  overflow-x: hidden;
-  -webkit-tap-highlight-color: transparent;  /* remove blue flash on tap */
-}
-
-/* =========================================================================
-   2. APP SHELL
-   Full viewport column; no outer window frame styling (no box-shadow/border)
-   because on mobile we ARE the window.
-   ========================================================================= */
-.app-shell {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 100%;
-  min-height: 100svh;           /* svh = small viewport height (respects browser chrome) */
-  margin: 10px;
-  padding: 10px;
-  border: none;
-  box-shadow: none;
-  background: transparent;
-  border-radius: 12px;
-}
-
-/* =========================================================================
-   3. TOP BAR — slim on mobile
+   1. TOP BAR
+   Single horizontal strip: [✕  TRADCHAT]  ——————————  [👤]
+   Uses a gradient for a subtle metallic / satin sheen.
    ========================================================================= */
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
-  background: linear-gradient(180deg, #ddd9d3 0%, #c9c4bd 100%);
+  padding: 10px 18px;
+
+  /* Subtle cross-hatch / linen texture via gradient */
+  background: linear-gradient(
+    180deg,
+    #ddd9d3 0%,
+    #c9c4bd 100%
+  );
   border-bottom: 2px solid var(--color-dark);
-  position: sticky;
-  top: 0;
-  z-index: 200;                 /* stays above content while scrolling */
 }
 
-.topbar__close { width: 28px; height: 28px; font-size: 0.8rem; }
-
-.topbar__logo  { font-size: 1.5rem; letter-spacing: 0.05em; }
-
-.topbar__profile { width: 32px; height: 32px; }
-
-/* =========================================================================
-   4. NAV BAR — horizontal scrolling tabs (same tabs, compact spacing)
-   ========================================================================= */
-.navbar {
+.topbar__left {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 12px;
-  background: var(--color-dark);
-  border-bottom: 2px solid var(--color-dark);
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;     /* momentum scrolling on iOS */
-  position: sticky;
-  top: 48px;                             /* stick just below topbar */
-  z-index: 190;
+  gap: 12px;
 }
-.navbar::-webkit-scrollbar { display: none; }
 
-.nav-tab {
-  font-size: 0.7rem;
-  padding: 5px 14px;
-  min-width: unset;
-  white-space: nowrap;
+/* The ✕ close button in the top-left - now replaced with logo */
+.topbar__logo-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;         /* circle button matching wireframe */
+  object-fit: cover;
+  border: none;
+}
+
+/* TRADCHAT wordmark — Bebas Neue gives the bold trading-floor energy */
+.topbar__logo {
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  letter-spacing: 0.06em;
+  text-decoration: none;      /* removed underline */
+  user-select: none;
+}
+
+/* Profile / avatar button (top-right) */
+.topbar__profile {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Account wrapper box */
+.topbar__right {
+  display: flex;
+  align-items: center;
+  background: var(--color-light);
+  border-radius: 12px;
+  padding: 8px 16px;
+  gap: 12px;  /* Space for another icon */
+  border: 2px solid var(--color-dark);
+}
+
+/* Make the account icon fill its container and be circular */
+.topbar__profile {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+}
+
+.topbar__profile svg {
+  width: 34px;  /* Much bigger, almost fills container */
+  height: 34px;
+  stroke-width: 2.5;
 }
 
 /* =========================================================================
-   5. MAIN CONTENT — single column (sidebar hidden; accessible via drawer)
+   2. MAIN CONTENT
+   A two-column flex row: sidebar (fixed width) | chat panel (flex grow)
    ========================================================================= */
 .main-content {
   display: flex;
-  flex: 1;
-  overflow: hidden;
+  flex: 1;                      /* fill remaining vertical space */
+  overflow: hidden;             /* clips children; each child scrolls independently */
+  gap: 20px;                   /* spacing between sidebar and chat panel */
+  padding: 20px;
+  height: calc(100vh - 140px); /* Account for topbar + navbar height */
+  transition: all 0.3s ease;
 }
 
-/* Desktop sidebar is HIDDEN on mobile — it becomes a drawer (see §8) */
-.sidebar { display: none; }
+/* =========================================================================
+   3. SIDEBAR
+   Left column with tray icons, search bar, and conversation list.
+   ========================================================================= */
+/* Desktop sidebar is HIDDEN on mobile */
+.sidebar { 
+  display: none; 
+}
+
+/* ---- 3a. Sidebar Action Buttons ---- */
+.sidebar__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1.5px solid var(--color-border);
+}
+
+.sidebar-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: white;
+  border: 1.5px solid var(--color-border);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-dark);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sidebar-action-btn:hover {
+  background-color: var(--color-light);
+  border-color: var(--color-medium);
+}
+
+.back-btn {
+  color: #2c2416;
+}
+
+.create-btn {
+  background-color: #2c2416;
+  color: white;
+  border-color: #2c2416;
+}
+
+.create-btn:hover {
+  background-color: #3a301f;
+  border-color: #3a301f;
+}
+
+/* ---- 3a. Tray ---- */
+/* Icon tray at the top of the sidebar (Messenger | Open Groups | Invite Groups) */
+.sidebar__tray {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1.5px solid var(--color-border);
+}
+
+/* Each icon+label button */
+.tray-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 6px;
+  border: none;                 /* tray items share outer border, not individual borders */
+  border-radius: 0;
+  font-size: 0.62rem;
+  line-height: 1.3;
+  text-align: center;
+  background: transparent;
+}
+.tray-item:hover {
+  background: var(--color-medium);
+  color: var(--color-dark);
+}
+
+/* Labels under each tray icon */
+.tray-item__label {
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: none;         /* override .btn-sharp uppercase for readability */
+  line-height: 1.25;
+}
+
+/* Thin vertical dividers between tray items */
+.tray-divider {
+  width: 1.5px;
+  background: var(--color-border);
+  align-self: stretch;
+}
+
+/* ---- 3b. Search ---- */
+.sidebar__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 10px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--color-medium);
+  border-radius: 12px;
+  background-color: #fafafa;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-dark);
+  outline: none;
+  transition: border-color var(--transition);
+}
+.search-input:focus {
+  border-color: var(--color-accent);
+}
+.search-input::placeholder { color: var(--color-medium); }
+
+/* Magnifying glass button inside the search pill */
+.search-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-dark);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+.search-btn:hover { color: var(--color-accent); }
+
+/* ---- 3c. Conversation list ---- */
+.sidebar__list {
+  list-style: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+/* A single conversation row (injected by JS) */
+.sidebar__list .convo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  transition: background var(--transition);
+}
+.sidebar__list .convo-item:hover { background: var(--color-medium); }
+.sidebar__list .convo-item.active { background: var(--color-dark); color: var(--color-light); }
+
+/* Avatar circle inside each list item */
+.convo-item__avatar {
+  width: 42px;  /* 32px * 1.3 ≈ 42px */
+  height: 42px; /* 32px * 1.3 ≈ 42px */
+  border-radius: 50%;
+  background: var(--color-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 1.5px solid var(--color-dark);
+}
+
+.convo-item__info { display: flex; flex-direction: column; overflow: hidden; }
+.convo-item__name { font-size: 0.78rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.convo-item__preview { font-size: 0.68rem; color: var(--color-border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* =========================================================================
-   6. CHAT PANEL — full width on mobile
+   4. CHAT PANEL
+   Main right column: room header, scrollable feed, input bar.
    ========================================================================= */
 .chat-panel {
   display: flex;
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  background: var(--color-light);
-  position: relative;
+  background: rgba(232, 228, 220, 0.85);
+  position: relative;          /* anchor for emoji picker */
   border-radius: 12px;
-  padding: 8px;
+  padding: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
-/* ---- 6a. Room Header ---- */
+/* ---- 4a. Room Header ---- */
+/* The arrow-badge banner at the top of the chat area */
 .chat-panel__header {
   display: flex;
   align-items: center;
-  padding: 10px 14px;
+  justify-content: space-between;
+  padding: 12px 20px;
   border-bottom: 1.5px solid var(--color-border);
-  background: var(--color-panel);
-  gap: 8px;
+  width: 100%;
+  border-radius: 20px;
+
+  /* Clip-path chevron / arrow on the right (mirrors wireframe arrow label) */
+  background: var(--color-medium);
 }
 
-.room-title { font-size: 1.15rem; letter-spacing: 0.08em; }
-.room-title__arrow { font-size: 0.7rem; margin-left: auto; }
+.room-title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  letter-spacing: 0.1em;
+  color: var(--color-dark);
+}
 
-/* ---- 6b. Message Feed ---- */
+/* The ▶ arrow appended to the room title bar */
+.room-title__arrow {
+  font-size: 0.75rem;
+  color: var(--color-border);
+  margin-left: auto;
+}
+
+/* ---- 4b. Message Feed ---- */
 .chat-panel__feed {
   flex: 1;
   overflow-y: auto;
-  padding: 14px 12px;
-  padding-bottom: 6px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  -webkit-overflow-scrolling: touch;
+  gap: 12px;
 }
+
+/* Individual message bubble (injected by home.js) */
+.message {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  animation: msgFadeIn 0.2s ease both;
+}
+
+/* Own messages pushed to right */
+.message.own { 
+  flex-direction: row-reverse; 
+}
+
+/* Content wrapper for name + bubble */
+.message__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 60%;
+}
+
+.message.own .message__content {
+  align-items: flex-end;
+}
+
+/* Avatar beside each message */
+.message__avatar {
+  width: 39px;  /* 30px * 1.3 = 39px */
+  height: 39px; /* 30px * 1.3 = 39px */
+  border-radius: 50%;
+  background: var(--color-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 1.5px solid var(--color-dark);
+}
+
+/* Bubble wrapping text only (name is outside) */
+.message__bubble {
+  background: var(--color-dark);
+  border: 1.5px solid var(--color-dark);
+  border-radius: 16px;           /* more rounded like wireframe */
+  padding: 8px 12px;
+  color: var(--color-light);
+  display: inline-block;
+}
+.message.own .message__bubble {
+  background: var(--color-dark);
+  color: var(--color-light);
+  border-color: var(--color-dark);
+}
+
+.message__name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.05);
+}
+
+.message.own .message__name {
+  text-align: right;
+}
+.message__text { font-size: 1.1rem; line-height: 1.45; font-weight: 600; }
+
+/* Fade-in for new messages */
+@keyframes msgFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* ---- 4c. Input Bar ---- */
+.chat-panel__inputbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 2px solid var(--color-dark);
+  background: var(--color-panel);
+}
+
+/* Input wrapper for positioning icons inside */
+.input-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+/* Main text input field */
+.inputbar__text {
+  width: 100%;
+  padding: 14px 140px 14px 18px;  /* Right padding makes space for internal buttons */
+  border: 2px solid var(--color-dark);
+  border-radius: 16px;           /* more rounded input field */
+  background: transparent;  /* Removed color-light background */
+  font-family: var(--font-body);
+  font-size: 1rem;  /* Bigger text: 0.85rem → 1rem */
+  color: var(--color-dark);
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  height: 50px;  /* Explicit height for taller input */
+}
+.inputbar__text:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(192,57,43,0.15);
+}
+.inputbar__text::placeholder { color: #000; }  /* Black placeholder text */
+
+/* Icon group (emoji, gif, upload) */
+.inputbar__icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;  /* Slightly more spacing */
+  position: absolute;  /* Position inside the input field */
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Square icon buttons in the input bar */
+.icon-btn {
+  width: 38px;  /* Slightly larger */
+  height: 38px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(44, 36, 22, 0.08);  /* Subtle background */
+  border: 1.5px solid var(--color-dark);
+  transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.icon-btn:hover {
+  background: var(--color-dark);
+  color: var(--color-light);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(44, 36, 22, 0.2);
+}
+
+.icon-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(44, 36, 22, 0.2);
+}
+
+.icon-btn svg {
+  width: 28px;  /* Much larger icons */
+  height: 28px;
+  stroke-width: 1.8;
+  transition: stroke-width 0.2s ease;
+}
+
+.icon-btn i {
+  font-size: 20px;  /* FontAwesome icon size */
+  transition: transform 0.2s ease;
+}
+
+.icon-btn:hover i {
+  transform: scale(1.1);  /* Slight scale on hover */
+}
+
+.icon-btn:hover svg {
+  stroke-width: 1.8;  /* Slightly thinner on hover */
+}
+
+/* Clickable icon styling */
+.clickable-icon {
+  font-size: 20px;
+  cursor: pointer;
+  padding: 8px;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--color-dark);
+}
+
+.clickable-icon:hover {
+  transform: scale(1.1);
+}
+
+/* Send icon - 0.85 times original size */
+.send-icon {
+  font-size: 34px;  /* 0.85 × 40px = 34px */
+  cursor: pointer;
+  color: var(--color-dark);
+  transition: all var(--transition);
+  padding: 8px;
+  margin-left: 8px;  /* Extra left margin */
+}
+
+.send-icon:hover {
+  transform: scale(1.05);
+}
+
+
+/* Send button — slightly larger and visually separated */
+.send-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-dark);
+  color: var(--color-light);
+  border-color: var(--color-dark);
+  margin-left: 4px;
+  transition: background var(--transition), transform 0.1s ease;
+}
+
+.send-btn svg {
+  width: 26px;  /* Much bigger paper airplane */
+  height: 26px;
+  stroke-width: 2.5;
+}
+.send-btn:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  transform: scale(1.05);
+}
+.send-btn:active { transform: scale(0.97); }
+
+/* =========================================================================
+   5. EMOJI PICKER
+   A popover grid of emoji buttons anchored above the input bar.
+   Hidden by default; toggled by looks/home.js.
+   ========================================================================= */
+.emoji-picker {
+  position: absolute;
+  bottom: 68px;               /* float above the input bar */
+  left: 0;
+  width: 260px;
+  padding: 10px;
+  background: var(--color-panel);
+  border: 2px solid var(--color-dark);
+  border-radius: 16px;           /* more rounded emoji picker */
+  display: none;              /* hidden; looks/home.js sets display:grid */
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  box-shadow: 4px 4px 0 var(--color-dark);
+  z-index: 100;
+}
+.emoji-picker.open { display: grid; }
+
+/* Individual emoji cell */
+.emoji-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background var(--transition);
+  text-align: center;
+}
+.emoji-btn:hover { background: var(--color-medium); }
+
+/* =========================================================================
+   6. UTILITY
+   Custom scrollbar, text selection colour, etc.
+   ========================================================================= */
+
+/* Slim scrollbar for the chat feed and sidebar list */
+.chat-panel__feed::-webkit-scrollbar,
+.sidebar__list::-webkit-scrollbar { width: 5px; }
+.chat-panel__feed::-webkit-scrollbar-track,
+.sidebar__list::-webkit-scrollbar-track { background: transparent; }
+.chat-panel__feed::-webkit-scrollbar-thumb,
+.sidebar__list::-webkit-scrollbar-thumb {
+  background: var(--color-medium);
+  border-radius: 99px;
+}
+
+/* Brand selection highlight */
+::selection {
+  background: var(--color-accent);
+  color: var(--color-light);
+}
+
+/* =========================================================================
+   7. MOBILE-SPECIFIC MESSAGE FEED OVERRIDES
+   Keep mobile-optimized message styling
+   ========================================================================= */
 
 /* Message bubbles slightly narrower text for small screens */
 .message__bubble { max-width: 80%; }
 .message__text   { font-size: 0.82rem; }
 
-/* ---- 6c. Input Bar ---- */
-.chat-panel__inputbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  border-top: 2px solid var(--color-dark);
-  background: var(--color-panel);
-  /* Push it above the bottom nav bar */
-  padding-bottom: calc(8px + env(safe-area-inset-bottom));
-}
+/* =========================================================================
+   8. MOBILE TEXTAREA STYLING
+   Transform input to textarea on mobile for better typing experience
+   ========================================================================= */
 
+/* Mobile textarea styling */
 .inputbar__text {
-  flex: 1;
-  padding: 8px 12px;
-  font-size: 0.82rem;
-}
-
-/* Smaller icon buttons on mobile */
-.icon-btn   { width: 30px; height: 30px; }
-.send-btn   { width: 36px; height: 36px; }
-
-/* =========================================================================
-   7. BOTTOM NAV BAR — mobile-only quick-access bar
-   Replaces the desktop sidebar tray.
-   Buttons: [☰ Chats] [👥 Groups] [➕ Invite]
-   ========================================================================= */
-.bottom-nav {
-  display: flex;             /* shown only on mobile */
-  align-items: stretch;
-  background: var(--color-panel);
-  border-top: 2px solid var(--color-dark);
-  /* Respect iPhone home-bar notch */
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.bottom-nav__item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 8px 0;
-  cursor: pointer;
-  border: none;
-  background: transparent;
-  font-family: var(--font-body);
-  font-size: 0.6rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-dark);
-  transition: background var(--transition);
-  border-right: 1px solid var(--color-border);
-}
-.bottom-nav__item:last-child { border-right: none; }
-.bottom-nav__item:hover,
-.bottom-nav__item.active {
-  background: var(--color-dark);
-  color: var(--color-light);
-}
-
-/* =========================================================================
-   8. SIDEBAR DRAWER
-   The sidebar content lives inside a bottom sheet that slides up when the
-   user taps "Chats" in the bottom nav.
-   ========================================================================= */
-
-/* ---- 8a. Dimmed overlay behind the drawer ---- */
-.drawer-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(28, 26, 23, 0.45);
-  z-index: 300;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease;
-}
-.drawer-overlay.open {
-  opacity: 1;
-  pointer-events: all;
-}
-
-/* ---- 8b. Drawer panel (the white sheet) ---- */
-.sidebar-drawer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 400;
-  background: var(--color-panel);
-  border-top: 2px solid var(--color-dark);
-  border-radius: 14px 14px 0 0;    /* rounded top corners like a bottom sheet */
-  max-height: 80svh;
-  display: flex;
-  flex-direction: column;
-  transform: translateY(100%);     /* starts hidden below viewport */
-  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
-  overflow: hidden;
-}
-.sidebar-drawer.open {
-  transform: translateY(0);        /* slides into view */
-}
-
-/* Drag handle pill at top of drawer */
-.drawer-handle {
-  width: 40px;
-  height: 4px;
-  background: var(--color-medium);
-  border-radius: 99px;
-  margin: 10px auto 6px;
-  flex-shrink: 0;
-}
-
-/* Drawer section title */
-.drawer-title {
-  font-family: var(--font-display);
-  font-size: 1rem;
-  letter-spacing: 0.08em;
-  padding: 4px 14px 10px;
-  border-bottom: 1.5px solid var(--color-border);
-  flex-shrink: 0;
-}
-
-/* ---- 8c. Tray inside the drawer ---- */
-/* Reuse .sidebar__tray styles; just override display for three equal columns */
-.sidebar-drawer .sidebar__tray {
-  display: flex;
-  flex-direction: row;
-  border-bottom: 1.5px solid var(--color-border);
-  flex-shrink: 0;
-}
-.sidebar-drawer .tray-item { padding: 14px 6px; }
-.sidebar-drawer .tray-item svg { width: 32px; height: 32px; }
-.sidebar-drawer .tray-item__label { font-size: 0.65rem; }
-
-/* ---- 8d. Search inside drawer ---- */
-.sidebar-drawer .sidebar__search { margin: 10px 12px; }
-
-/* ---- 8e. Conversation list inside drawer ---- */
-.sidebar-drawer .sidebar__list {
-  flex: 1;
+  resize: none;
+  min-height: 50px;
+  max-height: 120px;
+  line-height: 1.4;
+  padding-top: 12px;
+  padding-bottom: 12px;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
-
-/* =========================================================================
-   9. EMOJI PICKER — repositioned on mobile
-   ========================================================================= */
-.emoji-picker {
-  bottom: auto;
-  top: 50%;                     /* vertically centered on mobile */
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 90vw;
-  max-width: 320px;
-  z-index: 500;
-}
-
-/* =========================================================================
-   10. ANIMATIONS
-   ========================================================================= */
-
-/* Drawer open — used on .sidebar-drawer (translateY handled above via classes) */
-
-/* Feed message fade-in unchanged — inherited from base styles */
