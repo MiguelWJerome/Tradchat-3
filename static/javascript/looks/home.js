@@ -268,6 +268,43 @@
   }
 
   /**
+   * convertTextareaToInput()
+   * -----------------------
+   * Converts the chat input from <textarea> back to <input> on desktop
+   * for consistent desktop experience.
+   */
+  function convertTextareaToInput() {
+    if (isMobile()) return;
+
+    var $textarea = $("#chat-input");
+    
+    if (!$textarea.length || $textarea.prop("tagName") === "INPUT") {
+      return; // Already converted or not found
+    }
+
+    // Get current textarea attributes
+    var currentClass = $textarea.attr("class");
+    var currentId = $textarea.attr("id");
+    var currentPlaceholder = $textarea.attr("placeholder");
+    var currentAriaLabel = $textarea.attr("aria-label");
+    var currentValue = $textarea.val();
+
+    // Create input with same attributes
+    var $input = $("<input>")
+      .attr("type", "text")
+      .attr("class", currentClass)
+      .attr("id", currentId)
+      .attr("placeholder", currentPlaceholder)
+      .attr("aria-label", currentAriaLabel)
+      .val(currentValue);
+
+    // Replace textarea with input
+    $textarea.replaceWith($input);
+
+    console.log("[home.js] Converted textarea back to input for desktop");
+  }
+
+  /**
    * handleMobileSubmit()
    * --------------------
    * Handles form submission on mobile to ensure textarea works properly
@@ -291,10 +328,20 @@
       handleMobileSubmit();
     }
 
-    // Handle window resize (e.g., device rotation)
+    // Handle window resize (e.g., device rotation or browser resize)
     $(window).on("resize", function() {
+      var $chatInput = $("#chat-input");
+      
       if (isMobile()) {
-        convertInputToTextarea();
+        // Convert to textarea if currently input and on mobile
+        if ($chatInput.length && $chatInput.prop("tagName") === "INPUT") {
+          convertInputToTextarea();
+        }
+      } else {
+        // Convert back to input if currently textarea and on desktop
+        if ($chatInput.length && $chatInput.prop("tagName") === "TEXTAREA") {
+          convertTextareaToInput();
+        }
       }
     });
   });

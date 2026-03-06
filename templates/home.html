@@ -31,7 +31,7 @@
         <div class="sidebar__tray">
 
           <!-- Messenger shortcut -->
-          <button class="tray-item btn-sharp" aria-label="Open Messenger">
+          <button class="tray-item" aria-label="Open Messenger">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <rect x="2" y="4" width="20" height="14" rx="2"/>
               <polyline points="2,4 12,13 22,4"/>
@@ -44,7 +44,7 @@
           <div class="tray-divider" aria-hidden="true"></div>
 
           <!-- Open Groups shortcut -->
-          <button class="tray-item btn-sharp" aria-label="Open Groups">
+          <button class="tray-item" aria-label="Open Groups">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="9"  cy="8"  r="3"/>
               <circle cx="17" cy="8"  r="3"/>
@@ -59,7 +59,7 @@
           <div class="tray-divider" aria-hidden="true"></div>
 
           <!-- Invite Groups shortcut -->
-          <button class="tray-item btn-sharp" aria-label="Invite Groups">
+          <button class="tray-item" aria-label="Invite Groups">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="9"  cy="8" r="3"/>
               <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
@@ -72,26 +72,28 @@
 
         <!-- Sidebar action buttons -->
         <div class="sidebar__actions">
-          <!-- Back to Mainroom button -->
-          <button class="sidebar-action-btn back-btn" id="back-to-mainroom">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="15 18 9 12 15 6"/>
-              <line x1="9" y1="12" x2="21" y2="12"/>
-            </svg>
-            <span>Back to Mainroom</span>
-          </button>
-          
-          <!-- Create button -->
-          <button class="sidebar-action-btn create-btn" id="create-btn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            <span>Create</span>
-          </button>
+          <div class="sidebar-actions-row">
+            <!-- Back to Mainroom button -->
+            <button class="sidebar-action-btn back-btn" id="back-to-mainroom">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"/>
+                <line x1="9" y1="12" x2="21" y2="12"/>
+              </svg>
+              <span>Mainroom</span>
+            </button>
+            
+            <!-- Create button -->
+            <button class="sidebar-action-btn create-btn" id="create-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span>Create</span>
+            </button>
+          </div>
         </div>
 
-        <!-- Search bar below the tray -->
+        <!-- Search bar -->
         <div class="sidebar__search">
           <input
             type="text"
@@ -100,12 +102,7 @@
             aria-label="Search conversations"
           />
           <!-- Search icon inside field -->
-          <button class="search-btn" aria-label="Run search">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="7"/>
-              <line  x1="16.5" y1="16.5" x2="22" y2="22"/>
-            </svg>
-          </button>
+          <i class="fa-solid fa-magnifying-glass static-icon" id="search-icon" aria-label="Run search"></i>
         </div>
 
         <!-- Conversation list — populated dynamically by JS -->
