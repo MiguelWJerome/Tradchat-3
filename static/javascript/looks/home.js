@@ -137,11 +137,21 @@
       username = "You";  // Normalize display name
     }
 
-    // Create avatar with initials (first 2 letters of username)
-    var initials = username.slice(0, 2).toUpperCase();
-    var $avatar = $("<div>")
+    // Create avatar with profile picture
+    var $avatar = $("<img>")
       .addClass("message__avatar")
-      .text(initials);
+      .css({
+        "width": "calc(39px * 1.4)",          // 1.4x larger avatar
+        "height": "calc(39px * 1.4)",         // 1.4x larger avatar
+        "object-fit": "cover",
+        "border-radius": "50%"
+      })
+      .attr("src", "/static/profile-pictures/" + username + ".png")
+      .attr("alt", username + "'s profile picture")
+      .on("error", function() {
+        // Fallback to default profile picture if user's image doesn't exist
+        $(this).attr("src", "/static/graphics/defaultMale.png");
+      });
 
     // Create content wrapper
     var $content = $("<div>").addClass("message__content");
@@ -149,6 +159,9 @@
     // Create name + timestamp header
     var $name = $("<div>")
       .addClass("message__name")
+      .css({
+        "font-size": "calc(0.75rem * 1.4)"   // 1.4x larger font
+      })
       .text(username + " · " + (timestamp || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })));
 
     // Create message bubble
@@ -157,6 +170,9 @@
     // Create message text (using .text() for XSS protection)
     var $text = $("<div>")
       .addClass("message__text")
+      .css({
+        "font-size": "calc(1.1rem * 1.4)"     // 1.4x larger font
+      })
       .text(message);
 
     // Assemble the message

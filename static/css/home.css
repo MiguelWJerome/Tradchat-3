@@ -9,7 +9,7 @@
   1.  Top Bar          — logo + profile button
   2.  Main Content     — flex row containing sidebar + chat
   3.  Sidebar          — left panel
-      3a. Tray         — Messenger / Open Groups / Invite Groups icons
+      3a. Tray         — Messenger / Public Rooms / Private Rooms icons
       3b. Search       — search input row
       3c. List         — conversation list
   4.  Chat Panel       — right panel
@@ -187,7 +187,7 @@
 }
 
 /* ---- 3a. Tray ---- */
-/* Icon tray at the top of the sidebar (Messenger | Open Groups | Invite Groups) */
+/* Icon tray at the top of the sidebar (Messenger | Public Rooms | Private Rooms) */
 .sidebar__tray {
   display: flex;
   align-items: stretch;
@@ -479,16 +479,16 @@
 /* Main text input field */
 .inputbar__text {
   width: 100%;
-  padding: 14px 140px 14px 18px;  /* Right padding makes space for internal buttons */
+  padding: 7px 70px 7px 9px;  /* Half the original padding */
   border: 2px solid var(--color-dark);
   border-radius: 16px;           /* more rounded input field */
   background: transparent;  /* Removed color-light background */
   font-family: var(--font-body);
-  font-size: 1rem;  /* Bigger text: 0.85rem → 1rem */
+  font-size: calc(1rem * 1.1);  /* 1.1x larger text */
   color: var(--color-dark);
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition);
-  height: 50px;  /* Explicit height for taller input */
+  height: calc(50px * 1.1);  /* 1.1x taller input */
 }
 .inputbar__text:focus {
   border-color: var(--color-accent);
@@ -537,14 +537,14 @@
 }
 
 .icon-btn svg {
-  width: 28px;  /* Much larger icons */
-  height: 28px;
+  width: calc(28px * 1.1);  /* 1.1x larger icons */
+  height: calc(28px * 1.1);
   stroke-width: 1.8;
   transition: stroke-width 0.2s ease;
 }
 
 .icon-btn i {
-  font-size: 20px;  /* FontAwesome icon size */
+  font-size: calc(20px * 1.1);  /* 1.1x larger FontAwesome icons */
   transition: transform 0.2s ease;
 }
 
@@ -558,15 +558,15 @@
 
 /* Clickable icon styling */
 .clickable-icon {
-  font-size: 20px;
+  font-size: calc(20px * 1.1);  /* 1.1x larger icons */
   cursor: pointer;
   padding: 8px;
   transition: all var(--transition);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: calc(36px * 1.1);
+  height: calc(36px * 1.1);
   color: var(--color-dark);
 }
 
@@ -576,19 +576,19 @@
 
 /* Static icon styling - like clickable-icon but without cursor and animations */
 .static-icon {
-  font-size: 20px;
+  font-size: calc(20px * 1.25);  /* 1.25x larger icons */
   padding: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: calc(36px * 1.25);
+  height: calc(36px * 1.25);
   color: var(--color-dark);
 }
 
 /* Send icon - 0.85 times original size */
 .send-icon {
-  font-size: 34px;  /* 0.85 × 40px = 34px */
+  font-size: calc(34px * 1.1);  /* 1.1x larger send icon */
   cursor: pointer;
   color: var(--color-dark);
   transition: all var(--transition);
@@ -617,8 +617,8 @@
 }
 
 .send-btn svg {
-  width: 26px;  /* Much bigger paper airplane */
-  height: 26px;
+  width: calc(26px * 1.1);  /* 1.1x larger paper airplane */
+  height: calc(26px * 1.1);
   stroke-width: 2.5;
 }
 .send-btn:hover {

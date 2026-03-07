@@ -164,7 +164,7 @@
 }
 
 /* ---- 3a. Tray ---- */
-/* Icon tray at the top of the sidebar (Messenger | Open Groups | Invite Groups) */
+/* Icon tray at the top of the sidebar (Messenger | Public Rooms | Private Rooms) */
 .sidebar__tray {
   display: flex;
   align-items: stretch;

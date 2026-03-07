@@ -3,6 +3,7 @@ from flask_socketio import SocketIO
 from werkzeug.utils import secure_filename
 import werkzeug
 import sqlite3
+import datetime
 import os
 import shutil
 import secrets
@@ -40,23 +41,24 @@ def db_sql(sql, db_string, params=[], chat_room=False):
         conn.close()
         return result
 
-room_dict = {}
-
-#make room databases dict
-for file in os.listdir("rooms"):
-    if file.endswith(".db"):
-        file_path = os.path.join("rooms", file)
-        file_lock = Lock() 
-
-        room_dict[file] = {
-            'file_path': file_path,
-            'queue': file_lock
-        }
 
 
-def remove_go_spaces(text):
-    """Remove all spaces from text"""
-    return text.replace(" ", "")
+def remove_go_spaces(string):
+    while True:
+        if list(string)[0] == ' ':
+            string = list(string)
+            string.pop(0)
+            string = ''.join(string)
+        else:
+            break
+    while True:
+        if list(string)[-1] == ' ':
+            string = list(string)
+            string.pop()
+            string = ''.join(string)
+        else:
+            break
+    return string
 
 
 # Create application and Server
@@ -66,16 +68,26 @@ app.secret_key = secrets.token_hex(64)
 Server = SocketIO(app)
 
 
-
-accounts_db_exists = os.path.exists("accounts.db")
-rooms_db_exists = os.path.exists("rooms.db")
-
 accounts_lock = Lock()
 rooms_lock = Lock()
 
+if not os.path.exists("rooms/mainroom.db"):
+    room_db = sqlite3.connect("rooms/mainroom.db")
+    room_cursor = room_db.cursor()
+    room_cursor.execute('''
+        CREATE TABLE messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            message TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            reply_id INTEGER NOT NULL,
+            upload TEXT NOT NULL
+        );
+    ''')
+    room_db.close()
 
 # Create tables if databases didn't exist
-if not accounts_db_exists:
+if not os.path.exists("accounts.db"):
     accounts_db = sqlite3.connect("accounts.db")
     accounts_cursor = accounts_db.cursor()
     accounts_cursor.execute('''
@@ -93,7 +105,7 @@ if not accounts_db_exists:
     ''')
     accounts_db.close()
 
-if not rooms_db_exists:
+if not os.path.exists("rooms.db"):
     rooms_db = sqlite3.connect("rooms.db")
     rooms_cursor = rooms_db.cursor()
     rooms_cursor.execute('''
@@ -101,10 +113,68 @@ if not rooms_db_exists:
             roomid INTEGER PRIMARY KEY AUTOINCREMENT,
             roomname TEXT NOT NULL,
             roomtype TEXT NOT NULL,
-            invites TEXT
+            invites TEXT NOT NULL
         );
     ''')
+    rooms_cursor.execute(''' INSERT INTO rooms (roomname, roomtype, invites) VALUES (?, ?, ?);''', ('Mainroom', 'public', ''))
     rooms_db.close()
+
+def convert_to_gmt(timestamp):
+    # Parse timestamp and convert to GMT military time
+    # Input format: "Sat Mar 07 2026 15:15:11 GMT-0500 (Eastern Standard Time)"
+    try:
+        # Extract the timezone offset (e.g., "GMT-0500")
+        tz_match = timestamp.split('GMT-')[1].split(' (')[0]
+        tz_offset = int(tz_match)
+        
+        # Extract the datetime part (e.g., "Sat Mar 07 2026 15:15:11")
+        datetime_part = remove_go_spaces(timestamp.split('GMT')[0])
+        
+        # Parse the datetime and add timezone offset to get GMT
+        dt = datetime.datetime.strptime(datetime_part, "%a %b %d %Y %H:%M:%S")
+        gmt_dt = dt + datetime.timedelta(hours=-tz_offset//100)
+        
+        # Format as date and GMT military time
+        gmt_timestamp = gmt_dt.strftime("%Y-%m-%d %H:%M:%S")
+    except:
+        # Fallback to original timestamp if parsing fails
+        gmt_timestamp = timestamp
+    return gmt_timestamp
+
+
+room_dict = {}
+
+#make room databases dict
+for file in os.listdir("rooms"):
+    if file.endswith(".db"):
+        file_path = os.path.join("rooms", file)
+        file_lock = Lock() 
+
+        room_dict[file] = {
+            'file_path': file_path,
+            'lock': file_lock
+        }
+
+
+@app.route('/<smth>/')
+def smth(smth):
+    return redirect('/')
+
+@app.route('/<smth>/<smth2>/')
+def smth_smth(smth, smth2):
+    return redirect('/')
+
+@app.route('/<smth>/<smth2>/<smth3>/')
+def smth_smth_smth(smth, smth2, smth3):
+    return redirect('/')
+
+@app.route('/<smth>/<smth2>/<smth3>/<smth4>/')
+def smth_smth_smth_smth(smth, smth2, smth3, smth4):
+    return redirect('/')
+
+@app.route('/<smth>/<smth2>/<smth3>/<smth4>/<smth5>/')
+def smth_smth_smth_smth_smth(smth, smth2, smth3, smth4, smth5):
+    return redirect('/')
 
 
 @app.route('/')
@@ -250,7 +320,47 @@ def upload_file():
 def Recv(message, sid):
     msg = ast.literal_eval(message)
     print(msg)
-    if msg[0] == 'Log In':
+
+    if msg[0] == 'Message':
+        data = msg[1]
+        try:
+            setting = data['setting']
+            room = data['room']
+            username = data['username']
+            password = data['password']
+            timestamp = data['timestamp']
+            user_message = data['message']
+        
+        except KeyError:
+            return # Dont bother to return a response to someone who is trying to alter the code
+
+        queryResult = db_sql("""SELECT password FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)
+        if queryResult:
+            if remove_go_spaces(queryResult[0][0].lower()) == remove_go_spaces(password.lower()):
+                if setting == 'public room':
+                    # Send message to public room
+                    
+                    user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
+                    gmt_timestamp = convert_to_gmt(timestamp)
+
+                    db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, -1, ''], chat_room=True)
+                    Server.send(str(['Message', {'username': username, 'message': user_message, 'timestamp': gmt_timestamp}]), room=room)
+
+                elif setting == 'private room':
+                    # Send message to private room
+                    pass
+                elif setting == 'direct message':
+                    # Send message to direct message
+                    pass
+                else:
+                    return # Invalid setting
+            else:
+                return # Invalid password
+        else:
+            return # User not found
+
+    
+    elif msg[0] == 'Log In':
         data = msg[1]
         username = data['username']
         password = data['password']
@@ -266,7 +376,7 @@ def Recv(message, sid):
     
         else:
             Server.send(str(['Log In Results', username, 'Wrong Username']), room=sid)
-
+            
     elif msg[0] == 'Secret Log In':
         data = msg[1]
         username = data['username']
