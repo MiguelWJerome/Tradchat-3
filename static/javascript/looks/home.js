@@ -104,89 +104,92 @@
    * @param {string} message - The message content
    * @param {boolean} myself - Set to true if this is your own message (appears on right)
    */
-  window.appendMessage = function (username, timestamp, message, myself) {
-    if (!$chatFeed.length) {
-      console.error("[home.js] Chat feed not found. Make sure DOM is ready.");
-      return;
+  window.appendMessage = function (username, timestamp, message, id, myself) {
+    if (!$chatFeed.length) return;
+
+    // --- 1. Fix "Invalid Date" & Parse ---
+    // We force the string into ISO format: yyyy-mm-ddThh:mm:ssZ
+    var msgDate = timestamp ? new Date(timestamp.replace(" ", "T") + "Z") : new Date();
+    
+    // Check if parsing failed, fallback to current time
+    if (isNaN(msgDate.getTime())) {
+        msgDate = new Date();
     }
 
-    /*
-      Message HTML structure:
-      <div class="message [own]">
-        <div class="message__avatar">UN</div>
-        <div class="message__content">
-          <div class="message__name">Username · 09:04</div>
-          <div class="message__bubble">
-            <div class="message__text">Message content</div>
-          </div>
-        </div>
-      </div>
-    */
+    var timeStr = msgDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+    var dayShort = msgDate.toLocaleDateString([], { weekday: 'short' });
+    var fullDateStr = msgDate.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-    // Generate unique ID for this message
-    var messageId = "msg-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
+    // Header Display: "Mon 10:30 PM" (No year here per your request)
+    var headerStamp = dayShort + " " + timeStr;
 
-    // Create message container
-    var $msg = $("<div>")
-      .addClass("message")
-      .attr("data-id", messageId);
+    // --- 2. Big Centered Date Stamp ---
+    var $lastMsg = $chatFeed.find(".message").last();
+    var lastDateAttr = $lastMsg.attr("data-date"); 
 
-    // Determine if this is the user's own message
-    if (myself === true) {
-      $msg.addClass("own");
-      username = "You";  // Normalize display name
+    if (lastDateAttr !== fullDateStr) {
+        $chatFeed.append($("<div>")
+            .addClass("chat-date-separator")
+            .css({ "text-align": "center", "margin": "30px 0 15px", "font-size": "0.85rem", "color": "#888", "font-weight": "bold" })
+            .text(fullDateStr));
     }
 
-    // Create avatar with profile picture
-    var $avatar = $("<img>")
-      .addClass("message__avatar")
-      .css({
-        "width": "calc(39px * 1.4)",          // 1.4x larger avatar
-        "height": "calc(39px * 1.4)",         // 1.4x larger avatar
-        "object-fit": "cover",
-        "border-radius": "50%"
-      })
-      .attr("src", "/static/profile-pictures/" + username + ".png")
-      .attr("alt", username + "'s profile picture")
-      .on("error", function() {
-        // Fallback to default profile picture if user's image doesn't exist
-        $(this).attr("src", "/static/graphics/defaultMale.png");
-      });
+    // --- 3. Construction ---
+    var displayUser = myself ? "You" : username;
+    var lastUser = $lastMsg.attr("data-user");
+    var isSameUser = (lastUser === displayUser) && (lastDateAttr === fullDateStr);
 
-    // Create content wrapper
-    var $content = $("<div>").addClass("message__content");
+    if (isSameUser) {
+        // Grouped bubble
+        var $newBubble = $("<div>").addClass("message__bubble");
+        var $newText = $("<div>").addClass("message__text").text(message);
+        // Small side stamp
+        var $sideTime = $("<span>").css({ "font-size": "0.7rem", "color": "#999", "margin-left": "8px" }).text(timeStr);
+        
+        $newBubble.append($newText, $sideTime);
+        $lastMsg.find(".message__content").append($newBubble);
+    } else {
+        // New Message Group
+        var $msg = $("<div>").addClass("message").attr("data-user", displayUser).attr("data-date", fullDateStr);
+        $msg.attr("id", id);
+        if (myself) $msg.addClass("own");
 
-    // Create name + timestamp header
-    var $name = $("<div>")
-      .addClass("message__name")
-      .css({
-        "font-size": "calc(0.75rem * 1.4)"   // 1.4x larger font
-      })
-      .text(username + " · " + (timestamp || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })));
+        var $avatar = $("<img>").addClass("message__avatar").attr("src", "/static/profile-pictures/" + username + ".png")
+            .css({ "border": "2px solid black" })  // Always black outline
+            .on("error", function() { $(this).attr("src", "/static/graphics/defaultMale.png"); });
 
-    // Create message bubble
-    var $bubble = $("<div>").addClass("message__bubble");
+        var $content = $("<div>").addClass("message__content");
 
-    // Create message text (using .text() for XSS protection)
-    var $text = $("<div>")
-      .addClass("message__text")
-      .css({
-        "font-size": "calc(1.1rem * 1.4)"     // 1.4x larger font
-      })
-      .text(message);
+        // UI FIX: Separate the Name Box from the Timestamp
+        var $nameWrapper = $("<div>").css({ "display": "flex", "align-items": "center", "margin-bottom": "4px" });
+        
+        var $nameBox = $("<span>")
+            .addClass("message__name")
+            .css({ "padding": "2px 8px", "border-radius": "4px", "font-weight": "bold", "font-size": "1.2rem" }) // Bigger and bold
+            .text(displayUser);
 
-    // Assemble the message
-    $bubble.append($text);
-    $content.append($name, $bubble);
-    $msg.append($avatar, $content);
-    $chatFeed.append($msg);
+        var $timestampLabel = $("<span>")
+            .css({ "margin-left": "8px", "font-size": "0.8rem", "color": "#777" })
+            .text(" " + headerStamp); // No dot before date
 
-    // Scroll to bottom to show new message
+        $nameWrapper.append($nameBox, $timestampLabel);
+
+        var $bubble = $("<div>").addClass("message__bubble");
+        var $text = $("<div>").addClass("message__text").css({ "color": "black" }).text(message); // Always black text
+
+        // Style bubble background based on sender
+        if (!myself) {
+            $bubble.css({ "background": "white", "border": "1px solid black" }); // White background for others
+        }
+        
+        $bubble.append($text);
+        $content.append($nameWrapper, $bubble);
+        $msg.append($avatar, $content);
+        $chatFeed.append($msg);
+    }
+
     scrollToBottom();
-
-    console.log("[home.js] Appended message from:", username, "at:", timestamp);
-  };
-
+};
   /**
    * switchToRoom(roomId, roomName)
    * ------------------------------
