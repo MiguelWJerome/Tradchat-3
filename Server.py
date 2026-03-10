@@ -303,7 +303,6 @@ def home():
                     color_medium=colors['color_medium'],
                     color_light=colors['color_light'],
                     room=db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0],
-
                 )
 
             else:
@@ -435,6 +434,34 @@ def Recv(message, sid):
         data = msg[1]
         room = data['room']
         Server.server.leave_room(sid, room)
+
+
+    elif msg[0] == 'Get Rooms':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        
+        queryResult = db_sql("""SELECT username, password FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)
+        if queryResult:
+            if remove_go_spaces(queryResult[0][1].lower()) == remove_go_spaces(password.lower()):
+
+                all_rooms = db_sql("""SELECT room_name, room_type, invites FROM rooms;""", 'rooms', chat_room=False)
+                user_rooms = {'public': [], 'private': []}
+
+                user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
+
+                for room in all_rooms:
+                    if all_rooms[1] == 'public':
+                        user_rooms['public'].append(all_rooms[0])
+                    elif all_rooms[1] == 'private':
+                        if user_id in all_rooms[2].split('-'):
+                            user_rooms['private'].append(all_rooms[0])
+
+                Server.send(str(['Get Rooms', user_rooms]), room=sid)
+            else:
+                return # Invalid password
+        else:
+            return # User not found
     
             
     elif msg[0] == 'Log In':

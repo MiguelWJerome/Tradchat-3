@@ -394,11 +394,10 @@ body {
 
 /* Bubble wrapping text only (name is outside) */
 .message__bubble {
-  background: var(--color-dark);
+  background: var(--color-light);
   border: 1.5px solid var(--color-dark);
   border-radius: 16px;           /* more rounded like wireframe */
   padding: 8px 12px;
-  color: var(--color-light);
   display: inline-block;
 }
 .message.own .message__bubble {
