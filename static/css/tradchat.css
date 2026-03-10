@@ -20,6 +20,10 @@ body {
   background-color: var(--color-light);
   color: var(--color-dark);
   margin: 0;
+  height: 100vh; /* Force body to be exactly the height of the screen */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevent the entire page from having a scrollbar */
 }
 
 /* GLOBAL BUTTON SYSTEM */

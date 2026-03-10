@@ -8,14 +8,15 @@ cl.send(JSON.stringify(['Join Room', {'room': 'mainroom', 'username': username, 
 
 function recv(message) {
     msg = eval(message)
+    console.log(msg)
     if (msg[0] === 'Message') {
         data = msg[1]
-        appendMessage(data['username'], data['time-stamp'], data['message'], data['id'], data['username'] === username)
+        appendMessage(data['id'], data['username'], data['message'], data['time-stamp'], data['username'] === username)
     }
     else if (msg[0] === 'Fetch Messages') {
         data = msg[1]
-        for (let i = 0; i < data.length; i++) {
-            appendMessage(data[i][1], data[i][3], data[i][2], data[i][0], data[i][1] === username)
+        for (var i in data) {
+            appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['time-stamp'], data[i]['username'] === username)
         }
     }
 }

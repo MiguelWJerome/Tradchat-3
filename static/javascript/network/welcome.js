@@ -3,7 +3,7 @@ cl = io()
 cl.connect('http://'+document.domain+':'+location.port)
 
 if (typeof(localStorage['username']) !== 'undefined' && typeof(localStorage['password']) !== 'undefined') {
-    cl.send(JSON.stringify(['Secret Log In', {username: localStorage['username'], password: localStorage['password']}]));
+    cl.send(JSON.stringify(['Log In', {username: localStorage['username'], password: localStorage['password']}]));
 }
 
 function recv(message) {

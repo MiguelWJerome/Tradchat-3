@@ -66,18 +66,18 @@ def fetch_messages(room_name, limit, offset):
     id_to_username = {}
 
     for t in query:
-        message = []
-        message.append(t[0])
+        message = {}
+        message['id'] = t[0]
         if t[1] in id_to_username:
-            message.append(id_to_username[t[1]])
+            message['username'] = id_to_username[t[1]]
         else:
             id_to_username[t[1]] = db_sql("""SELECT username FROM accounts WHERE id = ?;""", 'accounts', params=[t[1]], chat_room=False)[0][0]
-            message.append(id_to_username[t[1]])
+            message['username'] = id_to_username[t[1]]
         
-        message.append(t[2])
-        message.append(t[3])
-        message.append(t[4])
-        message.append(t[5])
+        message['message'] = t[2]
+        message['timestamp'] = t[3]
+        message['reply_id'] = t[4]
+        message['upload'] = t[5]
         messages.append(message)
     
     return messages
@@ -252,12 +252,12 @@ def computer_log_into_server():
         username = request.form['username']
         password = request.form['password']
 
-        account_password = db_sql("SELECT password FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+        queryResults = db_sql("SELECT username, password FROM accounts WHERE LOWER(username) = ?;", 'accounts', params=[remove_go_spaces(username.lower())], chat_room=False)
 
-        if account_password:
-            if remove_go_spaces(account_password[0][0].lower()) == remove_go_spaces(password.lower()):
-                session['username'] = username
-                session['password'] = password
+        if queryResults:
+            if remove_go_spaces(queryResults[0][1].lower()) == remove_go_spaces(password.lower()):
+                session['username'] = queryResults[0][0]
+                session['password'] = queryResults[0][1]
 
                 return redirect('/home/')
 
@@ -288,17 +288,23 @@ def home():
         if account_password:
             if remove_go_spaces(account_password[0][0].lower()) == remove_go_spaces(password.lower()):
 
-                theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
-                if theme:
-                    theme = theme[0][0]
-                else:
-                    theme = 'classic'
+                theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+
 
                 colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
                 colors = ast.literal_eval(colorsFile.read())
                 colorsFile.close()
 
-                return render_template('home.html', theme=theme, color_dark=colors['color_dark'], color_medium=colors['color_medium'], color_light=colors['color_light'], room=db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0])
+
+                return render_template(
+                    'home.html',
+                    theme=theme,
+                    color_dark=colors['color_dark'],
+                    color_medium=colors['color_medium'],
+                    color_light=colors['color_light'],
+                    room=db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0],
+
+                )
 
             else:
                 raise KeyError('Why do people try to hack accounts?')
@@ -430,33 +436,17 @@ def Recv(message, sid):
         room = data['room']
         Server.server.leave_room(sid, room)
     
-    elif msg[0] == 'Secret Log In':
-        data = msg[1]
-        username = data['username']
-        password = data['password']
-
-        queryResult = db_sql("""SELECT password FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)
-
-        if queryResult:
-            if remove_go_spaces(queryResult[0][0].lower()) == remove_go_spaces(password.lower()):
-                Server.send(str(['Log In Results', username, 'Success', password]), room=sid)
-
-            else:
-                return
-    
-        else:
-            return
             
     elif msg[0] == 'Log In':
         data = msg[1]
         username = data['username']
         password = data['password']
 
-        queryResult = db_sql("""SELECT password FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)
+        queryResult = db_sql("""SELECT username, password FROM accounts WHERE LOWER(username) = ?;""", 'accounts', params=[remove_go_spaces(username.lower())], chat_room=False)
 
         if queryResult:
-            if remove_go_spaces(queryResult[0][0].lower()) == remove_go_spaces(password.lower()):
-                Server.send(str(['Log In Results', username, 'Success', password]), room=sid)
+            if remove_go_spaces(queryResult[0][1].lower()) == remove_go_spaces(password.lower()):
+                Server.send(str(['Log In Results', queryResult[0][0], 'Success', queryResult[0][1]]), room=sid)
 
             else:
                 Server.send(str(['Log In Results', username, 'Wrong Password']), room=sid)
@@ -467,7 +457,7 @@ def Recv(message, sid):
     elif msg[0] == 'Create Account':
         data = msg[1]
         
-        username = data['username']
+        username = remove_go_spaces(data['username'])
 
         # Check if username already exists (case-insensitive and no spaces)
         clean_username = remove_go_spaces(username.lower())
@@ -478,10 +468,10 @@ def Recv(message, sid):
             Server.send(str(['Create Account Results', data['username'], 'Username Exists']), room=sid)
             return
 
-        password = data['password']
-        first_name = data['first_name']
-        last_name = data['last_name']
-        email = data['email']
+        password = remove_go_spaces(data['password'])
+        first_name = remove_go_spaces(data['first_name'])
+        last_name = remove_go_spaces(data['last_name'])
+        email = remove_go_spaces(data['email'])
         dob = data['dob']
         gender = data['gender']
 

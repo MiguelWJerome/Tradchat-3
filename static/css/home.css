@@ -31,7 +31,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 18px;
+  padding: 10px 20px; /* Changed to 20px to match your side margins */
+  height: 70px;       /* Giving it a fixed height helps the layout stay stable */
 
   /* Subtle cross-hatch / linen texture via gradient */
   background: linear-gradient(
@@ -107,18 +108,15 @@
   stroke-width: 2.5;
 }
 
-/* =========================================================================
-   2. MAIN CONTENT
-   A two-column flex row: sidebar (fixed width) | chat panel (flex grow)
-   ========================================================================= */
+/* Remove duplicate body styles - now handled in tradchat.css */
+
 .main-content {
   display: flex;
-  flex: 1;                      /* fill remaining vertical space */
-  overflow: hidden;             /* clips children; each child scrolls independently */
-  gap: 20px;                   /* spacing between sidebar and chat panel */
-  padding: 20px;
-  height: calc(100vh - 140px); /* Account for topbar + navbar height */
-  transition: all 0.3s ease;
+  flex: 1;          /* This forces the content area to fill all remaining space */
+  min-height: 0;    /* Essential: allows the chat feed inside to scroll instead of pushing the box down */
+  gap: 20px;
+  padding: 20px;    /* This creates the consistent 20px margin on all sides */
+  overflow: hidden;
 }
 
 /* =========================================================================
@@ -128,7 +126,8 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  width: 240px;                 /* fixed sidebar width */
+  width: 280px;
+  flex-shrink: 0; /* Prevents the sidebar from getting squashed */
   min-width: 180px;
   background: rgba(218, 212, 202, 0.85);
   border-radius: 20px;          /* rounded corners */
@@ -195,6 +194,14 @@
   padding: 16px 0;
 }
 
+/* FontAwesome icon styling for tray items */
+.sidebar__tray i {
+  font-size: 20px;
+  cursor: pointer;
+  transition: var(--transition);
+  color: black;
+}
+
 /* Each icon+label button */
 .tray-item {
   flex: 1;
@@ -258,12 +265,12 @@
 
 .search-input {
   width: 100%;
-  padding: 8px 32px 8px 12px;
+  padding: 7.5px 24px 7.5px 10.5px;
   border: 1.5px solid var(--color-medium);
   border-radius: 6px;
   background-color: white;
   font-family: var(--font-body);
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   color: var(--color-dark);
   outline: none;
   transition: border-color var(--transition);
@@ -271,7 +278,11 @@
 .search-input:focus {
   border-color: var(--color-accent);
 }
-.search-input::placeholder { color: var(--color-medium); }
+.search-input::placeholder { 
+  color: var(--color-medium); 
+  font-size: 0.8rem;
+  font-family: var(--font-body);
+}
 
 /* Search icon inside field */
 .sidebar__search .static-icon {
@@ -333,6 +344,7 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0; /* Ensures the message feed stays contained */
   overflow: hidden;
   background: rgba(232, 228, 220, 0.85);
   position: relative;          /* anchor for emoji picker */
@@ -375,6 +387,7 @@
 .chat-panel__feed {
   flex: 1;
   overflow-y: auto;
+  min-height: 0; /* CRITICAL */
   padding: 18px 20px;
   display: flex;
   flex-direction: column;
@@ -478,8 +491,6 @@
   align-items: center;
   gap: 8px;
   padding: 12px 14px;
-  border-top: 2px solid var(--color-dark);
-  background: var(--color-panel);
 }
 
 /* Input wrapper for positioning icons inside */

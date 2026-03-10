@@ -104,7 +104,7 @@
    * @param {string} message - The message content
    * @param {boolean} myself - Set to true if this is your own message (appears on right)
    */
-  window.appendMessage = function (username, timestamp, message, id, myself) {
+  window.appendMessage = function (id, username, message, timestamp, myself) {
     if (!$chatFeed.length) return;
 
     // --- 1. Fix "Invalid Date" & Parse ---
