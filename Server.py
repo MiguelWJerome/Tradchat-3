@@ -48,7 +48,7 @@ def db_sql(sql, db_string, params=[], chat_room=False):
 
 def check_room_access(room_name, username):
     user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
-    queryResults = db_sql("""SELECT roomtype, invites FROM rooms WHERE roomname = ?;""", 'rooms', params=[room_name], chat_room=False)
+    queryResults = db_sql("""SELECT room_type, members FROM rooms WHERE room_name = ?;""", 'rooms', params=[room_name], chat_room=False)
     
     if queryResults[0][0] == 'private':
         if user_id in queryResults[0][1].split('-'):
@@ -110,6 +110,8 @@ Server = SocketIO(app)
 
 accounts_lock = Lock()
 rooms_lock = Lock()
+boys_dm_lock = Lock()
+girls_db_lock = Lock()
 
 if not os.path.exists("mainroom.db"):
     room_db = sqlite3.connect("mainroom.db")
@@ -126,6 +128,7 @@ if not os.path.exists("mainroom.db"):
     ''')
     room_db.close()
 
+
 # Create tables if databases didn't exist
 if not os.path.exists("accounts.db"):
     accounts_db = sqlite3.connect("accounts.db")
@@ -141,7 +144,8 @@ if not os.path.exists("accounts.db"):
             dob TEXT NOT NULL,
             gender TEXT NOT NULL,
             theme TEXT NOT NULL,
-            room TEXT NOT NULL
+            room TEXT NOT NULL,
+            dms TEXT NOT NULL
         );
     ''')
     accounts_db.close()
@@ -152,14 +156,50 @@ if not os.path.exists("rooms.db"):
     rooms_cursor.execute('''
         CREATE TABLE rooms (
             roomid INTEGER PRIMARY KEY AUTOINCREMENT,
-            roomname TEXT NOT NULL,
-            roomtype TEXT NOT NULL,
-            invites TEXT NOT NULL
+            room_name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            room_type TEXT NOT NULL,
+            owners TEXT NOT NULL,
+            managers TEXT NOT NULL,
+            curators TEXT NOT NULL,
+            members TEXT NOT NULL
         );
     ''')
-    rooms_cursor.execute("""INSERT INTO rooms (roomname, roomtype, invites) VALUES (?, ?, ?);""", ('mainroom', 'public', ''))
+    rooms_cursor.execute("""INSERT INTO rooms (room_name, room_type, description, owners, managers, curators, members) VALUES (?, ?, ?, ?, ?, ?, ?);""", ('mainroom', 'public', 'The main room for all users', '1', '', '', ''))
     rooms_db.commit()
     rooms_db.close()
+
+if not os.path.exists("dms/boys_dm.db"):
+    boys_dm_db = sqlite3.connect("dms/boys_dm.db")
+    boys_dm_cursor = boys_dm_db.cursor()
+    boys_dm_cursor.execute('''
+        CREATE TABLE boys_dm (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            convo_hash TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            message TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            reply_id INTEGER NOT NULL,
+            upload TEXT NOT NULL
+        );
+    ''')
+    boys_dm_db.close()
+
+if not os.path.exists("dms/girls_dm.db"):
+    girls_dm_db = sqlite3.connect("dms/girls_dm.db")
+    girls_dm_cursor = girls_dm_db.cursor()
+    girls_dm_cursor.execute('''
+        CREATE TABLE girls_dm (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            convo_hash TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            message TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            reply_id INTEGER NOT NULL,
+            upload TEXT NOT NULL
+        );
+    ''')
+    girls_dm_db.close()
 
 def convert_to_gmt(timestamp):
     # Parse timestamp and convert to GMT military time
@@ -189,13 +229,13 @@ room_dict = {'mainroom': {'file_path': 'mainroom.db', 'lock': Lock()}}
 #make room databases dict
 for file in os.listdir("rooms"):
     if file.endswith(".db"):
-        roomnameList = list(file)
-        for i in range(3): roomnameList.pop()
-        roomname = ''.join(roomnameList)
+        room_nameList = list(file)
+        for i in range(3): room_nameList.pop()
+        room_name = ''.join(room_nameList)
         file_path = os.path.join("rooms", file)
         file_lock = Lock() 
 
-        room_dict[roomname] = {
+        room_dict[room_name] = {
             'file_path': file_path,
             'lock': file_lock
         }
@@ -445,21 +485,40 @@ def Recv(message, sid):
         if queryResult:
             if remove_go_spaces(queryResult[0][1].lower()) == remove_go_spaces(password.lower()):
 
-                all_rooms = db_sql("""SELECT room_name, room_type, invites FROM rooms;""", 'rooms', chat_room=False)
-                user_rooms = {'public': [], 'private': []}
+                all_rooms = db_sql("""SELECT room_name, room_type, description, members FROM rooms;""", 'rooms', chat_room=False)
+                user_rooms = {'public': {}, 'private': {}}
 
                 user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
 
                 for room in all_rooms:
-                    if all_rooms[1] == 'public':
-                        user_rooms['public'].append(all_rooms[0])
-                    elif all_rooms[1] == 'private':
-                        if user_id in all_rooms[2].split('-'):
-                            user_rooms['private'].append(all_rooms[0])
+                    if room[1] == 'public':
+                        user_rooms['public']['name'] = room[0]
+                        user_rooms['public']['description'] = room[2]
+                    elif room[1] == 'private':
+                        if user_id in room[3].split('-'):
+                            user_rooms['private']['name'] = room[0]
+                            user_rooms['private']['description'] = room[2]
 
                 Server.send(str(['Get Rooms', user_rooms]), room=sid)
             else:
                 return # Invalid password
+        else:
+            return # User not found
+
+    elif msg[0] == 'Secret Log In':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+
+        queryResult = db_sql("""SELECT username, password FROM accounts WHERE LOWER(username) = ?;""", 'accounts', params=[remove_go_spaces(username.lower())], chat_room=False)
+
+        if queryResult:
+            if remove_go_spaces(queryResult[0][1].lower()) == remove_go_spaces(password.lower()):
+                Server.send(str(['Log In Results', queryResult[0][0], 'Success', queryResult[0][1]]), room=sid)
+
+            else:
+                return # Invalid password
+    
         else:
             return # User not found
     
@@ -503,7 +562,7 @@ def Recv(message, sid):
         gender = data['gender']
 
         # Username available - create account
-        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom'], chat_room=False)
+        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', ''], chat_room=False)
 
         shutil.copyfile(f'static/graphics/default{gender.capitalize()}.png', f'static/profile-pictures/{username}.png')
         
