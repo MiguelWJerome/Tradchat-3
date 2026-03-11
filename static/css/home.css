@@ -172,17 +172,28 @@
 
 .back-btn {
   color: #2c2416;
+
+}
+
+#back-to-mainroom {
+  cursor: pointer;
+}
+
+#back-to-mainroom:hover {
+  cursor: pointer;
 }
 
 .create-btn {
   background-color: #2c2416;
   color: white;
   border-color: #2c2416;
+  cursor: pointer;
 }
 
 .create-btn:hover {
-  background-color: #3a301f;
-  border-color: #3a301f;
+  background-color: var(--color-dark);
+  border-color: var(--color-medium);
+  cursor: pointer;
 }
 
 /* ---- 3a. Tray ---- */
@@ -246,7 +257,6 @@
 
 /* Optional: Add a small accent indicator on the left of the active button */
 .tray-item.active::before {
-  content: "";
   position: absolute;
   left: 4px;
   height: 60%;

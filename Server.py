@@ -25,6 +25,12 @@ def db_sql(sql, db_string, params=[], chat_room=False):
         elif db_string == "rooms":
             lock = rooms_lock
             db_path = 'rooms.db'
+        elif db_string == "boys_dm":
+            lock = boys_dm_lock
+            db_path = 'dms/boys_dm.db'
+        elif db_string == "girls_dm":
+            lock = girls_dm_lock
+            db_path = 'dms/girls_dm.db'
     
     with lock:
         conn = sqlite3.connect(db_path)
@@ -57,6 +63,24 @@ def check_room_access(room_name, username):
             return False
     else:
         return True
+
+def check_credentials(username, password, foolproof=False):
+    if foolproof:
+        username = remove_go_spaces(username.lower())
+        query = """SELECT username, password FROM accounts WHERE LOWER(username) = ?;"""
+    else:
+        query = """SELECT username, password FROM accounts WHERE username = ?;"""
+
+    queryResults = db_sql(query, 'accounts', params=[username], chat_room=False)
+    if queryResults:
+        
+        if foolproof and remove_go_spaces(queryResults[0][1].lower()) == remove_go_spaces(password.lower()):
+            return True
+        elif not foolproof and queryResults[0][1] == password:
+            return True
+        else:
+            return False
+    return False
 
 
 def fetch_messages(room_name, limit, offset):
@@ -111,7 +135,7 @@ Server = SocketIO(app)
 accounts_lock = Lock()
 rooms_lock = Lock()
 boys_dm_lock = Lock()
-girls_db_lock = Lock()
+girls_dm_lock = Lock()
 
 if not os.path.exists("mainroom.db"):
     room_db = sqlite3.connect("mainroom.db")
@@ -162,10 +186,11 @@ if not os.path.exists("rooms.db"):
             owners TEXT NOT NULL,
             managers TEXT NOT NULL,
             curators TEXT NOT NULL,
-            members TEXT NOT NULL
+            members TEXT NOT NULL,
+            emoji TEXT NOT NULL
         );
     ''')
-    rooms_cursor.execute("""INSERT INTO rooms (room_name, room_type, description, owners, managers, curators, members) VALUES (?, ?, ?, ?, ?, ?, ?);""", ('mainroom', 'public', 'The main room for all users', '1', '', '', ''))
+    rooms_cursor.execute("""INSERT INTO rooms (room_name, room_type, description, owners, managers, curators, members, emoji) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", ('mainroom', 'public', 'The main room for all users', '1', '', '', '', 'MR'))
     rooms_db.commit()
     rooms_db.close()
 
@@ -268,17 +293,11 @@ def index():
         username = request.form['username']
         password = request.form['password']
 
-        account_password = db_sql("SELECT password FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+        if check_credentials(username, password, foolproof=True):   
+            session['username'] = username
+            session['password'] = password
 
-        if account_password:
-            if remove_go_spaces(account_password[0][0].lower()) == remove_go_spaces(password.lower()):
-                session['username'] = username
-                session['password'] = password
-
-                return redirect('/home/')
-
-            else:
-                raise werkzeug.exceptions.BadRequestKeyError('Lets get him directed back to the welcome page')
+            return redirect('/home/')
 
         else:
             raise werkzeug.exceptions.BadRequestKeyError('Lets get him directed back to the welcome page')
@@ -292,18 +311,10 @@ def computer_log_into_server():
         username = request.form['username']
         password = request.form['password']
 
-        queryResults = db_sql("SELECT username, password FROM accounts WHERE LOWER(username) = ?;", 'accounts', params=[remove_go_spaces(username.lower())], chat_room=False)
-
-        if queryResults:
-            if remove_go_spaces(queryResults[0][1].lower()) == remove_go_spaces(password.lower()):
-                session['username'] = queryResults[0][0]
-                session['password'] = queryResults[0][1]
-
-                return redirect('/home/')
-
-            else:
-                raise werkzeug.exceptions.BadRequestKeyError('Lets get him directed back to the welcome page')
-
+        if check_credentials(username, password, foolproof=True):
+            session['username'] = username
+            session['password'] = password
+            return redirect('/home/')
         else:
             raise werkzeug.exceptions.BadRequestKeyError('Lets get him directed back to the welcome page')
 
@@ -323,30 +334,24 @@ def home():
         username = session['username']
         password = session['password']
 
-        account_password = db_sql("SELECT password FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+        if check_credentials(username, password, foolproof=True):
 
-        if account_password:
-            if remove_go_spaces(account_password[0][0].lower()) == remove_go_spaces(password.lower()):
-
-                theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+            theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
 
 
-                colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
-                colors = ast.literal_eval(colorsFile.read())
-                colorsFile.close()
+            colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
+            colors = ast.literal_eval(colorsFile.read())
+            colorsFile.close()
 
 
-                return render_template(
-                    'home.html',
-                    theme=theme,
-                    color_dark=colors['color_dark'],
-                    color_medium=colors['color_medium'],
-                    color_light=colors['color_light'],
-                    room=db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0],
-                )
-
-            else:
-                raise KeyError('Why do people try to hack accounts?')
+            return render_template(
+                'home.html',
+                theme=theme,
+                color_dark=colors['color_dark'],
+                color_medium=colors['color_medium'],
+                color_light=colors['color_light'],
+                room=db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0],
+            )
 
         else:
             raise KeyError('Why do people try to hack accounts?')
@@ -426,22 +431,20 @@ def Recv(message, sid):
         except KeyError:
             return # Dont bother to return a response to someone who is trying to alter the code
 
-        queryResult = db_sql("""SELECT password FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)
-        if queryResult:
-            if remove_go_spaces(queryResult[0][0].lower()) == remove_go_spaces(password.lower()):
-                if setting == 'room':
-                    
-                    if check_room_access(room, username):
-                    
-                        user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
-                        gmt_timestamp = convert_to_gmt(timestamp)
-
-                        message_id = db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, reply_index, upload], chat_room=True)
-                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp}]), room=room)
+        if check_credentials(username, password, foolproof=True):
+            if setting == 'room':
                 
-                elif setting == 'direct message':
-                    # Send message to direct message
-                    pass
+                if check_room_access(room, username):
+                
+                    user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
+                    gmt_timestamp = convert_to_gmt(timestamp)
+
+                    message_id = db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, reply_index, upload], chat_room=True)
+                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp}]), room=room)
+            
+            elif setting == 'direct message':
+                # Send message to direct message
+                pass
 
     elif msg[0] == 'Fetch Messages':
         data = msg[1]
@@ -458,17 +461,14 @@ def Recv(message, sid):
         username = data['username']
         password = data['password']
         
-        queryResult = db_sql("""SELECT password FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)
-        if queryResult:
-            if remove_go_spaces(queryResult[0][0].lower()) == remove_go_spaces(password.lower()):
-                if check_room_access(room, username):
-                    Server.server.enter_room(sid, room)
-                else:
-                    return # User not allowed in room
+        
+        if check_credentials(username, password, foolproof=True):
+            if check_room_access(room, username):
+                Server.server.enter_room(sid, room)
             else:
-                return # Invalid password
+                return # User not allowed in room
         else:
-            return # User not found
+            return 
 
     elif msg[0] == 'Leave Room':
         data = msg[1]
@@ -481,9 +481,7 @@ def Recv(message, sid):
         username = data['username']
         password = data['password']
         
-        queryResult = db_sql("""SELECT username, password FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)
-        if queryResult:
-            if remove_go_spaces(queryResult[0][1].lower()) == remove_go_spaces(password.lower()):
+        if check_credentials(username, password, foolproof=True):
 
                 all_rooms = db_sql("""SELECT room_name, room_type, description, members FROM rooms;""", 'rooms', chat_room=False)
                 user_rooms = {'public': {}, 'private': {}}
@@ -500,10 +498,9 @@ def Recv(message, sid):
                             user_rooms['private']['description'] = room[2]
 
                 Server.send(str(['Get Rooms', user_rooms]), room=sid)
-            else:
-                return # Invalid password
+
         else:
-            return # User not found
+            return
 
     elif msg[0] == 'Secret Log In':
         data = msg[1]
@@ -567,6 +564,23 @@ def Recv(message, sid):
         shutil.copyfile(f'static/graphics/default{gender.capitalize()}.png', f'static/profile-pictures/{username}.png')
         
         Server.send(str(['Create Account Results', data['username'], 'Success']), room=sid)
+
+    elif msg[0] == 'Create Room':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        roomname = data['roomname']
+        description = data['description']
+        emoji = data['emoji']
+        roomtype = data['roomtype']
+
+        if check_credentials(username, password, foolproof=True):
+            query = db_sql("""SELECT roomname FROM rooms;""", 'rooms', params=[], chat_room=False)
+            if query:
+                Server.send(str(['Create Room Results', 'Room Already Exists']), room=sid)
+                return
+        
+        # TODO: Implement create room functionality
 
 @Server.on('message')
 def recv(message):

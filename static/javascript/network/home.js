@@ -80,6 +80,16 @@ sendButton.addEventListener('click', function() {
     chatInput.value = ''
 })
 
+function create_dm(username) {
+    // TODO: Implement create DM functionality
+    cl.send(JSON.stringify(['Create DM', {'username': username}]))
+}
+
+function create_chat_room(roomname, description, emoji, roomtype) {
+    // TODO: Implement create chat room functionality
+    cl.send(JSON.stringify(['Create Room', {'username': username, 'password': password, 'roomname': roomname, 'description': description, 'emoji': emoji, 'roomtype': roomtype}]))
+}
+
 
 cl.on('message', recv)
 
