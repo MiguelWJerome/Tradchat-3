@@ -57,7 +57,7 @@ def check_room_access(room_name, username):
     queryResults = db_sql("""SELECT room_type, members FROM rooms WHERE room_name = ?;""", 'rooms', params=[room_name], chat_room=False)
     
     if queryResults[0][0] == 'private':
-        if user_id in queryResults[0][1].split('-'):
+        if str(user_id) in queryResults[0][1].split('-'):
             return True
         else:
             return False
@@ -447,13 +447,16 @@ def Recv(message, sid):
                 pass
 
     elif msg[0] == 'Fetch Messages':
+        username = msg[1]['username']
+        password = msg[1]['password']
         data = msg[1]
         room = data['room']
         limit = data['limit']
         offset = data['offset']
         
-        messages = fetch_messages(room, limit, offset)
-        Server.send(str(['Fetch Messages', messages]), room=sid)
+        if check_credentials(username, password, foolproof=True) and check_room_access(room, username):
+            messages = fetch_messages(room, limit, offset)
+            Server.send(str(['Fetch Messages', messages]), room=sid)
     
     elif msg[0] == 'Join Room':
         data = msg[1]
@@ -465,6 +468,23 @@ def Recv(message, sid):
         if check_credentials(username, password, foolproof=True):
             if check_room_access(room, username):
                 Server.server.enter_room(sid, room)
+            else:
+                return # User not allowed in room
+        else:
+            return 
+
+    elif msg[0] == 'Switch Room':
+        data = msg[1]
+        old_room = data['old-room']
+        new_room = data['room']
+        username = data['username']
+        password = data['password']
+        
+        if check_credentials(username, password, foolproof=True):
+            if check_room_access(new_room, username):
+                Server.server.leave_room(sid, old_room)
+                Server.server.enter_room(sid, new_room)
+                Server.send(str(['Fetch Messages', fetch_messages(new_room, 50, 0), 'switched room']), room=new_room)
             else:
                 return # User not allowed in room
         else:
@@ -501,6 +521,30 @@ def Recv(message, sid):
 
         else:
             return
+
+    elif msg[0] == 'Get Dms':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        
+        if check_credentials(username, password, foolproof=True):
+            dms = {'unread': [], 'read': []}
+            dms_ids = db_sql("""SELECT dms FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0].split('-')
+            
+            for dm in dms_ids:
+                if dm[0] == 'u':
+                    dm_info = db_sql("""SELECT username, first_name, last_name FROM accounts WHERE id = ?;""", 'accounts', params=[dm], chat_room=False)
+                    dms['unread'].append({'username': dm_info[0], 'first_name': dm_info[1], 'last_name': dm_info[2]})
+                else:
+                    dmli = list(dm)
+                    dmli.pop(0)
+                    dm = ''.join(dmli)
+                    dm_info = db_sql("""SELECT username, first_name, last_name FROM accounts WHERE id = ?;""", 'accounts', params=[dm], chat_room=False)
+                    dms['read'].append({'username': dm_info[0], 'first_name': dm_info[1], 'last_name': dm_info[2]})
+                
+            
+            Server.send(str(['Get Dms', dms]), room=sid)
+            
 
     elif msg[0] == 'Secret Log In':
         data = msg[1]

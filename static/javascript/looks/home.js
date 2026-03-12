@@ -6,15 +6,58 @@
  *
  * PURPOSE
  * -------
- * This file contains two essential functions for the TradChat interface:
+ * This file contains three essential functions for the TradChat interface:
  * 1. createChatRoomOption - Creates and adds a chat room option to the sidebar
  * 2. appendMessage - Appends a message to the chat feed
+ * 3. clearAllChatRoomOptions - Clears all chat room options from the sidebar
  *
  * DEPENDENCIES
  * ------------
  * - jQuery ($ helper)
  * =============================================================================
  */
+
+// jQuery reference - ensure jQuery is loaded
+if (typeof $ === 'undefined') {
+    // If jQuery is not loaded, create a simple reference
+    // This assumes jQuery is already loaded via the HTML
+    console.error('[home.js] jQuery not found');
+}
+
+// Initialize sidebar tray functionality when document is ready
+$(document).ready(function() {
+    // 1. Set 'Messenger' as active by default on load
+    $('.tray-item:first').addClass('active');
+
+    // 2. Handle Tray Item Clicks
+    $('.tray-item').on('click', function() {
+        // Remove active class from all items
+        $('.tray-item').removeClass('active');
+        
+        // Add active class to the clicked item
+        $(this).addClass('active');
+        
+        // Get the label to determine what to show
+        var selectedView = $(this).find('.tray-item__label').text().replace(/\s+/g, '').toLowerCase();
+        
+        console.log("[home.js] Switching sidebar view to:", selectedView);
+
+        /* Placeholder for toggling content:
+           Here you can add logic to filter your #sidebar-list 
+           or fetch different data based on 'selectedView' 
+        */
+        if (selectedView === 'messenger') {
+            // Show DMs
+            console.log('[home.js] Showing Messenger (DMs)');
+        } else if (selectedView === 'publicrooms') {
+            // Show Public Rooms
+            console.log('[home.js] Showing Public Rooms');
+        } else if (selectedView === 'privaterooms') {
+            // Show Private Rooms
+            console.log('[home.js] Showing Private Rooms');
+        }
+    });
+});
 
 ;(function () {
   "use strict";
@@ -29,16 +72,19 @@
   });
 
   /**
-   * createChatRoomOption(name, emoji, description)
+   * createChatRoomOption(name, description, action=null, emoji=null, picture = null)
    * --------------------------------------------
    * Creates a chat room option in the sidebar with the provided parameters.
-   * Uses emoji as the avatar display and shows description as preview.
+   * Uses emoji as the avatar display by default, or a picture if provided.
+   * Shows description as preview. Can execute custom action when clicked.
    *
    * @param {string} name - The name of the chat room
-   * @param {string} emoji - The emoji to use as profile picture/avatar
    * @param {string} description - Description/preview text for the room
+   * @param {string} emoji - The emoji to use as profile picture/avatar (if no picture)
+   * @param {string} picture - Optional picture URL to use instead of emoji
+   * @param {function} action - Optional function to call when clicked (overrides default behavior)
    */
-  window.createChatRoomOption = function (name, emoji, description) {
+  window.createChatRoomOption = function (name, description, action=null, emoji=null, picture = null) {
     if (!$sidebarList.length) {
       console.error("[home.js] Sidebar list not found. Make sure DOM is ready.");
       return;
@@ -55,10 +101,29 @@
       </li>
     */
 
-    // Create avatar with emoji
-    var $avatar = $("<div>")
-      .addClass("convo-item__avatar")
-      .text(emoji || "📊");  // Default emoji if none provided
+    // Create avatar with picture or emoji
+    var $avatar;
+    if (picture) {
+      $avatar = $("<img>")
+        .addClass("convo-item__avatar")
+        .attr("src", picture)
+        .css({
+          "width": "40px",
+          "height": "40px",
+          "border-radius": "50%",
+          "object-fit": "cover"
+        })
+        .on("error", function() {
+          // Fallback to emoji if picture fails to load
+          $(this).replaceWith($("<div>")
+            .addClass("convo-item__avatar")
+            .text(emoji || "📊"));
+        });
+    } else {
+      $avatar = $("<div>")
+        .addClass("convo-item__avatar")
+        .text(emoji || "📊");  // Default emoji if none provided
+    }
 
     // Create room name
     var $name = $("<span>")
@@ -82,15 +147,35 @@
       .attr("data-room", roomId)
       .append($avatar, $info);
 
-    // Add click handler to switch to this room
+    // Add click handler - use custom action if provided, otherwise default behavior
     $item.on("click", function () {
-      switchToRoom(roomId, name);
+      if (action && typeof action === 'function') {
+        action(name, roomId);
+      } else {
+        switchToRoom(roomId, name);
+      }
     });
 
     // Append to sidebar list
     $sidebarList.append($item);
 
-    console.log("[home.js] Created chat room:", name, "with emoji:", emoji);
+    console.log("[home.js] Created chat room:", name, "with:", picture ? "picture: " + picture : "emoji: " + (emoji || "📊"));
+  };
+
+  /**
+   * clearAllChatRoomOptions()
+   * -------------------------
+   * Clears all chat room options from the sidebar list.
+   * Useful for refreshing the room list or switching contexts.
+   */
+  window.clearAllChatRoomOptions = function () {
+    if (!$sidebarList.length) {
+      console.error("[home.js] Sidebar list not found. Make sure DOM is ready.");
+      return;
+    }
+    
+    $sidebarList.empty();
+    console.log("[home.js] Cleared all chat room options");
   };
 
   /**
