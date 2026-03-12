@@ -475,18 +475,54 @@ def Recv(message, sid):
 
     elif msg[0] == 'Switch Room':
         data = msg[1]
-        old_room = data['old-room']
+        old_group = data['old-group']
         new_room = data['room']
         username = data['username']
         password = data['password']
         
         if check_credentials(username, password, foolproof=True):
             if check_room_access(new_room, username):
-                Server.server.leave_room(sid, old_room)
+                Server.server.leave_room(sid, old_group)
                 Server.server.enter_room(sid, new_room)
-                Server.send(str(['Fetch Messages', fetch_messages(new_room, 50, 0), 'switched room']), room=new_room)
+                Server.send(str(['Fetch Messages', fetch_messages(new_room, 50, 0), 'switched room']), room=sid)
             else:
                 return # User not allowed in room
+        else:
+            return 
+
+    elif msg[0] == 'Switch DM':
+        data = msg[1]
+        old_group = data['old-group']
+        new_dm = data['new-dm']
+        username = data['username']
+        password = data['password']
+        
+        if check_credentials(username, password, foolproof=True):
+            Server.server.leave_room(sid, old_group)
+            Server.server.enter_room(sid, new_dm)
+            
+            primary_user_id, primaryGender = db_sql("""SELECT id, gender FROM accounts WHERE username = ?;""", 'accounts', params=[new_dm.split('.$@-@&.')[0]], chat_room=False)[0]
+            secondary_user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[new_dm.split('.$@-@&.')[1]], chat_room=False)[0][0]
+
+            id_to_username = {f"{primary_user_id}": new_dm.split('.$@-@&.')[0], f"{secondary_user_id}": new_dm.split('.$@-@&.')[1]}
+
+            genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
+            
+            raw_messages = db_sql(f"""SELECT id, user_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ?""", genderDict[primaryGender], params=[f"{primary_user_id}-{secondary_user_id}"], chat_room=False)
+            
+            messages = []
+            for message in raw_messages:
+                messages.append({
+                    'id': message[0],
+                    'username': id_to_username[str(message[1])],
+                    'message': message[2],
+                    'timestamp': message[3],
+                    'reply_id': message[4],
+                    'upload': message[5]
+                })
+            
+            Server.send(str(['Fetch Messages', messages, 'switched room']), room=sid)
+            
         else:
             return 
 
@@ -619,12 +655,15 @@ def Recv(message, sid):
         roomtype = data['roomtype']
 
         if check_credentials(username, password, foolproof=True):
-            query = db_sql("""SELECT roomname FROM rooms;""", 'rooms', params=[], chat_room=False)
+            query = db_sql("""SELECT * FROM rooms WHERE roomname = ?;""", 'rooms', params=[roomname], chat_room=False)
             if query:
                 Server.send(str(['Create Room Results', 'Room Already Exists']), room=sid)
                 return
-        
-        # TODO: Implement create room functionality
+            
+            else:
+                db_sql("""INSERT INTO rooms (roomname, description, roomtype, owner, emoji) VALUES (?, ?, ?, ?, ?);""", 'rooms', params=[roomname, description, roomtype, str(db_sql("SELECT id FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]), emoji], chat_room=False)
+                
+                Server.send(str(['Create Room Results', 'Room Created']), room=sid)
 
 @Server.on('message')
 def recv(message):

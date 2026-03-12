@@ -35,7 +35,6 @@ function recv(message) {
         }
     }
     else if (msg[0] === 'Get Rooms') {
-        clearAllChatRoomOptions()
         data = msg[1]
         for (var i in data) {
             createChatRoomOption(data[i]['roomname'], data[i]['description'], function(){
@@ -44,11 +43,10 @@ function recv(message) {
         }
     }
     else if (msg[0] === 'Get Dms') {
-        clearAllChatRoomOptions()
         data = msg[1]
         for (var i in data) {
             createChatRoomOption(data[i]['username'], `${data[i]['first_name']} ${data[i]['last_name']}`, function(){
-                switch_room(data[i]['roomname'])
+                switch_dm(data[i]['username'])
             }, `/static/profile-pictres/${data[i]['username']}.png`)
         }
     }
@@ -66,13 +64,17 @@ chatInput.addEventListener('keypress', function(e) {
 })
 
 function switch_room(roomname) {
-    cl.send(JSON.stringify(['Switch Room', {'old-room': ROOM, 'room': roomname, 'username': username, 'password': password}]))
+    clearAllChatRoomOptions()
+    cl.send(JSON.stringify(['Switch Room', {'old-group': ROOM, 'room': roomname, 'username': username, 'password': password}]))
     switch_room_mid_feed_toggle = true
     ROOM = roomname
 }
 
-function switch_dm(username) {
-    cl.send(JSON.stringify(['Switch DM', {'username': username}]))
+function switch_dm(dm_username) {
+    clearAllChatRoomOptions()
+    cl.send(JSON.stringify(['Switch DM', {'old-group': ROOM, 'new-dm': sortAndJoinStrings(dm_username, username), 'username': username, 'password': password}]))
+    switch_room_mid_feed_toggle = true
+    ROOM = sortAndJoinStrings(dm_username, username)
 }
 
 sendButton.addEventListener('click', function() {

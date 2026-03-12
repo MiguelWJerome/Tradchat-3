@@ -170,3 +170,30 @@ function form(url, dic, method='post')
     document.querySelector('body').appendChild(newForm)
     newForm.submit()
 }
+
+function sortAndJoinStrings(str1, str2) {
+    // Compare strings alphabetically character by character
+    const minLength = Math.min(str1.length, str2.length);
+    
+    for (let i = 0; i < minLength; i++) {
+        const char1 = str1[i].toLowerCase();
+        const char2 = str2[i].toLowerCase();
+        
+        if (char1 < char2) {
+            return str2 + '.$@-@&.' + str1;
+        } else if (char1 > char2) {
+            return str1 + '.$@-@&.' + str2;
+        }
+    }
+    
+    // If we get here, the strings are identical up to minLength
+    // The longer string comes first
+    if (str1.length > str2.length) {
+        return str1 + '.$@-@&.' + str2;
+    } else if (str2.length > str1.length) {
+        return str2 + '.$@-@&.' + str1;
+    } else {
+        // Strings are exactly the same, order doesn't matter
+        return str1 + '.$@-@&.' + str2;
+    }
+}
