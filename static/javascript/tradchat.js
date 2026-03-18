@@ -1,5 +1,8 @@
-function Alert(message, isOnPhone=false, shouldFlyUp=false, callback=function(){}, width=380, height=300, border=5) 
+function Alert(message, callback=function(){}, shouldFlyUp=false, width=380, height=300, border=5) 
 {
+    // Determine if device is mobile
+    const isOnPhone = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+    
     // Get window dimensions for responsive sizing
     const windowHeight = window.innerHeight;
     const windowWidth = window.innerWidth;

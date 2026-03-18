@@ -35,19 +35,55 @@ function recv(message) {
         }
     }
     else if (msg[0] === 'Get Rooms') {
+        clearAllChatRoomOptions()
         data = msg[1]
+        let unread = false
         for (var i in data) {
-            createChatRoomOption(data[i]['roomname'], data[i]['description'], function(){
+            createChatRoomOption(data[i]['name'], data[i]['description'], function(){
                 switch_room(data[i]['roomname'])
-            }, data[i]['emoji'])
+            }, false, unread, data[i]['emoji'])
         }
     }
     else if (msg[0] === 'Get Dms') {
+        clearAllChatRoomOptions()
         data = msg[1]
-        for (var i in data) {
-            createChatRoomOption(data[i]['username'], `${data[i]['first_name']} ${data[i]['last_name']}`, function(){
-                switch_dm(data[i]['username'])
-            }, `/static/profile-pictres/${data[i]['username']}.png`)
+        for (var i in data['unread']) {
+            createChatRoomOption(data['unread'][i]['username'], `${data['unread'][i]['first_name']} ${data['unread'][i]['last_name']}`, function(){
+                switch_dm(data['unread'][i]['username'])
+            }, `/static/profile-pictures/${data['unread'][i]['username']}.png`, true, true)
+        }
+        for (var i in data['read']) {
+            createChatRoomOption(data['read'][i]['username'], `${data['read'][i]['first_name']} ${data['read'][i]['last_name']}`, function(){
+                switch_dm(data['read'][i]['username'])
+            }, `/static/profile-pictures/${data['read'][i]['username']}.png`, false, true)
+        }
+    }
+
+    else if (msg[0] === 'Create Room Results')
+    {
+        if (msg[1] === 'Room Already Exists')
+        {
+            Alert('Sorry, but that room already exists, please pick a different name.')
+        }
+        else if (msg[1] === 'Room Created')
+        {
+            Alert('Room Created succesfuly!', function(){
+                location.reload()
+            })
+        }
+    }
+
+    else if (msg[0] === 'Create DM Results')
+    {
+        if (msg[1] === 'DM Already Exists')
+        {
+            Alert('Sorry, but that DM already exists, please pick a different user.')
+        }
+        else if (msg[1] === 'DM Created')
+        {
+            Alert('DM Created succesfuly!', function(){
+                location.reload()
+            })
         }
     }
 }
@@ -64,14 +100,12 @@ chatInput.addEventListener('keypress', function(e) {
 })
 
 function switch_room(roomname) {
-    clearAllChatRoomOptions()
     cl.send(JSON.stringify(['Switch Room', {'old-group': ROOM, 'room': roomname, 'username': username, 'password': password}]))
     switch_room_mid_feed_toggle = true
     ROOM = roomname
 }
 
 function switch_dm(dm_username) {
-    clearAllChatRoomOptions()
     cl.send(JSON.stringify(['Switch DM', {'old-group': ROOM, 'new-dm': sortAndJoinStrings(dm_username, username), 'username': username, 'password': password}]))
     switch_room_mid_feed_toggle = true
     ROOM = sortAndJoinStrings(dm_username, username)
@@ -82,15 +116,28 @@ sendButton.addEventListener('click', function() {
     chatInput.value = ''
 })
 
-function create_dm(username) {
+function create_dm(user) {
     // TODO: Implement create DM functionality
-    cl.send(JSON.stringify(['Create DM', {'username': username}]))
+    cl.send(JSON.stringify(['Create DM', {'username': username, 'password': password, 'user': user}]))
 }
 
 function create_chat_room(roomname, description, emoji, roomtype) {
     // TODO: Implement create chat room functionality
     cl.send(JSON.stringify(['Create Room', {'username': username, 'password': password, 'roomname': roomname, 'description': description, 'emoji': emoji, 'roomtype': roomtype}]))
 }
+
+
+document.getElementById('messenger-icon').addEventListener('click', function() {
+    cl.send(JSON.stringify(['Get Dms', {'username': username, 'password': password}]))
+});
+
+document.getElementById('public-rooms-icon').addEventListener('click', function() {
+    cl.send(JSON.stringify(['Get Rooms', {'username': username, 'password': password, 'roomtype': 'public'}]))
+});
+
+document.getElementById('private-rooms-icon').addEventListener('click', function() {
+    cl.send(JSON.stringify(['Get Rooms', {'username': username, 'password': password, 'roomtype': 'private'}]))
+});
 
 
 cl.on('message', recv)

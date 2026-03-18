@@ -57,7 +57,7 @@ def check_room_access(room_name, username):
     queryResults = db_sql("""SELECT room_type, members FROM rooms WHERE room_name = ?;""", 'rooms', params=[room_name], chat_room=False)
     
     if queryResults[0][0] == 'private':
-        if str(user_id) in queryResults[0][1].split('-'):
+        if str(user_id) in split(queryResults[0][1]):
             return True
         else:
             return False
@@ -108,21 +108,38 @@ def fetch_messages(room_name, limit, offset):
 
 
 def remove_go_spaces(string):
-    while True:
-        if list(string)[0] == ' ':
-            string = list(string)
-            string.pop(0)
-            string = ''.join(string)
-        else:
-            break
-    while True:
-        if list(string)[-1] == ' ':
-            string = list(string)
-            string.pop()
-            string = ''.join(string)
-        else:
-            break
-    return string
+    try:
+        while True:
+            if list(string)[0] == ' ':
+                string = list(string)
+                string.pop(0)
+                string = ''.join(string)
+            else:
+                break
+        while True:
+            if list(string)[-1] == ' ':
+                string = list(string)
+                string.pop()
+                string = ''.join(string)
+            else:
+                break
+        return string
+    except IndexError:
+        return string
+
+
+def split(string):
+    if string == '' or string is None:
+        return []
+    return string.split('-')
+
+
+def join(lst):
+    clean_list = []
+    for item in lst:
+        if item is not None and item != '':
+            clean_list.append(item)
+    return '-'.join(clean_list) if clean_list else ''
 
 
 # Create application and Server
@@ -536,27 +553,33 @@ def Recv(message, sid):
         data = msg[1]
         username = data['username']
         password = data['password']
+        roomtype = data['roomtype']
         
         if check_credentials(username, password, foolproof=True):
-
-                all_rooms = db_sql("""SELECT room_name, room_type, description, members FROM rooms;""", 'rooms', chat_room=False)
-                user_rooms = {'public': {}, 'private': {}}
+                all_rooms = db_sql("""SELECT room_name, room_type, description, owners, managers, curators, members, emoji FROM rooms;""", 'rooms', chat_room=False)
+                user_rooms = []
 
                 user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
-
+                
                 for room in all_rooms:
-                    if room[1] == 'public':
-                        user_rooms['public']['name'] = room[0]
-                        user_rooms['public']['description'] = room[2]
-                    elif room[1] == 'private':
-                        if user_id in room[3].split('-'):
-                            user_rooms['private']['name'] = room[0]
-                            user_rooms['private']['description'] = room[2]
+
+                    if room[1] == 'public' and roomtype == 'public':
+                        user_rooms.append({'name': room[0], 'description': room[2], 'emoji': room[7]})
+                    
+                    
+                    elif room[1] == 'private' and roomtype == 'private':
+                        owners = split(room[3])
+                        managers = split(room[4])
+                        curators = split(room[5])
+                        members = split(room[6])
+
+                        all_members = owners+managers+curators+members
+                        
+                        if str(user_id) in all_members:
+                            user_rooms.append({'name': room[0], 'description': room[2], 'emoji': room[7]})
 
                 Server.send(str(['Get Rooms', user_rooms]), room=sid)
 
-        else:
-            return
 
     elif msg[0] == 'Get Dms':
         data = msg[1]
@@ -565,18 +588,19 @@ def Recv(message, sid):
         
         if check_credentials(username, password, foolproof=True):
             dms = {'unread': [], 'read': []}
-            dms_ids = db_sql("""SELECT dms FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0].split('-')
+            dms_ids = split(db_sql("""SELECT dms FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0])
             
-            for dm in dms_ids:
-                if dm[0] == 'u':
-                    dm_info = db_sql("""SELECT username, first_name, last_name FROM accounts WHERE id = ?;""", 'accounts', params=[dm], chat_room=False)
-                    dms['unread'].append({'username': dm_info[0], 'first_name': dm_info[1], 'last_name': dm_info[2]})
-                else:
-                    dmli = list(dm)
-                    dmli.pop(0)
-                    dm = ''.join(dmli)
-                    dm_info = db_sql("""SELECT username, first_name, last_name FROM accounts WHERE id = ?;""", 'accounts', params=[dm], chat_room=False)
-                    dms['read'].append({'username': dm_info[0], 'first_name': dm_info[1], 'last_name': dm_info[2]})
+            if dms_ids:
+                for dm in dms_ids:
+                    if dm[0] == 'u':
+                        dmli = list(dm)
+                        dmli.pop(0)
+                        dm = ''.join(dmli)
+                        dm_info = db_sql("""SELECT username, first_name, last_name FROM accounts WHERE id = ?;""", 'accounts', params=[str(dm)], chat_room=False)[0]
+                        dms['unread'].append({'username': dm_info[0], 'first_name': dm_info[1], 'last_name': dm_info[2]})
+                    else:
+                        dm_info = db_sql("""SELECT username, first_name, last_name FROM accounts WHERE id = ?;""", 'accounts', params=[str(dm)], chat_room=False)[0]
+                        dms['read'].append({'username': dm_info[0], 'first_name': dm_info[1], 'last_name': dm_info[2]})
                 
             
             Server.send(str(['Get Dms', dms]), room=sid)
@@ -617,6 +641,31 @@ def Recv(message, sid):
         else:
             Server.send(str(['Log In Results', username, 'Wrong Username']), room=sid)
 
+    elif msg[0] == 'Create DM':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        user = data['user']
+
+        if check_credentials(username, password, foolproof=True):
+            username_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
+            user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[user], chat_room=False)[0][0]
+
+            query = split(remove_go_spaces(db_sql("""SELECT dms FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]).replace('u', ''))
+            if remove_go_spaces(str(user_id)) in query:
+                Server.send(str(['Create DM Results', 'DM Already Exists']), room=sid)
+                return
+            
+            else:
+                query.append(str(user_id))
+                db_sql("""UPDATE accounts SET dms = ? WHERE username = ?;""", 'accounts', params=[join(query), username], chat_room=False)
+                user_dms = split(remove_go_spaces(db_sql("""SELECT dms FROM accounts WHERE username = ?;""", 'accounts', params=[user], chat_room=False)[0][0]).replace('u', ''))
+                if remove_go_spaces(str(username_id)) not in user_dms:
+                    user_dms.append(str(username_id))
+                    db_sql("""UPDATE accounts SET dms = ? WHERE username = ?;""", 'accounts', params=[join(user_dms), user], chat_room=False)
+                
+                Server.send(str(['Create DM Results', 'DM Created']), room=sid)
+
     elif msg[0] == 'Create Account':
         data = msg[1]
         
@@ -639,7 +688,7 @@ def Recv(message, sid):
         gender = data['gender']
 
         # Username available - create account
-        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', ''], chat_room=False)
+        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2'], chat_room=False)
 
         shutil.copyfile(f'static/graphics/default{gender.capitalize()}.png', f'static/profile-pictures/{username}.png')
         
@@ -655,13 +704,13 @@ def Recv(message, sid):
         roomtype = data['roomtype']
 
         if check_credentials(username, password, foolproof=True):
-            query = db_sql("""SELECT * FROM rooms WHERE roomname = ?;""", 'rooms', params=[roomname], chat_room=False)
+            query = db_sql("""SELECT * FROM rooms WHERE room_name = ?;""", 'rooms', params=[roomname], chat_room=False)
             if query:
                 Server.send(str(['Create Room Results', 'Room Already Exists']), room=sid)
                 return
             
             else:
-                db_sql("""INSERT INTO rooms (roomname, description, roomtype, owner, emoji) VALUES (?, ?, ?, ?, ?);""", 'rooms', params=[roomname, description, roomtype, str(db_sql("SELECT id FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]), emoji], chat_room=False)
+                db_sql("""INSERT INTO rooms (room_name, description, room_type, owners, managers, curators, members, emoji) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", 'rooms', params=[roomname, description, roomtype, str(db_sql("SELECT id FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]), '', '', '', emoji], chat_room=False)
                 
                 Server.send(str(['Create Room Results', 'Room Created']), room=sid)
 

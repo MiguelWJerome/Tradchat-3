@@ -40,21 +40,16 @@ $(document).ready(function() {
         // Get the label to determine what to show
         var selectedView = $(this).find('.tray-item__label').text().replace(/\s+/g, '').toLowerCase();
         
-        console.log("[home.js] Switching sidebar view to:", selectedView);
-
         /* Placeholder for toggling content:
            Here you can add logic to filter your #sidebar-list 
            or fetch different data based on 'selectedView' 
         */
         if (selectedView === 'messenger') {
             // Show DMs
-            console.log('[home.js] Showing Messenger (DMs)');
         } else if (selectedView === 'publicrooms') {
             // Show Public Rooms
-            console.log('[home.js] Showing Public Rooms');
         } else if (selectedView === 'privaterooms') {
             // Show Private Rooms
-            console.log('[home.js] Showing Private Rooms');
         }
     });
 });
@@ -72,7 +67,7 @@ $(document).ready(function() {
   });
 
   /**
-   * createChatRoomOption(name, description, action=null, emoji=null, picture = null)
+   * createChatRoomOption(name, description, action=null, picture=null, unread=false, emoji=null)
    * --------------------------------------------
    * Creates a chat room option in the sidebar with the provided parameters.
    * Uses emoji as the avatar display by default, or a picture if provided.
@@ -80,11 +75,12 @@ $(document).ready(function() {
    *
    * @param {string} name - The name of the chat room
    * @param {string} description - Description/preview text for the room
-   * @param {string} emoji - The emoji to use as profile picture/avatar (if no picture)
-   * @param {string} picture - Optional picture URL to use instead of emoji
    * @param {function} action - Optional function to call when clicked (overrides default behavior)
+   * @param {string} picture - Optional picture URL to use instead of emoji
+   * @param {boolean} unread - Whether the room has unread messages (adds blue styling)
+   * @param {string} emoji - The emoji to use as profile picture/avatar (if no picture)
    */
-  window.createChatRoomOption = function (name, description, action=null, emoji=null, picture = null) {
+  window.createChatRoomOption = function (name, description, action=null, picture=null, unread=false, emoji=null) {
     if (!$sidebarList.length) {
       console.error("[home.js] Sidebar list not found. Make sure DOM is ready.");
       return;
@@ -103,7 +99,7 @@ $(document).ready(function() {
 
     // Create avatar with picture or emoji
     var $avatar;
-    if (picture) {
+    if (picture && picture !== true && picture !== false) {
       $avatar = $("<img>")
         .addClass("convo-item__avatar")
         .attr("src", picture)
@@ -141,11 +137,33 @@ $(document).ready(function() {
       .append($name, $preview);
 
     // Create list item with room ID (lowercase, no spaces)
-    var roomId = name.toLowerCase().replace(/\s+/g, '-');
+    var roomId = (name && typeof name === 'string') ? name.toLowerCase().replace(/\s+/g, '-') : 'unknown-room';
     var $item = $("<li>")
       .addClass("convo-item")
       .attr("data-room", roomId)
       .append($avatar, $info);
+
+    // Add unread styling if needed
+    if (unread) {
+      $item.css({
+        "background": "rgba(59, 130, 246, 0.1)" // Light blue background
+      });
+      
+      // Add unread indicator circle
+      var $unreadIndicator = $("<div>")
+        .css({
+          "width": "8px",
+          "height": "8px",
+          "background": "#1e40af", // Dark blue
+          "border-radius": "50%",
+          "position": "absolute",
+          "right": "12px",
+          "top": "50%",
+          "transform": "translateY(-50%)"
+        });
+      
+      $item.css("position", "relative").append($unreadIndicator);
+    }
 
     // Add click handler - use custom action if provided, otherwise default behavior
     $item.on("click", function () {
@@ -158,8 +176,6 @@ $(document).ready(function() {
 
     // Append to sidebar list
     $sidebarList.append($item);
-
-    console.log("[home.js] Created chat room:", name, "with:", picture ? "picture: " + picture : "emoji: " + (emoji || "📊"));
   };
 
   /**
@@ -175,7 +191,6 @@ $(document).ready(function() {
     }
     
     $sidebarList.empty();
-    console.log("[home.js] Cleared all chat room options");
   };
 
   /**
@@ -294,8 +309,6 @@ $(document).ready(function() {
     
     // Clear current chat feed
     $chatFeed.empty();
-    
-    console.log("[home.js] Switched to room:", roomId, roomName);
   }
 
   /**
@@ -367,8 +380,6 @@ $(document).ready(function() {
       this.style.height = "auto";
       this.style.height = Math.min(this.scrollHeight, 120) + "px";
     });
-
-    console.log("[home.js] Converted input to textarea for mobile");
   }
 
   /**
@@ -404,8 +415,6 @@ $(document).ready(function() {
 
     // Replace textarea with input
     $textarea.replaceWith($input);
-
-    console.log("[home.js] Converted textarea back to input for desktop");
   }
 
   /**
