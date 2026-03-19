@@ -26,36 +26,68 @@ function recv(message) {
         for (var i in data) {
             appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['time-stamp'], data[i]['username'] === username)
         }
-        if (typeof(msg[2]) === 'string') {
-            while (switch_room_mid_feed.length > 0) {
-                var msg = switch_room_mid_feed.splice(0, 1)[0]
-                appendMessage(msg['id'], msg['username'], msg['message'], msg['time-stamp'], msg['username'] === username)
-            }
-            switch_room_mid_feed_toggle = false
+    }
+    else if (msg[0] === 'Fetch Room Messages') {
+        document.querySelector('#chat-feed').innerHTML = ''
+        while (switch_room_mid_feed.length > 0) {
+            var msg = switch_room_mid_feed.splice(0, 1)[0]
+            appendMessage(msg['id'], msg['username'], msg['message'], msg['time-stamp'], msg['username'] === username)
         }
+        switch_room_mid_feed_toggle = false
+        data = msg[1]
+        for (var i in data) {
+            appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['time-stamp'], data[i]['username'] === username)
+        }
+        change_banner_picture(msg[3], false)
+        document.querySelector('.room-title').textContent = msg[2].toUpperCase()
+    }
+    else if (msg[0] === 'Fetch DM Messages') {
+        document.querySelector('#chat-feed').innerHTML = ''
+        while (switch_room_mid_feed.length > 0) {
+            var msg = switch_room_mid_feed.splice(0, 1)[0]
+            appendMessage(msg['id'], msg['username'], msg['message'], msg['time-stamp'], msg['username'] === username)
+        }
+        switch_room_mid_feed_toggle = false
+        data = msg[1]
+        for (var i in data) {
+            appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['time-stamp'], data[i]['username'] === username)
+        }
+        change_banner_picture(msg[3], true)
+        let dmParts = msg[2].split('.$@-@&.');
+        let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];
+        document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase()
     }
     else if (msg[0] === 'Get Rooms') {
         clearAllChatRoomOptions()
         data = msg[1]
         let unread = false
         for (var i in data) {
-            createChatRoomOption(data[i]['name'], data[i]['description'], function(){
-                switch_room(data[i]['roomname'])
-            }, false, unread, data[i]['emoji'])
+            let roomId = data[i]['name'];
+            createChatRoomOption(roomId, data[i]['name'], data[i]['description'], function(){
+                switch_room(data[i]['name'])
+            }, false, unread, data[i]['emoji'], roomId===ROOM)
         }
     }
     else if (msg[0] === 'Get Dms') {
         clearAllChatRoomOptions()
         data = msg[1]
         for (var i in data['unread']) {
-            createChatRoomOption(data['unread'][i]['username'], `${data['unread'][i]['first_name']} ${data['unread'][i]['last_name']}`, function(){
-                switch_dm(data['unread'][i]['username'])
-            }, `/static/profile-pictures/${data['unread'][i]['username']}.png`, true, true)
+            let dmId = sortAndJoinStrings(username, data['unread'][i]['username'])
+            let otherUsername = data['unread'][i]['username']
+            let firstName = data['unread'][i]['first_name']
+            let lastName = data['unread'][i]['last_name']
+            createChatRoomOption(dmId, otherUsername, `${firstName} ${lastName}`, function(){
+                switch_dm(otherUsername)
+            }, `/static/profile-pictures/${otherUsername}.png`, true, true, (dmId===ROOM))
         }
         for (var i in data['read']) {
-            createChatRoomOption(data['read'][i]['username'], `${data['read'][i]['first_name']} ${data['read'][i]['last_name']}`, function(){
-                switch_dm(data['read'][i]['username'])
-            }, `/static/profile-pictures/${data['read'][i]['username']}.png`, false, true)
+            let dmId = sortAndJoinStrings(username, data['read'][i]['username'])
+            let otherUsername = data['read'][i]['username']
+            let firstName = data['read'][i]['first_name']
+            let lastName = data['read'][i]['last_name']
+            createChatRoomOption(dmId, otherUsername, `${firstName} ${lastName}`, function(){
+                switch_dm(otherUsername)
+            }, `/static/profile-pictures/${otherUsername}.png`, false, true, (dmId===ROOM))
         }
     }
 
@@ -144,5 +176,5 @@ cl.on('message', recv)
 
 cl.send(JSON.stringify(['Fetch Messages', {'username': username, 'password': password, 'room': 'mainroom', 'limit': 50, 'offset': 0}]))
 setTimeout(function() {
-    cl.send(JSON.stringify(['Get Dms', {'username': username, 'password': password}]))
+    cl.send(JSON.stringify(['Get Rooms', {'username': username, 'password': password, 'roomtype': 'public'}]))
 }, 300);

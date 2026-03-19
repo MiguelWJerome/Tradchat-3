@@ -54,10 +54,17 @@ def db_sql(sql, db_string, params=[], chat_room=False):
 
 def check_room_access(room_name, username):
     user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
-    queryResults = db_sql("""SELECT room_type, members FROM rooms WHERE room_name = ?;""", 'rooms', params=[room_name], chat_room=False)
+    queryResults = db_sql("""SELECT room_type, owners, managers, curators, members FROM rooms WHERE room_name = ?;""", 'rooms', params=[room_name], chat_room=False)
     
     if queryResults[0][0] == 'private':
-        if str(user_id) in split(queryResults[0][1]):
+        owners = split(queryResults[0][1])
+        managers = split(queryResults[0][2])
+        curators = split(queryResults[0][3])
+        members = split(queryResults[0][4])
+
+        all_members = owners+managers+curators+members
+        
+        if str(user_id) in all_members:
             return True
         else:
             return False
@@ -360,6 +367,9 @@ def home():
             colors = ast.literal_eval(colorsFile.read())
             colorsFile.close()
 
+            room = db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+            room_emoji = db_sql("SELECT emoji FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)[0][0]
+
 
             return render_template(
                 'home.html',
@@ -367,7 +377,8 @@ def home():
                 color_dark=colors['color_dark'],
                 color_medium=colors['color_medium'],
                 color_light=colors['color_light'],
-                room=db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0],
+                room=room,
+                room_emoji=room_emoji
             )
 
         else:
@@ -501,7 +512,7 @@ def Recv(message, sid):
             if check_room_access(new_room, username):
                 Server.server.leave_room(sid, old_group)
                 Server.server.enter_room(sid, new_room)
-                Server.send(str(['Fetch Messages', fetch_messages(new_room, 50, 0), 'switched room']), room=sid)
+                Server.send(str(['Fetch Room Messages', fetch_messages(new_room, 50, 0), new_room, db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[new_room], chat_room=False)[0][0]]), room=sid)
             else:
                 return # User not allowed in room
         else:
@@ -526,6 +537,8 @@ def Recv(message, sid):
             genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
             
             raw_messages = db_sql(f"""SELECT id, user_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ?""", genderDict[primaryGender], params=[f"{primary_user_id}-{secondary_user_id}"], chat_room=False)
+
+            actual_user_dm_username = new_dm.split('.$@-@&.')[1] if new_dm.split('.$@-@&.')[0] == username else new_dm.split('.$@-@&.')[0]
             
             messages = []
             for message in raw_messages:
@@ -538,7 +551,7 @@ def Recv(message, sid):
                     'upload': message[5]
                 })
             
-            Server.send(str(['Fetch Messages', messages, 'switched room']), room=sid)
+            Server.send(str(['Fetch DM Messages', messages, new_dm, f'/static/profile-pictures/{actual_user_dm_username}.png']), room=sid)
             
         else:
             return 
@@ -710,6 +723,24 @@ def Recv(message, sid):
                 return
             
             else:
+                new_room_connection = sqlite3.connect(f'rooms/{roomname}.db')
+                new_room_cursor = new_room_connection.cursor()
+
+                new_room_cursor.execute('''
+                    CREATE TABLE messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        message TEXT NOT NULL,
+                        timestamp TEXT NOT NULL,
+                        reply_id INTEGER NOT NULL,
+                        upload TEXT NOT NULL
+                    );
+                ''')
+                
+                new_room_connection.close()
+
+                room_dict[roomname] = {'filepath': f'rooms/{roomname}.db', 'lock': Lock()}
+
                 db_sql("""INSERT INTO rooms (room_name, description, room_type, owners, managers, curators, members, emoji) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", 'rooms', params=[roomname, description, roomtype, str(db_sql("SELECT id FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]), '', '', '', emoji], chat_room=False)
                 
                 Server.send(str(['Create Room Results', 'Room Created']), room=sid)

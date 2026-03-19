@@ -6,10 +6,21 @@
  *
  * PURPOSE
  * -------
- * This file contains three essential functions for the TradChat interface:
+ * This file contains essential functions for the TradChat interface:
  * 1. createChatRoomOption - Creates and adds a chat room option to the sidebar
+ *    Args: (id, name, description, action=null, picture=null, unread=false, emoji=null, active=false)
+ *    - id: unique string ID for the room
+ *    - active: if true, marks this option as selected on creation
  * 2. appendMessage - Appends a message to the chat feed
  * 3. clearAllChatRoomOptions - Clears all chat room options from the sidebar
+ * 4. changeSelectedRoomOption - Changes which room option is visually selected
+ *    Args: (roomId) - pass null to deselect all
+ * 5. change_banner_picture - Changes the banner picture/emoji in the chat panel header
+ *    Args: (emoji, picture=false) - if picture=true, emoji is treated as a URL
+ *
+ * STATE TRACKING
+ * --------------
+ * - selectedRoomId: stores the currently selected room ID (string, null if none)
  *
  * DEPENDENCIES
  * ------------
@@ -26,8 +37,8 @@ if (typeof $ === 'undefined') {
 
 // Initialize sidebar tray functionality when document is ready
 $(document).ready(function() {
-    // 1. Set 'Messenger' as active by default on load
-    $('.tray-item:first').addClass('active');
+    // 1. Set 'Public Rooms' as active by default on load
+    $('.tray-item:eq(1)').addClass('active');
 
     // 2. Handle Tray Item Clicks
     $('.tray-item').on('click', function() {
@@ -66,21 +77,26 @@ $(document).ready(function() {
     $chatFeed = $("#chat-feed");
   });
 
+  // Track the currently selected room ID (string)
+  var selectedRoomId = null;
+
   /**
-   * createChatRoomOption(name, description, action=null, picture=null, unread=false, emoji=null)
-   * --------------------------------------------
+   * createChatRoomOption(id, name, description, action=null, picture=null, unread=false, emoji=null, active=false)
+   * ----------------------------------------------------------------------------------------------------------
    * Creates a chat room option in the sidebar with the provided parameters.
    * Uses emoji as the avatar display by default, or a picture if provided.
    * Shows description as preview. Can execute custom action when clicked.
    *
+   * @param {string} id - The unique ID for this room option
    * @param {string} name - The name of the chat room
    * @param {string} description - Description/preview text for the room
    * @param {function} action - Optional function to call when clicked (overrides default behavior)
    * @param {string} picture - Optional picture URL to use instead of emoji
    * @param {boolean} unread - Whether the room has unread messages (adds blue styling)
    * @param {string} emoji - The emoji to use as profile picture/avatar (if no picture)
+   * @param {boolean} active - If true, marks this option as selected
    */
-  window.createChatRoomOption = function (name, description, action=null, picture=null, unread=false, emoji=null) {
+  window.createChatRoomOption = function (id, name, description, action=null, picture=null, unread=false, emoji=null, active=false) {
     if (!$sidebarList.length) {
       console.error("[home.js] Sidebar list not found. Make sure DOM is ready.");
       return;
@@ -136,8 +152,8 @@ $(document).ready(function() {
       .addClass("convo-item__info")
       .append($name, $preview);
 
-    // Create list item with room ID (lowercase, no spaces)
-    var roomId = (name && typeof name === 'string') ? name.toLowerCase().replace(/\s+/g, '-') : 'unknown-room';
+    // Create list item with provided ID
+    var roomId = id || (name && typeof name === 'string' ? name.toLowerCase().replace(/\s+/g, '-') : 'unknown-room');
     var $item = $("<li>")
       .addClass("convo-item")
       .attr("data-room", roomId)
@@ -167,6 +183,9 @@ $(document).ready(function() {
 
     // Add click handler - use custom action if provided, otherwise default behavior
     $item.on("click", function () {
+      // Update selected room tracking
+      changeSelectedRoomOption(roomId);
+
       if (action && typeof action === 'function') {
         action(name, roomId);
       } else {
@@ -176,6 +195,34 @@ $(document).ready(function() {
 
     // Append to sidebar list
     $sidebarList.append($item);
+
+    // If active, select this room
+    if (active) {
+      changeSelectedRoomOption(roomId);
+    }
+  };
+
+  /**
+   * changeSelectedRoomOption(roomId)
+   * ---------------------------------
+   * Changes the selected room option by deselecting the current one
+   * and selecting the new one based on the provided room ID.
+   *
+   * @param {string} roomId - The ID of the room to select
+   */
+  window.changeSelectedRoomOption = function (roomId) {
+    // Deselect the current room if one exists
+    if (selectedRoomId) {
+      $(".convo-item[data-room='" + selectedRoomId + "']").removeClass("active");
+    }
+
+    // Update the selected room ID
+    selectedRoomId = roomId;
+
+    // Select the new room if roomId is provided
+    if (roomId) {
+      $(".convo-item[data-room='" + roomId + "']").addClass("active");
+    }
   };
 
   /**
@@ -191,6 +238,53 @@ $(document).ready(function() {
     }
     
     $sidebarList.empty();
+  };
+
+  /**
+   * change_banner_picture(emoji, picture=false)
+   * -------------------------------------------
+   * Changes the banner picture/emoji in the chat panel header.
+   * If picture is true, treats emoji as a URL and creates an image avatar.
+   * Otherwise, displays the emoji as text.
+   *
+   * @param {string} emoji - The emoji to display, or URL if picture=true
+   * @param {boolean} picture - If true, creates an image avatar with emoji as src
+   */
+  window.change_banner_picture = function (emoji, picture=false) {
+    var $bannerPicture = $("#banner-picture");
+    if (!$bannerPicture.length) {
+      console.error("[home.js] Banner picture element not found.");
+      return;
+    }
+
+    if (picture && emoji) {
+      // Create image avatar with emoji as URL
+      var $img = $("<img>")
+        .addClass("convo-item__avatar")
+        .attr("id", "banner-picture")
+        .attr("src", emoji)
+        .css({
+          "width": "42px",
+          "height": "42px",
+          "border-radius": "50%",
+          "object-fit": "cover"
+        })
+        .on("error", function() {
+          // Fallback to emoji if image fails to load
+          $(this).replaceWith($("<div>")
+            .addClass("convo-item__avatar")
+            .attr("id", "banner-picture")
+            .text("📊"));
+        });
+      $bannerPicture.replaceWith($img);
+    } else {
+      // Create or update div with emoji text
+      var $div = $("<div>")
+        .addClass("convo-item__avatar")
+        .attr("id", "banner-picture")
+        .text(emoji || "📊");
+      $bannerPicture.replaceWith($div);
+    }
   };
 
   /**
