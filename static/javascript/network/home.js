@@ -9,6 +9,7 @@ let switch_room_mid_feed = []
 let switch_room_mid_feed_toggle = false
 
 function recv(message) {
+    console.log(message)
     msg = eval(message)
     console.log(msg)
     if (msg[0] === 'Message') {
@@ -144,7 +145,12 @@ function switch_dm(dm_username) {
 }
 
 sendButton.addEventListener('click', function() {
-    cl.send(JSON.stringify(['Message', {'setting': 'room', 'room': ROOM, 'username': localStorage['username'], 'password': localStorage['password'], 'time-stamp': Date(), 'message': chatInput.value, 'reply-index': -1, 'upload': ''}]))
+    setting = 'room'
+    if (ROOM.split('.$@-@&.').length > 1)
+    {
+        setting = 'dm'
+    }
+    cl.send(JSON.stringify(['Message', {'setting': setting, 'room': ROOM, 'username': localStorage['username'], 'password': localStorage['password'], 'time-stamp': Date(), 'message': chatInput.value, 'reply-index': -1, 'upload': ''}]))
     chatInput.value = ''
 })
 

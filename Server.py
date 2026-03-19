@@ -11,7 +11,7 @@ import secrets
 from threading import Thread, Lock
 import ast
 
-def db_sql(sql, db_string, params=[], chat_room=False):
+def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
     # The 'with' statement handles the "waiting" and "releasing" for you!
     lock = None
     db_path = None
@@ -46,7 +46,7 @@ def db_sql(sql, db_string, params=[], chat_room=False):
         else:
             conn.commit()
             result = True
-            if chat_room:
+            if chat_room or provide_id:
                 result = cursor.lastrowid
             
         conn.close()
@@ -225,7 +225,7 @@ if not os.path.exists("dms/boys_dm.db"):
         CREATE TABLE boys_dm (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             convo_hash TEXT NOT NULL,
-            user_id INTEGER NOT NULL,
+            sender_id INTEGER NOT NULL,
             message TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             reply_id INTEGER NOT NULL,
@@ -241,7 +241,7 @@ if not os.path.exists("dms/girls_dm.db"):
         CREATE TABLE girls_dm (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             convo_hash TEXT NOT NULL,
-            user_id INTEGER NOT NULL,
+            sender_id INTEGER NOT NULL,
             message TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             reply_id INTEGER NOT NULL,
@@ -470,9 +470,21 @@ def Recv(message, sid):
                     message_id = db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, reply_index, upload], chat_room=True)
                     Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp}]), room=room)
             
-            elif setting == 'direct message':
-                # Send message to direct message
-                pass
+            elif setting == 'dm':
+                actual_user_dm_username = room.split('.$@-@&.')[1] if room.split('.$@-@&.')[0] == username else room.split('.$@-@&.')[0]
+
+                username_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
+
+                important_id, important_gender = db_sql("""SELECT id, gender FROM accounts WHERE username = ?;""", 'accounts', params=[room.split('.$@-@&.')[0]], chat_room=False)[0]
+                un_important_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[room.split('.$@-@&.')[1]], chat_room=False)[0][0]
+
+                fm_to_gb = {'female': 'girl', 'male': 'boy'}
+
+                gmt_timestamp = convert_to_gmt(timestamp)
+
+                message_id = db_sql(f"""INSERT INTO {fm_to_gb[important_gender]}s_dm (convo_hash, sender_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?, ?);""", f"{fm_to_gb[important_gender]}s_dm", params=[f"{important_id}-{un_important_id}", username_id, user_message, gmt_timestamp, reply_index, upload], chat_room=False, provide_id=True)
+                Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp}]), room=room)
+                
 
     elif msg[0] == 'Fetch Messages':
         username = msg[1]['username']
@@ -536,7 +548,7 @@ def Recv(message, sid):
 
             genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
             
-            raw_messages = db_sql(f"""SELECT id, user_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ?""", genderDict[primaryGender], params=[f"{primary_user_id}-{secondary_user_id}"], chat_room=False)
+            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ?""", genderDict[primaryGender], params=[f"{primary_user_id}-{secondary_user_id}"], chat_room=False)
 
             actual_user_dm_username = new_dm.split('.$@-@&.')[1] if new_dm.split('.$@-@&.')[0] == username else new_dm.split('.$@-@&.')[0]
             
