@@ -386,7 +386,8 @@
 .chat-panel__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 12px;
   padding: 12px 20px;
   border-bottom: 1.5px solid var(--color-border);
   width: 50%;
