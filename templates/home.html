@@ -156,7 +156,7 @@
     Includes room name, description, emoji selector, and room status options
   -->
   <div id="create-room-modal" class="modal-overlay" style="display: none;" aria-hidden="true">
-    <div class="modal-container" style="background: #e8e4dc; border: 2px solid var(--color-dark); border-radius: 12px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto;">
+    <div class="modal-container" style="background: white; border-radius: 12px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto;">
       <!-- Modal Header -->
       <div class="modal-header">
         <h2 class="modal-title">Create Room</h2>
@@ -188,9 +188,12 @@
             <input type="text" id="room-description" class="modal-input" placeholder="" />
           </div>
 
-          <p class="modal-note">
-            *You can go back and edit your room settings in the MANAGE ROOMS section of SETTINGS, which can be acccessed by clicking your profile in the top right corner*
-          </p>
+          <div class="modal-bottom-row">
+            <p class="modal-note">
+              *You can go back and edit your room settings in the MANAGE ROOMS section of SETTINGS, which can be acccessed by clicking your profile in the top right corner*
+            </p>
+            <button class="submit-btn" id="create-room-submit">Submit</button>
+          </div>
         </div>
 
         <!-- Right Column: Room Status -->
@@ -228,11 +231,6 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="modal-footer">
-        <button class="submit-btn" id="create-room-submit">Submit</button>
       </div>
     </div>
   </div>

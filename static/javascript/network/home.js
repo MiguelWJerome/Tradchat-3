@@ -154,6 +154,25 @@ sendButton.addEventListener('click', function() {
     chatInput.value = ''
 })
 
+// Bind mainroom button to switch to public rooms and join mainroom
+document.getElementById('back-to-mainroom').addEventListener('click', function() {
+    // Switch tray selection to Public Rooms
+    document.getElementById('messenger-icon').classList.remove('active');
+    document.getElementById('private-rooms-icon').classList.remove('active');
+    document.getElementById('public-rooms-icon').classList.add('active');
+    
+    // Get public rooms list
+    cl.send(JSON.stringify(['Get Rooms', {'username': username, 'password': password, 'roomtype': 'public'}]));
+    
+    // Switch to mainroom
+    switch_room('mainroom');
+});
+
+// Bind Create button in sidebar to open modal
+document.getElementById('create-btn').addEventListener('click', function() {
+    roomModal('show');
+});
+
 function create_dm(user) {
     // TODO: Implement create DM functionality
     cl.send(JSON.stringify(['Create DM', {'username': username, 'password': password, 'user': user}]))

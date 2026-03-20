@@ -756,11 +756,10 @@
 }
 
 .modal-container {
-  background: #e8e4dc;
-  border: 2px solid var(--color-dark);
+  background: white;
   border-radius: 12px;
   width: 90%;
-  max-width: 600px;
+  max-width: 700px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 4px 4px 0 var(--color-dark);
@@ -887,6 +886,15 @@
   color: var(--color-dark);
   opacity: 0.8;
   line-height: 1.4;
+  flex: 1;
+}
+
+/* Modal Bottom Row */
+.modal-bottom-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
   margin-top: 8px;
 }
 

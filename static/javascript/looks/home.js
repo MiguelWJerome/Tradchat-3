@@ -773,11 +773,6 @@ $(document).ready(function() {
     $("#create-room-submit").on("click", function() {
       submitRoomCreation();
     });
-    
-    // Bind Create button in sidebar to open modal
-    $("#create-btn").on("click", function() {
-      roomModal('show');
-    });
   });
 
 })(); // End IIFE
