@@ -715,6 +715,17 @@ def Recv(message, sid):
         # Username available - create account
         db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2'], chat_room=False)
 
+        # Get new user ID and add to Server/Admin dms
+        new_id = str(db_sql("SELECT id FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0])
+        server_dms = split(db_sql("SELECT dms FROM accounts WHERE id = 1;", 'accounts', chat_room=False)[0][0])
+        if new_id not in server_dms:
+            server_dms.append(new_id)
+            db_sql("UPDATE accounts SET dms = ? WHERE id = 1;", 'accounts', params=[join(server_dms)], chat_room=False)
+        admin_dms = split(db_sql("SELECT dms FROM accounts WHERE id = 2;", 'accounts', chat_room=False)[0][0])
+        if new_id not in admin_dms:
+            admin_dms.append(new_id)
+            db_sql("UPDATE accounts SET dms = ? WHERE id = 2;", 'accounts', params=[join(admin_dms)], chat_room=False)
+
         shutil.copyfile(f'static/graphics/default{gender.capitalize()}.png', f'static/profile-pictures/{username}.png')
         
         Server.send(str(['Create Account Results', data['username'], 'Success']), room=sid)

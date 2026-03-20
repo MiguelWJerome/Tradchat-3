@@ -150,6 +150,93 @@
       </section>
     </main><!-- /main-content -->
 
+  <!--
+    CREATE ROOM MODAL
+    Hidden by default, shown via roomModal() function in looks/home.js
+    Includes room name, description, emoji selector, and room status options
+  -->
+  <div id="create-room-modal" class="modal-overlay" style="display: none;" aria-hidden="true">
+    <div class="modal-container" style="background: #e8e4dc; border: 2px solid var(--color-dark); border-radius: 12px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto;">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h2 class="modal-title">Create Room</h2>
+        <button class="modal-close-btn" id="modal-close-x" aria-label="Close modal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="modal-body">
+        <!-- Left Column: Form Fields -->
+        <div class="modal-left">
+          <div class="form-group">
+            <label>Room Emoji:</label>
+            <div class="emoji-selector" id="room-emoji-selector">
+              <div class="emoji-display" id="selected-emoji">
+                <i class="fa-solid fa-xmark"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="room-name">Room Name:</label>
+            <input type="text" id="room-name" class="modal-input" placeholder="" />
+          </div>
+
+          <div class="form-group">
+            <label for="room-description">Room Discription:</label>
+            <input type="text" id="room-description" class="modal-input" placeholder="" />
+          </div>
+
+          <p class="modal-note">
+            *You can go back and edit your room settings in the MANAGE ROOMS section of SETTINGS, which can be acccessed by clicking your profile in the top right corner*
+          </p>
+        </div>
+
+        <!-- Right Column: Room Status -->
+        <div class="modal-right">
+          <div class="room-status-box">
+            <h3 class="status-title">Room Status</h3>
+
+            <div class="radio-option">
+              <input type="radio" id="open-room" name="room-status" value="open" checked />
+              <div class="radio-content">
+                <label for="open-room" class="radio-label">Open Room</label>
+                <span class="radio-description">Anyone has access</span>
+              </div>
+            </div>
+
+            <div class="radio-option">
+              <input type="radio" id="invite-room" name="room-status" value="invite" />
+              <div class="radio-content">
+                <label for="invite-room" class="radio-label">Invite Room</label>
+                <span class="radio-description">You choose who has access</span>
+              </div>
+            </div>
+
+            <button class="send-invitations-btn" id="send-invitations-btn" disabled>
+              <span>Send Invitations</span>
+              <i class="fa-solid fa-user-plus"></i>
+            </button>
+
+            <!-- Invitations Dropdown (hidden by default) -->
+            <div class="invitations-dropdown" id="invitations-dropdown" style="display: none;">
+              <h4>Select people to invite:</h4>
+              <ul class="invite-list" id="invite-list">
+                <!-- Populated dynamically by JS -->
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-footer">
+        <button class="submit-btn" id="create-room-submit">Submit</button>
+      </div>
+    </div>
+  </div>
+
 {% endblock %}
 
 {% block scripts %}

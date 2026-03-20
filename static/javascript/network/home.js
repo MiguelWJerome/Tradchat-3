@@ -19,25 +19,25 @@ function recv(message) {
         }
         else {
             data = msg[1]
-            appendMessage(data['id'], data['username'], data['message'], data['time-stamp'], data['username'] === username)
+            appendMessage(data['id'], data['username'], data['message'], data['timestamp'], data['username'] === username)
         }
     }
     else if (msg[0] === 'Fetch Messages') {
         data = msg[1]
         for (var i in data) {
-            appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['time-stamp'], data[i]['username'] === username)
+            appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username)
         }
     }
     else if (msg[0] === 'Fetch Room Messages') {
         document.querySelector('#chat-feed').innerHTML = ''
         while (switch_room_mid_feed.length > 0) {
             var msg = switch_room_mid_feed.splice(0, 1)[0]
-            appendMessage(msg['id'], msg['username'], msg['message'], msg['time-stamp'], msg['username'] === username)
+            appendMessage(msg['id'], msg['username'], msg['message'], msg['timestamp'], msg['username'] === username)
         }
         switch_room_mid_feed_toggle = false
         data = msg[1]
         for (var i in data) {
-            appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['time-stamp'], data[i]['username'] === username)
+            appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username)
         }
         change_banner_picture(msg[3], false)
         document.querySelector('.room-title').textContent = msg[2].toUpperCase()
@@ -46,12 +46,12 @@ function recv(message) {
         document.querySelector('#chat-feed').innerHTML = ''
         while (switch_room_mid_feed.length > 0) {
             var msg = switch_room_mid_feed.splice(0, 1)[0]
-            appendMessage(msg['id'], msg['username'], msg['message'], msg['time-stamp'], msg['username'] === username)
+            appendMessage(msg['id'], msg['username'], msg['message'], msg['timestamp'], msg['username'] === username)
         }
         switch_room_mid_feed_toggle = false
         data = msg[1]
         for (var i in data) {
-            appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['time-stamp'], data[i]['username'] === username)
+            appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username)
         }
         change_banner_picture(msg[3], true)
         let dmParts = msg[2].split('.$@-@&.');

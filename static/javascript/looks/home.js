@@ -319,7 +319,8 @@ $(document).ready(function() {
 
     // --- 2. Big Centered Date Stamp ---
     var $lastMsg = $chatFeed.find(".message").last();
-    var lastDateAttr = $lastMsg.attr("data-date"); 
+    var lastDateAttr = $lastMsg.attr("data-date");
+    var lastTimestamp = parseInt($lastMsg.attr("data-timestamp") || "0");
 
     if (lastDateAttr !== fullDateStr) {
         $chatFeed.append($("<div>")
@@ -331,7 +332,10 @@ $(document).ready(function() {
     // --- 3. Construction ---
     var displayUser = myself ? "You" : username;
     var lastUser = $lastMsg.attr("data-user");
-    var isSameUser = (lastUser === displayUser) && (lastDateAttr === fullDateStr);
+    var currentTimestamp = msgDate.getTime();
+    var timeDiffMs = currentTimestamp - lastTimestamp;
+    var fiveMinutesMs = 5 * 60 * 1000; // 5 minutes in milliseconds
+    var isSameUser = (lastUser === displayUser) && (lastDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs);
 
     if (isSameUser) {
         // Grouped bubble
@@ -344,7 +348,7 @@ $(document).ready(function() {
         $lastMsg.find(".message__content").append($newBubble);
     } else {
         // New Message Group
-        var $msg = $("<div>").addClass("message").attr("data-user", displayUser).attr("data-date", fullDateStr);
+        var $msg = $("<div>").addClass("message").attr("data-user", displayUser).attr("data-date", fullDateStr).attr("data-timestamp", msgDate.getTime());
         $msg.attr("id", id);
         if (myself) $msg.addClass("own");
 
@@ -550,6 +554,229 @@ $(document).ready(function() {
           convertTextareaToInput();
         }
       }
+    });
+  });
+
+  /**
+   * =========================================================================
+   * CREATE ROOM MODAL FUNCTIONALITY
+   * roomModal() and related functions for the Create Room modal
+   * =========================================================================
+   */
+
+  /**
+   * roomModal(action)
+   * ---------------
+   * Controls the visibility of the Create Room modal.
+   * 
+   * @param {string} action - 'show' to display the modal, 'hide' to hide it
+   */
+  window.roomModal = function(action) {
+    var $modal = $("#create-room-modal");
+    
+    if (action === 'show') {
+      $modal.css('display', 'flex').attr('aria-hidden', 'false');
+      // Reset form when showing
+      resetRoomModal();
+    } else if (action === 'hide') {
+      $modal.css('display', 'none').attr('aria-hidden', 'true');
+    }
+  };
+
+  /**
+   * resetRoomModal()
+   * ---------------
+   * Resets the modal form to default state.
+   */
+  function resetRoomModal() {
+    $("#room-name").val('');
+    $("#room-description").val('');
+    $("#selected-emoji").html('<i class="fa-solid fa-xmark"></i>');
+    $("#open-room").prop('checked', true);
+    $("#invite-room").prop('checked', false);
+    $("#send-invitations-btn").prop('disabled', true);
+    $("#invitations-dropdown").hide();
+    selectedInvitees = [];
+  }
+
+  // Track selected invitees
+  var selectedInvitees = [];
+
+  /**
+   * loadInviteList()
+   * ---------------
+   * Loads the list of users available to invite.
+   * Populates the invitations dropdown.
+   */
+  function loadInviteList() {
+    var $inviteList = $("#invite-list");
+    $inviteList.empty();
+    
+    // Sample users - replace with actual user list from your backend
+    var users = [
+      { id: 1, name: "Alice Johnson" },
+      { id: 2, name: "Bob Smith" },
+      { id: 3, name: "Charlie Brown" },
+      { id: 4, name: "Diana Prince" },
+      { id: 5, name: "Eve Davis" }
+    ];
+    
+    users.forEach(function(user) {
+      var $item = $("<li>").addClass("invite-list-item");
+      var $checkbox = $("<input>")
+        .attr("type", "checkbox")
+        .attr("id", "invite-" + user.id)
+        .attr("value", user.id)
+        .on("change", function() {
+          if ($(this).is(":checked")) {
+            selectedInvitees.push(user.id);
+          } else {
+            selectedInvitees = selectedInvitees.filter(function(id) {
+              return id !== user.id;
+            });
+          }
+        });
+      
+      var $label = $("<label>")
+        .attr("for", "invite-" + user.id)
+        .text(user.name);
+      
+      $item.append($checkbox, $label);
+      $inviteList.append($item);
+    });
+  }
+
+  /**
+   * submitRoomCreation()
+   * ------------------
+   * Handles form submission for creating a new room.
+   */
+  function submitRoomCreation() {
+    var roomName = $("#room-name").val().trim();
+    var roomDescription = $("#room-description").val().trim();
+    var roomEmoji = $("#selected-emoji").text().trim() || $("#selected-emoji i").length ? '❌' : $("#selected-emoji").text();
+    var roomStatus = $("input[name='room-status']:checked").val();
+    
+    if (!roomName) {
+      alert("Please enter a room name.");
+      return;
+    }
+    
+    var roomData = {
+      name: roomName,
+      description: roomDescription,
+      emoji: roomEmoji === '❌' ? '📢' : roomEmoji, // Default emoji if X
+      status: roomStatus,
+      invitees: roomStatus === 'invite' ? selectedInvitees : []
+    };
+    
+    console.log("Creating room:", roomData);
+    
+    // TODO: Send to backend
+    // $.ajax({
+    //   url: '/api/create-room',
+    //   method: 'POST',
+    //   data: JSON.stringify(roomData),
+    //   contentType: 'application/json',
+    //   success: function(response) {
+    //     console.log("Room created:", response);
+    //     roomModal('hide');
+    //   },
+    //   error: function(xhr, status, error) {
+    //     console.error("Error creating room:", error);
+    //     alert("Failed to create room. Please try again.");
+    //   }
+    // });
+    
+    // For now, just close the modal
+    roomModal('hide');
+  }
+
+  // Document ready handlers for modal
+  $(document).ready(function() {
+    // Close modal when clicking the X button
+    $("#modal-close-x").on("click", function() {
+      roomModal('hide');
+    });
+    
+    // Close modal when clicking outside the container
+    $("#create-room-modal").on("click", function(e) {
+      if ($(e.target).is("#create-room-modal")) {
+        roomModal('hide');
+      }
+    });
+    
+    // Handle room status radio button changes
+    $("input[name='room-status']").on("change", function() {
+      var isInviteRoom = $("#invite-room").is(":checked");
+      var $sendBtn = $("#send-invitations-btn");
+      
+      if (isInviteRoom) {
+        $sendBtn.prop('disabled', false);
+      } else {
+        $sendBtn.prop('disabled', true);
+        $("#invitations-dropdown").hide();
+      }
+    });
+    
+    // Handle Send Invitations button click
+    $("#send-invitations-btn").on("click", function() {
+      if ($(this).prop('disabled')) return;
+      
+      var $dropdown = $("#invitations-dropdown");
+      
+      if ($dropdown.is(":visible")) {
+        $dropdown.hide();
+      } else {
+        loadInviteList();
+        $dropdown.show();
+      }
+    });
+    
+    // Handle emoji selector click
+    $("#room-emoji-selector").on("click", function() {
+      // Create a simple emoji picker if it doesn't exist
+      var $picker = $("#room-emoji-picker");
+      
+      if ($picker.length === 0) {
+        var emojis = ['📢', '💬', '🎮', '🎵', '📚', '💼', '🎨', '🏆', '🔬', '🍕', '🎬', '✈️', '🏠', '🐱', '🐶', '🌟'];
+        $picker = $("<div>")
+          .attr("id", "room-emoji-picker")
+          .addClass("room-emoji-picker");
+        
+        emojis.forEach(function(emoji) {
+          $("<button>")
+            .addClass("emoji-btn")
+            .text(emoji)
+            .on("click", function(e) {
+              e.stopPropagation();
+              $("#selected-emoji").text(emoji);
+              $picker.removeClass("open");
+            })
+            .appendTo($picker);
+        });
+        
+        $("#room-emoji-selector").append($picker);
+      }
+      
+      $picker.toggleClass("open");
+    });
+    
+    // Close emoji picker when clicking outside
+    $(document).on("click", function(e) {
+      if (!$(e.target).closest("#room-emoji-selector").length) {
+        $("#room-emoji-picker").removeClass("open");
+      }
+    });
+    
+    // Handle Submit button
+    $("#create-room-submit").on("click", function() {
+      submitRoomCreation();
+    });
+    
+    // Bind Create button in sidebar to open modal
+    $("#create-btn").on("click", function() {
+      roomModal('show');
     });
   });
 
