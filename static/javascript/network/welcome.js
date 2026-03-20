@@ -2,7 +2,15 @@ cl = io()
 
 cl.connect('http://'+document.domain+':'+location.port)
 
+// Detect login loop - clear credentials if we've tried logging in multiple times recently
+if (sessionStorage['login_attempts'] && parseInt(sessionStorage['login_attempts']) > 2) {
+    localStorage.removeItem('username');
+    localStorage.removeItem('password');
+    sessionStorage.removeItem('login_attempts');
+}
+
 if (typeof(localStorage['username']) !== 'undefined' && typeof(localStorage['password']) !== 'undefined') {
+    sessionStorage['login_attempts'] = (parseInt(sessionStorage['login_attempts'] || 0) + 1).toString();
     cl.send(JSON.stringify(['Secret Log In', {username: localStorage['username'], password: localStorage['password']}]));
 }
 
@@ -14,6 +22,7 @@ function recv(message) {
         if (msg[2] === 'Success') {
             localStorage['username'] = msg[1]
             localStorage['password'] = msg[3]
+            sessionStorage.removeItem('login_attempts'); // Clear loop counter on success
             form('/computer-log-into-server/', {'username': localStorage['username'], 'password': localStorage['password']}, 'post')
         }
         else if (msg[2] === 'Wrong Username')

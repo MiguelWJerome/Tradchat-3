@@ -37,9 +37,6 @@ if (typeof $ === 'undefined') {
 
 // Initialize sidebar tray functionality when document is ready
 $(document).ready(function() {
-    // 1. Set 'Public Rooms' as active by default on load
-    $('.tray-item:eq(1)').addClass('active');
-
     // 2. Handle Tray Item Clicks
     $('.tray-item').on('click', function() {
         // Remove active class from all items

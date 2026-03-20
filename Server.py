@@ -368,7 +368,14 @@ def home():
             colorsFile.close()
 
             room = db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
-            room_emoji = db_sql("SELECT emoji FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)[0][0]
+            
+            if '.$@-@&.' in room:                
+                actual_user_dm_username = room.split('.$@-@&.')[1] if room.split('.$@-@&.')[0] == username else room.split('.$@-@&.')[0]
+
+                room_emoji = f"/static/profile-pictures/{actual_user_dm_username}.png"
+                room_type = 'dm'
+            else:
+                room_emoji, room_type = db_sql("SELECT emoji, room_type FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)[0]
 
 
             return render_template(
@@ -378,13 +385,14 @@ def home():
                 color_medium=colors['color_medium'],
                 color_light=colors['color_light'],
                 room=room,
-                room_emoji=room_emoji
+                room_emoji=room_emoji,
+                room_type=room_type
             )
 
         else:
             raise KeyError('Why do people try to hack accounts?')
 
-    except KeyError:
+    except (KeyError, SyntaxError, ValueError):
         return redirect('/')
 
 
@@ -524,6 +532,9 @@ def Recv(message, sid):
             if check_room_access(new_room, username):
                 Server.server.leave_room(sid, old_group)
                 Server.server.enter_room(sid, new_room)
+
+                db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_room, username], chat_room=False)
+
                 Server.send(str(['Fetch Room Messages', fetch_messages(new_room, 50, 0), new_room, db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[new_room], chat_room=False)[0][0]]), room=sid)
             else:
                 return # User not allowed in room
@@ -562,6 +573,8 @@ def Recv(message, sid):
                     'reply_id': message[4],
                     'upload': message[5]
                 })
+
+            db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_dm, username], chat_room=False)
             
             Server.send(str(['Fetch DM Messages', messages, new_dm, f'/static/profile-pictures/{actual_user_dm_username}.png']), room=sid)
             

@@ -1,1 +1,1 @@
-{'dark': '#013220', 'main': '#66BB6A', 'light': '#FFF9C4'}
+{'color_dark': '#013220', 'color_medium': '#66BB6A', 'color_light': '#FFF9C4'}

@@ -103,8 +103,8 @@
 
         <!-- Room header — the arrow-chevron label shown in wireframe -->
         <div class="chat-panel__header">
-          <div class="convo-item__avatar" id="banner-picture">{{ room_emoji }}</div>
-          <h2 class="room-title">MAINROOM</h2>
+          <div class="convo-item__avatar" id="banner-picture"></div>
+          <h2 class="room-title"></h2>
         </div>
 
         <!-- Scrollable message feed -->
@@ -239,7 +239,9 @@
 
 {% block scripts %}
 <script>
-  let ROOM = '{{ room }}';
+  let ROOM = '{{ room }}'.replaceAll('amp;', '');
+  let ROOM_TYPE = '{{ room_type }}';
+  let ROOM_EMOJI = '{{ room_emoji }}';
 </script>
 <script src="/static/javascript/tradchat.js"           defer></script>
 <script src="/static/javascript/socketio.js"           defer></script>

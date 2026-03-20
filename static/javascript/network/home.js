@@ -199,7 +199,43 @@ document.getElementById('private-rooms-icon').addEventListener('click', function
 
 cl.on('message', recv)
 
-cl.send(JSON.stringify(['Fetch Messages', {'username': username, 'password': password, 'room': 'mainroom', 'limit': 50, 'offset': 0}]))
-setTimeout(function() {
+
+
+
+$(document).ready(function() {
+if (ROOM_TYPE === 'public') {
+
+    document.getElementById('public-rooms-icon').classList.add('active');
+    change_banner_picture(ROOM_EMOJI, false);
+    document.querySelector('.room-title').textContent = ROOM.toUpperCase()
+    changeSelectedRoomOption(ROOM)
+
     cl.send(JSON.stringify(['Get Rooms', {'username': username, 'password': password, 'roomtype': 'public'}]))
+
+} else if (ROOM_TYPE === 'private') {
+
+    document.getElementById('private-rooms-icon').classList.add('active');
+    change_banner_picture(ROOM_EMOJI, false);
+    document.querySelector('.room-title').textContent = ROOM.toUpperCase()
+    changeSelectedRoomOption(ROOM)
+
+    cl.send(JSON.stringify(['Get Rooms', {'username': username, 'password': password, 'roomtype': 'private'}]))    
+
+} else if (ROOM_TYPE === 'dm') {
+
+    document.getElementById('messenger-icon').classList.add('active');
+    change_banner_picture(ROOM_EMOJI, true);
+    let dmParts = ROOM.split('.$@-@&.');
+    let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];
+    document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase()
+    changeSelectedRoomOption(ROOM)
+
+    cl.send(JSON.stringify(['Get Dms', {'username': username, 'password': password}]))
+
+}
+
+
+setTimeout(function() {
+    cl.send(JSON.stringify(['Fetch Messages', {'username': username, 'password': password, 'room': 'mainroom', 'limit': 50, 'offset': 0}]))
 }, 300);
+});

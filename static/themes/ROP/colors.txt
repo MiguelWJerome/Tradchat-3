@@ -1,0 +1,1 @@
+{'color_dark': '#1E1B0E', 'color_medium': '#BF9245', 'color_light': '#F2EBD8'}
