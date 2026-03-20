@@ -655,7 +655,7 @@ $(document).ready(function() {
     var roomStatus = $("input[name='room-status']:checked").val();
     
     if (!roomName) {
-      alert("Please enter a room name.");
+      console.log("Please enter a room name.");
       return;
     }
     
@@ -681,7 +681,7 @@ $(document).ready(function() {
     //   },
     //   error: function(xhr, status, error) {
     //     console.error("Error creating room:", error);
-    //     alert("Failed to create room. Please try again.");
+    //     console.log("Failed to create room. Please try again.");
     //   }
     // });
     

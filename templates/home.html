@@ -166,33 +166,34 @@
       </div>
 
       <!-- Modal Body -->
-      <div class="modal-body">
+      <form id="create-room-form" class="modal-body">
         <!-- Left Column: Form Fields -->
         <div class="modal-left">
           <div class="form-group">
-            <label>Room Emoji:</label>
+            <label for="room-emoji">Room Emoji: <span style="color: red">*</span></label>
             <div class="emoji-selector" id="room-emoji-selector">
-              <div class="emoji-display" id="selected-emoji">
+              <input type="hidden" id="room-emoji" name="emoji" required>
+              <div class="emoji-display" id="selected-emoji" data-required="true">
                 <i class="fa-solid fa-xmark"></i>
               </div>
             </div>
           </div>
 
           <div class="form-group">
-            <label for="room-name">Room Name:</label>
-            <input type="text" id="room-name" class="modal-input" placeholder="" />
+            <label for="room-name">Room Name: <span style="color: red">*</span></label>
+            <input type="text" id="room-name" name="roomname" class="modal-input" placeholder="" required minlength="1" />
           </div>
 
           <div class="form-group">
-            <label for="room-description">Room Discription:</label>
-            <input type="text" id="room-description" class="modal-input" placeholder="" />
+            <label for="room-description">Room Description: <span style="color: red">*</span></label>
+            <input type="text" id="room-description" name="description" class="modal-input" placeholder="" required minlength="1" />
           </div>
 
           <div class="modal-bottom-row">
             <p class="modal-note">
               *You can go back and edit your room settings in the MANAGE ROOMS section of SETTINGS, which can be acccessed by clicking your profile in the top right corner*
             </p>
-            <button class="submit-btn" id="create-room-submit">Submit</button>
+            <button type="submit" class="submit-btn" id="create-room-submit">Submit</button>
           </div>
         </div>
 
@@ -201,37 +202,39 @@
           <div class="room-status-box">
             <h3 class="status-title">Room Status</h3>
 
-            <div class="radio-option">
-              <input type="radio" id="open-room" name="room-status" value="open" checked />
-              <div class="radio-content">
-                <label for="open-room" class="radio-label">Open Room</label>
-                <span class="radio-description">Anyone has access</span>
+            <div class="room-status-content">
+              <div class="radio-option">
+                <input type="radio" id="open-room" name="roomtype" value="public" checked required />
+                <div class="radio-content">
+                  <label for="open-room" class="radio-label">Open Room</label>
+                  <span class="radio-description">Anyone has access</span>
+                </div>
               </div>
-            </div>
 
-            <div class="radio-option">
-              <input type="radio" id="invite-room" name="room-status" value="invite" />
-              <div class="radio-content">
-                <label for="invite-room" class="radio-label">Invite Room</label>
-                <span class="radio-description">You choose who has access</span>
+              <div class="radio-option">
+                <input type="radio" id="invite-room" name="roomtype" value="private" required />
+                <div class="radio-content">
+                  <label for="invite-room" class="radio-label">Invite Room</label>
+                  <span class="radio-description">You choose who has access</span>
+                </div>
               </div>
-            </div>
 
-            <button class="send-invitations-btn" id="send-invitations-btn" disabled>
-              <span>Send Invitations</span>
-              <i class="fa-solid fa-user-plus"></i>
-            </button>
+              <button type="button" class="send-invitations-btn" id="send-invitations-btn" disabled>
+                <span>Send Invitations</span>
+                <i class="fa-solid fa-user-plus"></i>
+              </button>
 
-            <!-- Invitations Dropdown (hidden by default) -->
-            <div class="invitations-dropdown" id="invitations-dropdown" style="display: none;">
-              <h4>Select people to invite:</h4>
-              <ul class="invite-list" id="invite-list">
-                <!-- Populated dynamically by JS -->
-              </ul>
+              <!-- Invitations Dropdown (hidden by default) -->
+              <div class="invitations-dropdown" id="invitations-dropdown" style="display: none;">
+                <h4>Select people to invite:</h4>
+                <ul class="invite-list" id="invite-list">
+                  <!-- Populated dynamically by JS -->
+                </ul>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </form>
     </div>
   </div>
 

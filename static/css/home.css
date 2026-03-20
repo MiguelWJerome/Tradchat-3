@@ -732,12 +732,6 @@
   border-radius: 99px;
 }
 
-/* Brand selection highlight */
-::selection {
-  background: var(--color-accent);
-  color: var(--color-light);
-}
-
 /* =========================================================================
    7. CREATE ROOM MODAL
    Modal overlay and container styles for the room creation form.
@@ -758,7 +752,7 @@
 
 .modal-container {
   background: white;
-  border-radius: 12px;
+  border-radius: 8px;
   width: 90%;
   max-width: 700px;
   max-height: 90vh;
@@ -772,7 +766,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1.5px solid var(--color-border);
+  background: var(--color-medium);
+  border-bottom: 1.5px solid var(--color-dark);
+  border-radius: 6px 6px 0 0;
 }
 
 .modal-title {
@@ -904,6 +900,13 @@
   background: rgba(255, 255, 255, 0.5);
   border: 1.5px solid var(--color-dark);
   border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+
+.room-status-content {
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -915,10 +918,12 @@
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-dark);
-  margin: 0 0 4px 0;
+  margin: 0;
   text-align: center;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--color-border);
+  padding: 12px 16px;
+  background: var(--color-medium);
+  border-bottom: 1.5px solid var(--color-dark);
+  border-radius: 6px 6px 0 0;
 }
 
 /* Radio Options */
@@ -934,7 +939,7 @@
   height: 18px;
   margin: 2px 0 0 0;
   cursor: pointer;
-  accent-color: var(--color-dark);
+  accent-color: var(--color-medium);
 }
 
 .radio-content {
@@ -964,20 +969,21 @@
   justify-content: center;
   gap: 8px;
   padding: 10px 16px;
-  background: white;
+  background: var(--color-dark);
   border: 1.5px solid var(--color-dark);
   border-radius: 6px;
   font-family: var(--font-body);
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--color-dark);
+  color: var(--color-light);
   cursor: pointer;
   transition: all 0.2s ease;
   margin-top: 4px;
 }
 
 .send-invitations-btn:hover:not(:disabled) {
-  background: var(--color-light);
+  background: var(--color-medium);
+  color: var(--color-dark);
   transform: translateY(-1px);
 }
 
@@ -1068,8 +1074,8 @@
 }
 
 .submit-btn:hover {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  background: var(--color-medium);
+  border-color: var(--color-medium);
   transform: translateY(-1px);
 }
 

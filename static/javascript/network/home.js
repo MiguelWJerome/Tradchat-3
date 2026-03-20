@@ -96,13 +96,11 @@ function recv(message) {
     {
         if (msg[1] === 'Room Already Exists')
         {
-            Alert('Sorry, but that room already exists, please pick a different name.')
+            console.log('Room already exists');
         }
         else if (msg[1] === 'Room Created')
         {
-            Alert('Room Created succesfuly!', function(){
-                location.reload()
-            })
+            location.reload();
         }
     }
 
@@ -110,13 +108,11 @@ function recv(message) {
     {
         if (msg[1] === 'DM Already Exists')
         {
-            Alert('Sorry, but that DM already exists, please pick a different user.')
+            console.log('DM already exists');
         }
         else if (msg[1] === 'DM Created')
         {
-            Alert('DM Created succesfuly!', function(){
-                location.reload()
-            })
+            location.reload();
         }
     }
 }
@@ -195,6 +191,88 @@ document.getElementById('public-rooms-icon').addEventListener('click', function(
 document.getElementById('private-rooms-icon').addEventListener('click', function() {
     cl.send(JSON.stringify(['Get Rooms', {'username': username, 'password': password, 'roomtype': 'private'}]))
 });
+
+// Create Room Form Handling
+const createRoomForm = document.getElementById('create-room-form');
+const roomNameInput = document.getElementById('room-name');
+const roomDescInput = document.getElementById('room-description');
+const roomEmojiInput = document.getElementById('room-emoji');
+
+// Prevent Enter key from submitting when form is valid
+function handleEnterKey(e) {
+    if (e.key === 'Enter') {
+        const form = e.target.closest('form');
+        if (form && form.checkValidity()) {
+            e.preventDefault();
+        }
+    }
+}
+
+roomNameInput.addEventListener('keypress', handleEnterKey);
+roomDescInput.addEventListener('keypress', handleEnterKey);
+
+// Input validation feedback
+function validateInput(input) {
+    if (input.value.trim().length > 0) {
+        input.style.borderColor = 'var(--color-medium)';
+    } else {
+        input.style.borderColor = 'var(--color-dark)';
+    }
+}
+
+roomNameInput.addEventListener('input', function() {
+    validateInput(this);
+});
+
+roomDescInput.addEventListener('input', function() {
+    validateInput(this);
+});
+
+// Emoji selection handling (set required field when emoji selected)
+document.getElementById('room-emoji-selector').addEventListener('click', function(e) {
+    const emojiPicker = document.getElementById('room-emoji-picker');
+    if (emojiPicker) {
+        emojiPicker.classList.toggle('open');
+    }
+});
+
+// Handle emoji selection
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.room-emoji-btn')) {
+        const emoji = e.target.closest('.room-emoji-btn').textContent;
+        document.getElementById('selected-emoji').innerHTML = emoji;
+        roomEmojiInput.value = emoji;
+        roomEmojiInput.setAttribute('value', emoji);
+        document.getElementById('room-emoji-picker').classList.remove('open');
+        
+        // Visual feedback that emoji is selected
+        document.querySelector('.emoji-display').style.borderColor = 'var(--color-medium)';
+    }
+});
+
+// Form submission
+if (createRoomForm) {
+    createRoomForm.addEventListener('submit', function(e) {
+        if (this.checkValidity()) {
+            // All fields filled - prevent submission and call JS function
+            e.preventDefault();
+            
+            const roomname = roomNameInput.value.trim();
+            const description = roomDescInput.value.trim();
+            const emoji = roomEmojiInput.value;
+            const roomtype = document.querySelector('input[name="roomtype"]:checked').value;
+            
+            // Validate emoji is selected
+            if (!emoji) {
+                document.querySelector('.emoji-display').style.borderColor = 'red';
+                return;
+            }
+            
+            create_chat_room(roomname, description, emoji, roomtype);
+        }
+        // If form is not valid, let it submit naturally to show HTML5 validation
+    });
+}
 
 
 cl.on('message', recv)

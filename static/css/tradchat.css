@@ -15,6 +15,19 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Text selection highlight */
+::selection {
+  background: var(--color-medium);
+  color: var(--color-dark);
+}
+
+/* Input focus highlight - always color-medium */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--color-medium);
+  box-shadow: 0 0 0 2px var(--color-medium);
+}
+
 body {
   font-family: var(--font-body);
   background-color: var(--color-light);
