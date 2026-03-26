@@ -167,6 +167,7 @@ document.getElementById('back-to-mainroom').addEventListener('click', function()
 // Bind Create button in sidebar to open modal
 document.getElementById('create-btn').addEventListener('click', function() {
     roomModal('show');
+    emojiPicker.re_attach('#selected-emoji', function(emoji){document.querySelector('#selected-emoji').innerHTML=emoji})
 });
 
 function create_dm(user) {
@@ -191,6 +192,17 @@ document.getElementById('public-rooms-icon').addEventListener('click', function(
 document.getElementById('private-rooms-icon').addEventListener('click', function() {
     cl.send(JSON.stringify(['Get Rooms', {'username': username, 'password': password, 'roomtype': 'private'}]))
 });
+
+
+const emojiPicker = new lc_emoji_picker('#emoji-btn', {
+    emoji_json_url      : '/static/emoji.json',
+    selection_callback  : function(emoji){document.querySelector('#chat-input').value+=emoji}
+});
+
+document.querySelector('#selected-emoji').onclick = function() {
+    emojiPicker.re_attach('#emoji-btn', function(emoji){document.querySelector('#chat-input').value+=emoji})
+};
+
 
 // Create Room Form Handling
 const createRoomForm = document.getElementById('create-room-form');
@@ -228,28 +240,6 @@ roomDescInput.addEventListener('input', function() {
     validateInput(this);
 });
 
-// Emoji selection handling (set required field when emoji selected)
-document.getElementById('room-emoji-selector').addEventListener('click', function(e) {
-    const emojiPicker = document.getElementById('room-emoji-picker');
-    if (emojiPicker) {
-        emojiPicker.classList.toggle('open');
-    }
-});
-
-// Handle emoji selection
-document.addEventListener('click', function(e) {
-    if (e.target.closest('.room-emoji-btn')) {
-        const emoji = e.target.closest('.room-emoji-btn').textContent;
-        document.getElementById('selected-emoji').innerHTML = emoji;
-        roomEmojiInput.value = emoji;
-        roomEmojiInput.setAttribute('value', emoji);
-        document.getElementById('room-emoji-picker').classList.remove('open');
-        
-        // Visual feedback that emoji is selected
-        document.querySelector('.emoji-display').style.borderColor = 'var(--color-medium)';
-    }
-});
-
 // Form submission
 if (createRoomForm) {
     createRoomForm.addEventListener('submit', function(e) {
@@ -276,7 +266,6 @@ if (createRoomForm) {
 
 
 cl.on('message', recv)
-
 
 
 

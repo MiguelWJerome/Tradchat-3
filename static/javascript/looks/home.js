@@ -577,6 +577,10 @@ $(document).ready(function() {
       resetRoomModal();
     } else if (action === 'hide') {
       $modal.css('display', 'none').attr('aria-hidden', 'true');
+      // Reattach emoji picker back to chat input
+      if (typeof emojiPicker !== 'undefined' && emojiPicker.re_attach) {
+        emojiPicker.re_attach('#emoji-btn', function(emoji){document.querySelector('#chat-input').value+=emoji});
+      }
     }
   };
 
@@ -729,43 +733,7 @@ $(document).ready(function() {
         $dropdown.show();
       }
     });
-    
-    // Handle emoji selector click
-    $("#room-emoji-selector").on("click", function() {
-      // Create a simple emoji picker if it doesn't exist
-      var $picker = $("#room-emoji-picker");
-      
-      if ($picker.length === 0) {
-        var emojis = ['📢', '💬', '🎮', '🎵', '📚', '💼', '🎨', '🏆', '🔬', '🍕', '🎬', '✈️', '🏠', '🐱', '🐶', '🌟'];
-        $picker = $("<div>")
-          .attr("id", "room-emoji-picker")
-          .addClass("room-emoji-picker");
-        
-        emojis.forEach(function(emoji) {
-          $("<button>")
-            .addClass("emoji-btn")
-            .text(emoji)
-            .on("click", function(e) {
-              e.stopPropagation();
-              $("#selected-emoji").text(emoji);
-              $picker.removeClass("open");
-            })
-            .appendTo($picker);
-        });
-        
-        $("#room-emoji-selector").append($picker);
-      }
-      
-      $picker.toggleClass("open");
-    });
-    
-    // Close emoji picker when clicking outside
-    $(document).on("click", function(e) {
-      if (!$(e.target).closest("#room-emoji-selector").length) {
-        $("#room-emoji-picker").removeClass("open");
-      }
-    });
-    
+
     // Handle Submit button
     $("#create-room-submit").on("click", function() {
       submitRoomCreation();

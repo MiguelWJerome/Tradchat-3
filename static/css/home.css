@@ -758,6 +758,7 @@
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 4px 4px 0 var(--color-dark);
+  user-select: none;
 }
 
 /* Modal Header */
@@ -940,6 +941,7 @@
   margin: 2px 0 0 0;
   cursor: pointer;
   accent-color: var(--color-medium);
+  outline: none;
 }
 
 .radio-content {
@@ -1077,24 +1079,6 @@
   background: var(--color-medium);
   border-color: var(--color-medium);
   transform: translateY(-1px);
-}
-
-/* Emoji Picker for Room Modal */
-.room-emoji-picker {
-  position: absolute;
-  background: white;
-  border: 2px solid var(--color-dark);
-  border-radius: 8px;
-  padding: 10px;
-  display: none;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 4px;
-  box-shadow: 2px 2px 0 var(--color-dark);
-  z-index: 10;
-}
-
-.room-emoji-picker.open {
-  display: grid;
 }
 
 /* Mobile Responsive for Modal */
