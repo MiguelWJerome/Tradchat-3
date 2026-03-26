@@ -476,7 +476,7 @@ def Recv(message, sid):
                     gmt_timestamp = convert_to_gmt(timestamp)
 
                     message_id = db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, reply_index, upload], chat_room=True)
-                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp}]), room=room)
+                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index)}]), room=room)
             
             elif setting == 'dm':
                 actual_user_dm_username = room.split('.$@-@&.')[1] if room.split('.$@-@&.')[0] == username else room.split('.$@-@&.')[0]
@@ -491,7 +491,7 @@ def Recv(message, sid):
                 gmt_timestamp = convert_to_gmt(timestamp)
 
                 message_id = db_sql(f"""INSERT INTO {fm_to_gb[important_gender]}s_dm (convo_hash, sender_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?, ?);""", f"{fm_to_gb[important_gender]}s_dm", params=[f"{important_id}-{un_important_id}", username_id, user_message, gmt_timestamp, reply_index, upload], chat_room=False, provide_id=True)
-                Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp}]), room=room)
+                Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index)}]), room=room)
                 
 
     elif msg[0] == 'Fetch Messages':

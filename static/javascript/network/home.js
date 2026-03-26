@@ -19,39 +19,45 @@ function recv(message) {
         }
         else {
             data = msg[1]
-            appendMessage(data['id'], data['username'], data['message'], data['timestamp'], data['username'] === username)
+            appendMessage(data['username'], data['message'], data['timestamp'], data['username'] === username, data['reply_id'])
         }
     }
     else if (msg[0] === 'Fetch Messages') {
+        // Reset bubble index so reply_id corresponds to nth message in this batch
+        messageBubbleIndex = 0;
         data = msg[1]
         for (var i in data) {
-            appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username)
+            appendMessage(data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username, data[i]['reply_id'])
         }
     }
     else if (msg[0] === 'Fetch Room Messages') {
+        // Reset bubble index so reply_id corresponds to nth message in this batch
+        messageBubbleIndex = 0;
         document.querySelector('#chat-feed').innerHTML = ''
         while (switch_room_mid_feed.length > 0) {
             var msg = switch_room_mid_feed.splice(0, 1)[0]
-            appendMessage(msg['id'], msg['username'], msg['message'], msg['timestamp'], msg['username'] === username)
+            appendMessage(msg['username'], msg['message'], msg['timestamp'], msg['username'] === username, msg['reply_id'])
         }
         switch_room_mid_feed_toggle = false
         data = msg[1]
         for (var i in data) {
-            appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username)
+            appendMessage(data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username, data[i]['reply_id'])
         }
         change_banner_picture(msg[3], false)
         document.querySelector('.room-title').textContent = msg[2].toUpperCase()
     }
     else if (msg[0] === 'Fetch DM Messages') {
+        // Reset bubble index so reply_id corresponds to nth message in this batch
+        messageBubbleIndex = 0;
         document.querySelector('#chat-feed').innerHTML = ''
         while (switch_room_mid_feed.length > 0) {
             var msg = switch_room_mid_feed.splice(0, 1)[0]
-            appendMessage(msg['id'], msg['username'], msg['message'], msg['timestamp'], msg['username'] === username)
+            appendMessage(msg['username'], msg['message'], msg['timestamp'], msg['username'] === username, msg['reply_id'])
         }
         switch_room_mid_feed_toggle = false
         data = msg[1]
         for (var i in data) {
-            appendMessage(data[i]['id'], data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username)
+            appendMessage(data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username, data[i]['reply_id'])
         }
         change_banner_picture(msg[3], true)
         let dmParts = msg[2].split('.$@-@&.');
@@ -140,14 +146,35 @@ function switch_dm(dm_username) {
     ROOM = sortAndJoinStrings(dm_username, username)
 }
 
+// Global reply index tracker for the reply system
+let currentreply_id = -1;
+
 sendButton.addEventListener('click', function() {
-    setting = 'room'
-    if (ROOM.split('.$@-@&.').length > 1)
-    {
-        setting = 'dm'
+    if (chatInput.value.trim() === "" && !currentUpload) return; // Optional: prevent empty messages
+
+    let setting = 'room';
+    if (ROOM.split('.$@-@&.').length > 1) {
+        setting = 'dm';
     }
-    cl.send(JSON.stringify(['Message', {'setting': setting, 'room': ROOM, 'username': localStorage['username'], 'password': localStorage['password'], 'time-stamp': Date(), 'message': chatInput.value, 'reply-index': -1, 'upload': ''}]))
-    chatInput.value = ''
+
+    // Send the actual currentreply_id instead of hardcoded -1
+    cl.send(JSON.stringify(['Message', {
+        'setting': setting, 
+        'room': ROOM, 
+        'username': localStorage['username'], 
+        'password': localStorage['password'], 
+        'time-stamp': Date(), 
+        'message': chatInput.value, 
+        'reply-index': currentreply_id, // Dynamic index
+        'upload': ''
+    }]));
+
+    chatInput.value = '';
+    
+    // Clear the reply state after sending
+    if (typeof cancelReply === 'function') {
+        cancelReply();
+    }
 })
 
 // Bind mainroom button to switch to public rooms and join mainroom
@@ -303,6 +330,13 @@ if (ROOM_TYPE === 'public') {
 
 
 setTimeout(function() {
-    cl.send(JSON.stringify(['Fetch Messages', {'username': username, 'password': password, 'room': 'mainroom', 'limit': 50, 'offset': 0}]))
+    fetch_type = ROOM_TYPE === 'dm' ? 'Fetch DM Messages' : 'Fetch Messages'
+    cl.send(JSON.stringify([fetch_type, {
+        'username': username, 
+        'password': password, 
+        'room': ROOM, // ROOM holds the sorted dm string
+        'limit': 50, 
+        'offset': 0
+    }]));
 }, 300);
 });

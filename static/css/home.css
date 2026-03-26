@@ -478,23 +478,27 @@
   background: white;
   border: 1px solid black;
   color: black;
+  width: fit-content;
 }
 
 .message.own .message__bubble {
   background: var(--color-light);
   color: var(--color-light);
   border-color: var(--color-dark);
+  width: fit-content;
 }
 
 .message__name {
-  font-size: 1.2rem;  /* Bigger text */
-  font-weight: bold;  /* Bold text */
+  font-size: 1.2rem;
+  font-weight: bold;
   opacity: 0.7;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(0,0,0,0.05);
+  background: rgba(0, 0, 0, 0.05);
+  font-family: comic sans ms;
+  color: black;
 }
 
 .message.own .message__name {
@@ -514,11 +518,112 @@
 }
 
 /* ---- 4c. Input Bar ---- */
+/* 1. Restore the horizontal layout */
 .chat-panel__inputbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 14px;
+  padding: 12px 20px;
+  background: var(--color-bg);
+  border-top: 1.5px solid var(--color-border);
+  gap: 15px;
+  position: relative; /* This is the anchor for the floating preview */
+}
+
+/* 2. Make the preview bar "float" above the input */
+/* --- High-Fidelity Reply Preview Bar (Goal Match) --- */
+#reply-preview-bar {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 90%;
+  background: #eeeeee;
+  padding: 12px;
+  box-sizing: border-box;
+  z-index: 100;
+  border-top: 1px solid #ddd;
+  border-radius: 20px;
+  margin-left: 20px;
+  margin-right: 20px;
+}
+
+.reply-preview-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* The Curved Hook Line */
+.reply-preview-hook {
+  width: 22px;
+  height: 62px;
+  border-left: 4px solid var(--color-medium);
+  border-top: 4px solid var(--color-medium);
+  border-top-left-radius: 15px;
+  flex-shrink: 0;
+}
+
+/* Content Layout */
+.reply-preview-content {
+  display: flex;
+  align-items: flex-start;
+  flex-grow: 1;
+  overflow: hidden;
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+.reply-preview-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.preview-text-stack {
+  display: flex;
+  flex-direction: column;
+  margin-left: 10px;
+  overflow: hidden;
+  line-height: 1.2;
+  height: 100%;
+}
+
+/* Scaled Up Text */
+.preview-user {
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: var(--color-dark);
+}
+
+.preview-msg {
+  font-size: 1rem;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 700px;
+}
+
+/* Larger, cleaner X button */
+.reply-preview-close {
+  cursor: pointer;
+  font-size: 1.8rem;
+  font-weight: 300;
+  color: #888;
+  margin-left: 15px;
+  line-height: 1;
+  transition: color 0.2s;
+  pointer-events: auto; /* Ensures it's clickable */
+  position: relative;
+  z-index: 101; /* Higher than the bar itself */
+}
+
+.reply-preview-close:hover {
+  color: var(--color-dark);
 }
 
 /* Input wrapper for positioning icons inside */
@@ -1097,4 +1202,189 @@
   .modal-right {
     width: 100%;
   }
+}
+
+/* --- Final Threaded Reply Fix --- */
+.reply-wrapper {
+  display: flex;
+  flex-direction: column;
+  margin-left: 20px; /* Indent the whole reply block */
+  margin-bottom: -4px; /* Pull the main bubble up to meet the line */
+}
+
+.reply-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  background: #dadada;
+  border-radius: 12px;
+  height: fit-content;
+  padding: 5px;
+}
+
+/* The "Hook" */
+.reply-curve {
+  width: 15px;
+  height: 37px;
+  border-left: 3px solid var(--color-medium);
+  border-top: 3px solid var(--color-medium);
+  border-top-left-radius: 10px;
+  flex-shrink: 0;
+  align-self: self-start;
+}
+
+/* The Gray Box */
+.reply-content {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 10px;
+  border-bottom-left-radius: 2px;
+  max-width: 85%;
+  margin-left: 0px;
+  margin-top: 2px;
+}
+
+.reply-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  align-self: flex-start;
+}
+
+.reply-username {
+  font-weight: 800;
+  font-size: 0.85rem;
+  display: block;
+  color: black;
+  font-size: 15px;
+  font-family: comic sans ms;
+}
+
+.reply-preview-text {
+  font-size: 0.8rem;
+  color: black;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: italic;
+  max-width: 200px;
+}
+
+/* Highlight for the jumped-to message */
+.message-highlight {
+  border: 3px solid var(--color-dark) !important;
+  transition: all 0.2s ease;
+}
+
+/* =========================================================================
+   MESSAGE ACTIONS (HOVER MENU)
+   ========================================================================= */
+.message__bubble {
+  position: relative; /* Essential for positioning the actions div */
+}
+
+.message-actions {
+  display: none;
+  position: absolute;
+  top: -20px;
+  right: 12px;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 0; /* Remove padding so boxes touch the edges */
+  gap: 0;    /* Gap removed as requested */
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  z-index: 10;
+  overflow: hidden; /* Keeps the corner boxes from spilling over radius */
+}
+
+.message__bubble:hover .message-actions {
+  display: flex;
+}
+
+.action-item {
+  cursor: pointer;
+  font-size: 0.9rem;
+  width: 28px;  /* Fixed size for perfect squares */
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff; /* Default background */
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* Hover effect: Box turns color-medium, emoji stays clear */
+.action-item:hover {
+  background-color: var(--color-medium);
+}
+
+/* Slimmed down dividers with no margin */
+.action-divider {
+  width: 1px;
+  height: 18px; /* Slightly taller for the tight look */
+  background-color: #eee;
+  margin: 0; /* Margin removed as requested */
+  flex-shrink: 0;
+}
+
+/* =========================================================================
+   REPLY PREVIEW BAR
+   ========================================================================= */
+
+
+.reply-preview-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Pushes X to the right */
+  width: 100%;
+}
+
+.reply-preview-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.reply-preview-close {
+  cursor: pointer;
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: var(--color-medium);
+  line-height: 1;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+
+/* Reusing the stack styles from our earlier work */
+.preview-text-stack {
+  display: flex;
+  flex-direction: column;
+  margin-left: 10px;
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+.preview-user {
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--color-dark);
+}
+
+.preview-msg {
+  font-size: 0.8rem;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
 }

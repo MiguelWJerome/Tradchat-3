@@ -284,19 +284,31 @@ $(document).ready(function() {
     }
   };
 
+  // Global message bubble index counter
+
   /**
-   * appendMessage(username, timestamp, message, myself)
+   * appendMessage(username, timestamp, message, myself, replyIndex=-1)
    * -----------------------------------------
    * Appends a message to the chat feed with the provided parameters.
    * Creates proper message structure with avatar, name, and bubble.
+   * Each bubble gets an aria-index attribute for reply targeting.
+   * If replyIndex is provided (not -1), shows a reply indicator that links to the original message.
    *
    * @param {string} username - The username of the message sender
    * @param {string} timestamp - The timestamp for the message
    * @param {string} message - The message content
    * @param {boolean} myself - Set to true if this is your own message (appears on right)
+   * @param {number} replyIndex - aria-index of message being replied to (-1 if not a reply)
    */
-  window.appendMessage = function (id, username, message, timestamp, myself) {
+  window.appendMessage = function (username, message, timestamp, myself, replyIndex=-1) {
     if (!$chatFeed.length) return;
+
+    // Important: Count EXISTING bubbles to get the next index
+    const currentIdx = $('.message__bubble').length + 1;
+    
+    // Find the avatar from the wrapper (or use a default)
+    // If your app passes the avatar URL into this function, use that instead.
+    const avatarUrl = myself ? "/static/profile-pictures/me.png" : "/static/profile-pictures/" + username + ".png";
 
     // --- 1. Fix "Invalid Date" & Parse ---
     // We force the string into ISO format: yyyy-mm-ddThh:mm:ssZ
@@ -318,35 +330,55 @@ $(document).ready(function() {
     var $lastMsg = $chatFeed.find(".message").last();
     var lastDateAttr = $lastMsg.attr("data-date");
     var lastTimestamp = parseInt($lastMsg.attr("data-timestamp") || "0");
-
-    if (lastDateAttr !== fullDateStr) {
-        $chatFeed.append($("<div>")
-            .addClass("chat-date-separator")
-            .css({ "text-align": "center", "margin": "30px 0 15px", "font-size": "0.85rem", "color": "#888", "font-weight": "bold" })
-            .text(fullDateStr));
-    }
-
-    // --- 3. Construction ---
-    var displayUser = myself ? "You" : username;
     var lastUser = $lastMsg.attr("data-user");
     var currentTimestamp = msgDate.getTime();
     var timeDiffMs = currentTimestamp - lastTimestamp;
     var fiveMinutesMs = 5 * 60 * 1000; // 5 minutes in milliseconds
-    var isSameUser = (lastUser === displayUser) && (lastDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs);
+    var isSameUser = (lastUser === (myself ? "You" : username)) && (lastDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs);
 
     if (isSameUser) {
-        // Grouped bubble
-        var $newBubble = $("<div>").addClass("message__bubble");
+        // Grouped bubble - use currentIdx for this new bubble
+        
+        // Grouped bubble with message actions and data stamps
+        var $newBubble = $("<div>").addClass("message__bubble").attr("aria-index", currentIdx)
+            .attr("aria-username", username)
+            .attr("data-message-text", message)
+        
+        // Add message actions hover menu
+        var $actions = $("<div>").addClass("message-actions");
+        $actions.html(
+            '<div class="action-item reaction-btn" title="React">😊</div>' +
+            '<div class="action-divider"></div>' +
+            '<div class="action-item edit-btn" title="Edit">✏️</div>' +
+            '<div class="action-divider"></div>' +
+            '<div class="action-item reply-btn" title="Reply">↩️</div>'
+        );
+        $newBubble.append($actions);
+        
         var $newText = $("<div>").addClass("message__text").text(message);
         // Small side stamp
         var $sideTime = $("<span>").css({ "font-size": "0.7rem", "color": "#999", "margin-left": "8px" }).text(timeStr);
         
+        // If this is a reply, add reply indicator before the text
+        if (replyIndex !== -1) {
+            var $replyIndicator = createReplyIndicator(replyIndex);
+            $newText.prepend($replyIndicator);
+        }
+        
         $newBubble.append($newText, $sideTime);
         $lastMsg.find(".message__content").append($newBubble);
+        
+        // Add reply button click handler
+        $newBubble.find('.reply-btn').on('click', function(e) {
+            e.stopPropagation();
+            const index = $(this).closest('.message__bubble').attr('aria-index');
+            showReplyPreview(index);
+        });
     } else {
+        // New Message Group - use currentIdx for this new bubble
+        
         // New Message Group
-        var $msg = $("<div>").addClass("message").attr("data-user", displayUser).attr("data-date", fullDateStr).attr("data-timestamp", msgDate.getTime());
-        $msg.attr("id", id);
+        var $msg = $("<div>").addClass("message").attr("data-user", myself ? "You" : username).attr("data-date", fullDateStr).attr("data-timestamp", msgDate.getTime());
         if (myself) $msg.addClass("own");
 
         var $avatar = $("<img>").addClass("message__avatar").attr("src", "/static/profile-pictures/" + username + ".png")
@@ -361,7 +393,7 @@ $(document).ready(function() {
         var $nameBox = $("<span>")
             .addClass("message__name")
             .css({ "padding": "2px 8px", "border-radius": "4px", "font-weight": "bold", "font-size": "1.2rem" }) // Bigger and bold
-            .text(displayUser);
+            .text(myself ? "You" : username);
 
         var $timestampLabel = $("<span>")
             .css({ "margin-left": "8px", "font-size": "0.8rem", "color": "#777" })
@@ -369,7 +401,27 @@ $(document).ready(function() {
 
         $nameWrapper.append($nameBox, $timestampLabel);
 
-        var $bubble = $("<div>").addClass("message__bubble");
+        var $bubble = $("<div>").addClass("message__bubble").attr("aria-index", currentIdx)
+            .attr("aria-username", username)
+            .attr("data-message-text", message)
+        
+        // Add message actions hover menu
+        var $actions = $("<div>").addClass("message-actions");
+        $actions.html(
+            '<div class="action-item reaction-btn" title="React">😊</div>' +
+            '<div class="action-divider"></div>' +
+            '<div class="action-item edit-btn" title="Edit">✏️</div>' +
+            '<div class="action-divider"></div>' +
+            '<div class="action-item reply-btn" title="Reply">↩️</div>'
+        );
+        $bubble.append($actions);
+        
+        // If this is a reply, add reply indicator
+        if (replyIndex !== -1) {
+            var $replyIndicator = createReplyIndicator(replyIndex);
+            $bubble.append($replyIndicator);
+        }
+        
         var $text = $("<div>").addClass("message__text").css({ "color": "black" }).text(message); // Always black text
 
         // Style bubble background based on sender
@@ -381,10 +433,136 @@ $(document).ready(function() {
         $content.append($nameWrapper, $bubble);
         $msg.append($avatar, $content);
         $chatFeed.append($msg);
+        
+        // Add reply button click handler
+        $bubble.find('.reply-btn').on('click', function(e) {
+            e.stopPropagation();
+            const index = $(this).closest('.message__bubble').attr('aria-index');
+            showReplyPreview(index);
+        });
     }
 
     scrollToBottom();
 };
+
+  /**
+   * createReplyIndicator(replyIndex)
+   * ---------------------------------
+   * Creates a reply indicator element that shows the user and message being replied to.
+   * Uses CSS classes for styling with stacked text layout.
+   *
+   * @param {number} replyIndex - The aria-index of the message being replied to
+   * @returns {jQuery} The reply indicator jQuery element
+   */
+  function createReplyIndicator(targetIndex) {
+    const $targetBubble = $(`.message__bubble[aria-index="${targetIndex}"]`);
+    
+    // Safety check: find data from the target
+    const originalText = $targetBubble.attr('data-message-text') || "...";
+    const originalUser = $targetBubble.attr('aria-username');
+    const avatarSrc = `/static/profile-pictures/${originalUser}.png`;
+
+    // Re-structured HTML for the flex alignment
+    return $(`
+        <div class="reply-container">
+            <div class="reply-curve"></div>
+            <div class="reply-content">
+                <img src="${avatarSrc}" class="reply-avatar">
+                <div class="reply-text-stack">
+                    <span class="reply-username">${originalUser}</span>
+                    <span class="reply-preview-text">${originalText}</span>
+                </div>
+            </div>
+        </div>
+    `).on('click', function() {
+        const $target = $(`.message__bubble[aria-index="${targetIndex}"]`);
+        if ($target.length) {
+            $target[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            $target.addClass('message-highlight');
+            setTimeout(() => {
+                $(document).one('click', () => $target.removeClass('message-highlight'));
+            }, 100);
+        }
+    });
+  }
+
+  /**
+   * scrollToMessageAndHighlight(replyIndex)
+   * -------------------------------------
+   * Smoothly scrolls to a message bubble by aria-index and adds a highlight border.
+   * Uses CSS class for highlight. The highlight is removed when user clicks anywhere.
+   *
+   * @param {number} replyIndex - The aria-index of the message bubble to scroll to
+   */
+  function scrollToMessageAndHighlight(replyIndex) {
+    var $targetBubble = $(".message__bubble[aria-index='" + replyIndex + "']");
+    if (!$targetBubble.length) {
+      console.log("[home.js] Message bubble with aria-index " + replyIndex + " not found");
+      return;
+    }
+    
+    // Remove any existing highlights first
+    $(".message__bubble").removeClass("message-highlight");
+    
+    // Add highlight using CSS class
+    $targetBubble.addClass("message-highlight");
+    
+    // Smooth scroll to the bubble
+    $targetBubble[0].scrollIntoView({ behavior: "smooth", block: "center" });
+    
+    // Set up one-time click handler to remove highlight when user clicks anywhere
+    var removeHighlight = function() {
+      $(".message__bubble").removeClass("message-highlight");
+    };
+    
+    // Use setTimeout to avoid immediate trigger from the click that started the scroll
+    setTimeout(function() {
+      $(document).one("click", removeHighlight);
+    }, 100);
+  }
+
+  /**
+   * showReplyPreview(index)
+   * Updates the global currentReplyIndex and shows the UI bar.
+   */
+  window.showReplyPreview = function(index) {
+    currentreply_id = index; // Updates the global variable in home.js
+    
+    const $target = $(`.message__bubble[aria-index="${index}"]`);
+    if (!$target.length) return;
+    
+    // Pull the stamped data we set in appendMessage
+    const user = $target.attr('aria-username');
+    const avatar = `/static/profile-pictures/${user}.png`;
+    const text = $target.attr('data-message-text') || "...";
+
+    const $bar = $('#reply-preview-bar');
+    
+    // Injecting the Goal-style HTML with the X button
+    $bar.html(`
+      <div class="reply-preview-container">
+        <div class="reply-preview-hook"></div>
+        <div class="reply-preview-content">
+          <img src="${avatar}" class="reply-preview-avatar" onerror="this.src='/static/graphics/defaultMale.png'">
+          <div class="preview-text-stack">
+            <span class="preview-user">${user}</span>
+            <span class="preview-msg">${text}</span>
+          </div>
+        </div>
+        <div class="reply-preview-close" onclick="cancelReply()">&times;</div>
+      </div>
+    `).show();
+  };
+
+  /**
+   * cancelReply()
+   * Resets the index and hides the bar.
+   * Attached to window so the 'onclick' in the HTML string can find it.
+   */
+  window.cancelReply = function() {
+    currentreply_id = -1; // Reset global variable
+    $('#reply-preview-bar').hide().empty();
+  };
   /**
    * switchToRoom(roomId, roomName)
    * ------------------------------
