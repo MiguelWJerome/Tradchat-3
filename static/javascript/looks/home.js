@@ -287,24 +287,36 @@ $(document).ready(function() {
   // Global message bubble index counter
 
   /**
-   * appendMessage(username, timestamp, message, myself, replyIndex=-1)
+   * appendMessage(username, timestamp, message, myself, replyIndex=-1, overhead=false)
    * -----------------------------------------
    * Appends a message to the chat feed with the provided parameters.
    * Creates proper message structure with avatar, name, and bubble.
    * Each bubble gets an aria-index attribute for reply targeting.
    * If replyIndex is provided (not -1), shows a reply indicator that links to the original message.
+   * If overhead is true, inserts the message at the TOP of the chat (for loading historical messages).
    *
    * @param {string} username - The username of the message sender
    * @param {string} timestamp - The timestamp for the message
    * @param {string} message - The message content
    * @param {boolean} myself - Set to true if this is your own message (appears on right)
    * @param {number} replyIndex - aria-index of message being replied to (-1 if not a reply)
+   * @param {boolean} overhead - If true, inserts message at top for historical loading
    */
-  window.appendMessage = function (username, message, timestamp, myself, replyIndex=-1) {
+  window.appendMessage = function (username, message, timestamp, myself, replyIndex=-1, overhead=false) {
     if (!$chatFeed.length) return;
 
     // Important: Count EXISTING bubbles to get the next index
     const currentIdx = $('.message__bubble').length + 1;
+    
+    // If overhead mode, increment all existing aria-index values by 1
+    if (overhead) {
+        $('.message__bubble').each(function() {
+            const idx = parseInt($(this).attr('aria-index'));
+            if (!isNaN(idx)) {
+                $(this).attr('aria-index', idx + 1);
+            }
+        });
+    }
     
     // Find the avatar from the wrapper (or use a default)
     // If your app passes the avatar URL into this function, use that instead.
@@ -326,21 +338,79 @@ $(document).ready(function() {
     // Header Display: "Mon 10:30 PM" (No year here per your request)
     var headerStamp = dayShort + " " + timeStr;
 
-    // --- 2. Big Centered Date Stamp ---
-    var $lastMsg = $chatFeed.find(".message").last();
-    var lastDateAttr = $lastMsg.attr("data-date");
-    var lastTimestamp = parseInt($lastMsg.attr("data-timestamp") || "0");
-    var lastUser = $lastMsg.attr("data-user");
+    // --- 2. Big Centered Date Stamp and User Grouping Logic ---
+    var isSameUser, $targetMsgGroup;
     var currentTimestamp = msgDate.getTime();
-    var timeDiffMs = currentTimestamp - lastTimestamp;
     var fiveMinutesMs = 5 * 60 * 1000; // 5 minutes in milliseconds
-    var isSameUser = (lastUser === (myself ? "You" : username)) && (lastDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs);
+    
+    if (overhead) {
+        // When inserting at top, check against the FIRST message (the one beneath)
+        var $firstMsg = $chatFeed.find(".message").first();
+        var firstDateAttr = $firstMsg.attr("data-date");
+        
+        // If the date is different from the first message (or this is the first message ever)
+        // we need a date divider ABOVE this message
+        if ($firstMsg.length === 0 || firstDateAttr !== fullDateStr) {
+            var $dateDivider = $("<div>")
+                .addClass("chat-date-divider")
+                .css({
+                    "display": "flex",
+                    "align-items": "center",
+                    "justify-content": "center",
+                    "margin": "20px 0",
+                    "position": "relative"
+                })
+                .html(`
+                    <div style="position: absolute; width: 100%; height: 1px; background: rgba(0,0,0,0.1); z-index: 1;"></div>
+                    <span style="background: var(--color-light); padding: 0 15px; z-index: 2; color: #777; font-size: 0.85rem; font-weight: 500;">
+                        ${fullDateStr}
+                    </span>
+                `);
+            $chatFeed.prepend($dateDivider);
+        }
+        
+        var firstTimestamp = parseInt($firstMsg.attr("data-timestamp") || "0");
+        var firstUser = $firstMsg.attr("data-user");
+        var timeDiffMs = firstTimestamp - currentTimestamp;
+        isSameUser = (firstUser === (myself ? "You" : username)) && (firstDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs) && (timeDiffMs >= 0);
+        $targetMsgGroup = $firstMsg;
+    } else {
+        // Normal append mode - check against the LAST message
+        var $lastMsg = $chatFeed.find(".message").last();
+        var lastDateAttr = $lastMsg.attr("data-date");
 
-    if (isSameUser) {
-        // Grouped bubble - use currentIdx for this new bubble
+        // If the date has changed since the last message (or this is the first message)
+        if (lastDateAttr !== fullDateStr) {
+            var $dateDivider = $("<div>")
+                .addClass("chat-date-divider")
+                .css({
+                    "display": "flex",
+                    "align-items": "center",
+                    "justify-content": "center",
+                    "margin": "20px 0",
+                    "position": "relative"
+                })
+                .html(`
+                    <div style="position: absolute; width: 100%; height: 1px; background: rgba(0,0,0,0.1); z-index: 1;"></div>
+                    <span style="background: var(--color-light); padding: 0 15px; z-index: 2; color: #777; font-size: 0.85rem; font-weight: 500;">
+                        ${fullDateStr}
+                    </span>
+                `);
+            $chatFeed.append($dateDivider);
+        }
+        
+        var lastTimestamp = parseInt($lastMsg.attr("data-timestamp") || "0");
+        var lastUser = $lastMsg.attr("data-user");
+        var timeDiffMs = currentTimestamp - lastTimestamp;
+        isSameUser = (lastUser === (myself ? "You" : username)) && (lastDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs);
+        $targetMsgGroup = $lastMsg;
+    }
+
+    if (isSameUser && $targetMsgGroup.length) {
+        // Grouped bubble - add to existing message group
         
         // Grouped bubble with message actions and data stamps
-        var $newBubble = $("<div>").addClass("message__bubble").attr("aria-index", currentIdx)
+        var $newBubble = $("<div>").addClass("message__bubble").attr("aria-index", overhead ? 1 : currentIdx)
             .attr("aria-username", username)
             .attr("data-message-text", message)
         
@@ -366,7 +436,13 @@ $(document).ready(function() {
         }
         
         $newBubble.append($newText, $sideTime);
-        $lastMsg.find(".message__content").append($newBubble);
+        
+        if (overhead) {
+            // Prepend bubble to the existing group's content (before the first bubble)
+            $targetMsgGroup.find(".message__content .message__bubble").first().before($newBubble);
+        } else {
+            $targetMsgGroup.find(".message__content").append($newBubble);
+        }
         
         // Add reply button click handler
         $newBubble.find('.reply-btn').on('click', function(e) {
@@ -375,7 +451,7 @@ $(document).ready(function() {
             showReplyPreview(index);
         });
     } else {
-        // New Message Group - use currentIdx for this new bubble
+        // New Message Group - create a new message container
         
         // New Message Group
         var $msg = $("<div>").addClass("message").attr("data-user", myself ? "You" : username).attr("data-date", fullDateStr).attr("data-timestamp", msgDate.getTime());
@@ -401,7 +477,7 @@ $(document).ready(function() {
 
         $nameWrapper.append($nameBox, $timestampLabel);
 
-        var $bubble = $("<div>").addClass("message__bubble").attr("aria-index", currentIdx)
+        var $bubble = $("<div>").addClass("message__bubble").attr("aria-index", overhead ? 1 : currentIdx)
             .attr("aria-username", username)
             .attr("data-message-text", message)
         
@@ -432,7 +508,13 @@ $(document).ready(function() {
         $bubble.append($text);
         $content.append($nameWrapper, $bubble);
         $msg.append($avatar, $content);
-        $chatFeed.append($msg);
+        
+        if (overhead) {
+            // Prepend the entire message group to the feed
+            $chatFeed.prepend($msg);
+        } else {
+            $chatFeed.append($msg);
+        }
         
         // Add reply button click handler
         $bubble.find('.reply-btn').on('click', function(e) {
@@ -442,7 +524,9 @@ $(document).ready(function() {
         });
     }
 
-    scrollToBottom();
+    if (!overhead) {
+        scrollToBottom();
+    }
 };
 
   /**
@@ -730,7 +814,57 @@ $(document).ready(function() {
         }
       }
     });
+
+    // =========================================================================
+    // SCROLL TO TOP DETECTION FOR LOADING OLDER MESSAGES
+    // =========================================================================
+    
+    /**
+     * Detect when user scrolls to the top of the chat feed
+     * and call fetch_overhead_messages() to load older messages
+     */
+    if ($chatFeed.length) {
+      var isFetchingOverhead = false; // Prevent multiple simultaneous calls
+      
+      $chatFeed.on("scroll", function() {
+        // Check if scrolled to top (with small threshold for tolerance)
+        if ($chatFeed.scrollTop() <= 10 && !isFetchingOverhead) {
+          // Get the topmost message ID (aria-index of the first message bubble)
+          var topmost_id = -1;
+          var $firstBubble = $chatFeed.find(".message__bubble").first();
+          if ($firstBubble.length) {
+            var firstIdx = parseInt($firstBubble.attr("aria-index"));
+            if (!isNaN(firstIdx)) {
+              topmost_id = firstIdx;
+            }
+          }
+          
+          isFetchingOverhead = true;
+          
+          // Call the function defined in network/home.js with the topmost message ID
+          if (typeof fetch_overhead_messages === "function") {
+            fetch_overhead_messages(topmost_id);
+          }
+        }
+      });
+    }
   });
+
+  // =========================================================================
+  // OVERHEAD LOADING SPINNER
+  // =========================================================================
+  
+  /**
+   * toggle_overhead_animation(toggle)
+   * ---------------------------------
+   * Shows or hides the overhead loading spinner with a fade effect.
+   * The spinner HTML is in home.html and CSS is in home.css.
+   *
+   * @param {boolean} toggle - true to show, false to hide
+   */
+  window.toggle_overhead_animation = function(toggle) {
+    $("#overhead-spinner").css("opacity", toggle ? "1" : "0");
+  };
 
   /**
    * =========================================================================

@@ -156,6 +156,9 @@ function Alert(message, callback=function(){}, shouldFlyUp=false, width=380, hei
     alertOverlay.style.opacity = '0.9';
 }
 
+const True = true
+const False = false
+
 
 function form(url, dic, method='post')
 {

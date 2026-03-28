@@ -1388,3 +1388,28 @@
   text-overflow: ellipsis;
   max-width: 300px;
 }
+
+/* =========================================================================
+   OVERHEAD LOADING SPINNER
+   ========================================================================= */
+#overhead-spinner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 3px solid var(--color-light);
+  border-top-color: var(--color-medium);
+  animation: overhead-spin 1s linear infinite;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 100;
+}
+
+@keyframes overhead-spin {
+  0% { transform: translateX(-50%) rotate(0deg); }
+  100% { transform: translateX(-50%) rotate(360deg); }
+}

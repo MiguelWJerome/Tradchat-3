@@ -53,7 +53,7 @@ def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
         return result
 
 def check_room_access(room_name, username):
-    user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
+    user_id = find_account_id_or_password_or_gender(username, 'id')
     queryResults = db_sql("""SELECT room_type, owners, managers, curators, members FROM rooms WHERE room_name = ?;""", 'rooms', params=[room_name], chat_room=False)
     
     if queryResults[0][0] == 'private':
@@ -71,40 +71,23 @@ def check_room_access(room_name, username):
     else:
         return True
 
-def check_credentials(username, password, foolproof=False):
-    if foolproof:
-        username = remove_go_spaces(username.lower())
-        query = """SELECT username, password FROM accounts WHERE LOWER(username) = ?;"""
-    else:
-        query = """SELECT username, password FROM accounts WHERE username = ?;"""
-
-    queryResults = db_sql(query, 'accounts', params=[username], chat_room=False)
-    if queryResults:
-        
-        if foolproof and remove_go_spaces(queryResults[0][1].lower()) == remove_go_spaces(password.lower()):
-            return True
-        elif not foolproof and queryResults[0][1] == password:
-            return True
-        else:
-            return False
-    return False
+def check_credentials(username, password):
+    password = find_account_id_or_password_or_gender(username, 'password', RGS=True)
+    return (password and password == password)
 
 
-def fetch_messages(room_name, limit, offset):
+def fetch_room_messages(room_name, limit, offset):
     messages = []
-    query = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages LIMIT ? OFFSET ?;""", room_name, params=[limit, offset], chat_room=True)
     
-    id_to_username = {}
+    if offset == -1:
+        query = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages ORDER BY id DESC LIMIT ?""", room_name, params=[limit], chat_room=True)
+    else:
+        query = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages WHERE id < ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)    
 
     for t in query:
         message = {}
         message['id'] = t[0]
-        if t[1] in id_to_username:
-            message['username'] = id_to_username[t[1]]
-        else:
-            id_to_username[t[1]] = db_sql("""SELECT username FROM accounts WHERE id = ?;""", 'accounts', params=[t[1]], chat_room=False)[0][0]
-            message['username'] = id_to_username[t[1]]
-        
+        message['username'] = find_username_from_id(t[1])
         message['message'] = t[2]
         message['timestamp'] = t[3]
         message['reply_id'] = t[4]
@@ -113,6 +96,82 @@ def fetch_messages(room_name, limit, offset):
     
     return messages
 
+
+def fetch_dm_messages(dm_string, username, limit=None, offset=None):
+    primary_user_id = find_account_id_or_password_or_gender(dm_string.split('.$@-@&.')[0], 'id')
+    primaryGender = find_account_id_or_password_or_gender(dm_string.split('.$@-@&.')[0], 'gender')
+    secondary_user_id = find_account_id_or_password_or_gender(dm_string.split('.$@-@&.')[1], 'id')
+
+    id_to_username = {f"{primary_user_id}": dm_string.split('.$@-@&.')[0], f"{secondary_user_id}": dm_string.split('.$@-@&.')[1]}
+
+    genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
+    
+    if limit is not None and offset is not None:
+        if offset == -1:
+            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[f"{primary_user_id}-{secondary_user_id}", limit], chat_room=False)
+        else:
+            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ? AND id < ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[f"{primary_user_id}-{secondary_user_id}", offset, limit], chat_room=False)
+    else:
+        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ?""", genderDict[primaryGender], params=[f"{primary_user_id}-{secondary_user_id}"], chat_room=False)
+
+    actual_user_dm_username = dm_string.split('.$@-@&.')[1] if dm_string.split('.$@-@&.')[0] == username else dm_string.split('.$@-@&.')[0]
+    
+    messages = []
+    for message in raw_messages:
+        messages.append({
+            'id': message[0],
+            'username': id_to_username[str(message[1])],
+            'message': message[2],
+            'timestamp': message[3],
+            'reply_id': message[4],
+            'upload': message[5]
+        })
+
+    return messages, actual_user_dm_username
+
+
+accounts_dict = {}
+id_to_accounts_dict = {}
+
+def find_account_id_or_password_or_gender(user, id_or_password_or_gender='id', RGS=False, RU=False):
+    if RGS:
+        user = remove_go_spaces(user)
+
+    try:
+        if id_or_password_or_gender == 'id':
+            return accounts_dict[user]['id']
+            
+        elif id_or_password_or_gender == 'password':
+            return accounts_dict[user]['password']
+
+        elif id_or_password_or_gender == 'gender':
+            return accounts_dict[user]['gender']
+        
+
+    except KeyError:
+        data = db_sql("""SELECT username, password, id, gender FROM accounts WHERE LOWER(username) = ?;""", 'accounts', params=[user.lower()], chat_room=False)[0]
+        if data:
+            accounts_dict[data[0]] = {'password': data[1], 'id': data[2], 'gender': data[3]}
+            id_to_accounts_dict[data[2]] = data[0]
+            returnable = data[1] if id_or_password_or_gender == 'password' else data[2] if id_or_password_or_gender == 'id' else data[3]
+            if RU:
+                return [data[0], returnable]
+            return returnable
+        return None
+
+def find_username_from_id(user_id):
+    try:
+        return id_to_accounts_dict[user_id]
+    except KeyError:
+        username = db_sql("""SELECT username FROM accounts WHERE id = ?;""", 'accounts', params=[user_id], chat_room=False)[0][0]
+        if username:
+            id_to_accounts_dict[user_id] = username
+            return username
+        return None
+
+
+true = True
+false = False
 
 def remove_go_spaces(string):
     try:
@@ -251,27 +310,36 @@ if not os.path.exists("dms/girls_dm.db"):
     girls_dm_db.close()
 
 def convert_to_gmt(timestamp):
-    # Parse timestamp and convert to GMT military time
-    # Input format: "Sat Mar 07 2026 15:15:11 GMT-0500 (Eastern Standard Time)"
+    # Input example: "Sat Mar 07 2026 15:15:11 GMT-0500 (Eastern Standard Time)"
     try:
-        # Extract the timezone offset (e.g., "GMT-0500")
-        tz_match = timestamp.split('GMT-')[1].split(' (')[0]
-        tz_offset = int(tz_match)
+        # 1. Clean the string to get just the date and the offset
+        # Parts will be: ["Sat Mar 07 2026 15:15:11", "-0500"]
+        parts = timestamp.split(' GMT')
+        dt_str = parts[0].strip()
         
-        # Extract the datetime part (e.g., "Sat Mar 07 2026 15:15:11")
-        datetime_part = remove_go_spaces(timestamp.split('GMT')[0])
+        # Extract just the numeric offset (e.g., "-0500") before the "(Time Name)"
+        offset_str = parts[1].split(' (')[0]
         
-        # Parse the datetime and add timezone offset to get GMT
-        dt = datetime.datetime.strptime(datetime_part, "%a %b %d %Y %H:%M:%S")
-        gmt_dt = dt + datetime.timedelta(hours=-tz_offset//100)
+        # 2. Parse the main datetime
+        dt = datetime.datetime.strptime(dt_str, "%a %b %d %Y %H:%M:%S")
         
-        # Format as date and GMT military time
-        gmt_timestamp = gmt_dt.strftime("%Y-%m-%d %H:%M:%S")
-    except:
-        # Fallback to original timestamp if parsing fails
-        gmt_timestamp = timestamp
-    return gmt_timestamp
-
+        # 3. Calculate the offset hours and minutes
+        # The first character is + or -
+        sign = -1 if offset_str[0] == '-' else 1
+        hours = int(offset_str[1:3])
+        minutes = int(offset_str[3:5])
+        
+        # 4. Apply the inverse of the offset to get back to GMT
+        # If user is GMT-0500, we ADD 5 hours to get to 0.
+        # If user is GMT+0200, we SUBTRACT 2 hours to get to 0.
+        gmt_dt = dt + datetime.timedelta(hours=sign * -hours, minutes=sign * -minutes)
+        
+        # 5. Return in Military Format (24h)
+        return gmt_dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception as e:
+        print(f"Time conversion error: {e}")
+        # Fallback to local time if parsing fails
+        return datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
 room_dict = {'mainroom': {'file_path': 'mainroom.db', 'lock': Lock()}}
 
@@ -317,7 +385,7 @@ def index():
         username = request.form['username']
         password = request.form['password']
 
-        if check_credentials(username, password, foolproof=True):   
+        if check_credentials(username, password):   
             session['username'] = username
             session['password'] = password
 
@@ -335,7 +403,7 @@ def computer_log_into_server():
         username = request.form['username']
         password = request.form['password']
 
-        if check_credentials(username, password, foolproof=True):
+        if check_credentials(username, password):
             session['username'] = username
             session['password'] = password
             return redirect('/home/')
@@ -358,7 +426,7 @@ def home():
         username = session['username']
         password = session['password']
 
-        if check_credentials(username, password, foolproof=True):
+        if check_credentials(username, password):
 
             theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
 
@@ -467,12 +535,12 @@ def Recv(message, sid):
         except KeyError:
             return # Dont bother to return a response to someone who is trying to alter the code
 
-        if check_credentials(username, password, foolproof=True):
+        if check_credentials(username, password):
             if setting == 'room':
                 
                 if check_room_access(room, username):
                 
-                    user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
+                    user_id = find_account_id_or_password_or_gender(username, 'id')
                     gmt_timestamp = convert_to_gmt(timestamp)
 
                     message_id = db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, reply_index, upload], chat_room=True)
@@ -481,10 +549,11 @@ def Recv(message, sid):
             elif setting == 'dm':
                 actual_user_dm_username = room.split('.$@-@&.')[1] if room.split('.$@-@&.')[0] == username else room.split('.$@-@&.')[0]
 
-                username_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
+                username_id = find_account_id_or_password_or_gender(username, 'id')
 
-                important_id, important_gender = db_sql("""SELECT id, gender FROM accounts WHERE username = ?;""", 'accounts', params=[room.split('.$@-@&.')[0]], chat_room=False)[0]
-                un_important_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[room.split('.$@-@&.')[1]], chat_room=False)[0][0]
+                important_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'id')
+                important_gender = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'gender')
+                un_important_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[1], 'id')
 
                 fm_to_gb = {'female': 'girl', 'male': 'boy'}
 
@@ -494,7 +563,7 @@ def Recv(message, sid):
                 Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index)}]), room=room)
                 
 
-    elif msg[0] == 'Fetch Messages':
+    elif msg[0] == 'Fetch Room Messages':
         username = msg[1]['username']
         password = msg[1]['password']
         data = msg[1]
@@ -502,40 +571,36 @@ def Recv(message, sid):
         limit = data['limit']
         offset = data['offset']
         
-        if check_credentials(username, password, foolproof=True) and check_room_access(room, username):
-            messages = fetch_messages(room, limit, offset)
-            Server.send(str(['Fetch Messages', messages]), room=sid)
+        if check_credentials(username, password) and check_room_access(room, username):
+            messages = fetch_room_messages(room, limit, offset)
+            messages.reverse()
+            Server.send(str(['Fetch Room Messages', messages, room, db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[room], chat_room=False)[0][0]]), room=sid)
+
+    elif msg[0] == 'Fetch DM Messages':
+        username = msg[1]['username']
+        password = msg[1]['password']
+        limit = msg[1]['limit']
+        offset = msg[1]['offset']
+        new_dm = db_sql("""SELECT room FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
+        
+        messages, actual_user_dm_username = fetch_dm_messages(new_dm, username, limit, offset)
+
+        db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_dm, username], chat_room=False)
+        
+        messages.reverse()
+        
+        Server.send(str(['Fetch DM Messages', messages, new_dm, f'/static/profile-pictures/{actual_user_dm_username}.png']), room=sid)
     
+
     elif msg[0] == 'Join Room':
         data = msg[1]
         room = data['room']
         username = data['username']
         password = data['password']
         
-        
-        if check_credentials(username, password, foolproof=True):
+        if check_credentials(username, password):
             if check_room_access(room, username):
                 Server.server.enter_room(sid, room)
-            else:
-                return # User not allowed in room
-        else:
-            return 
-
-    elif msg[0] == 'Switch Room':
-        data = msg[1]
-        old_group = data['old-group']
-        new_room = data['room']
-        username = data['username']
-        password = data['password']
-        
-        if check_credentials(username, password, foolproof=True):
-            if check_room_access(new_room, username):
-                Server.server.leave_room(sid, old_group)
-                Server.server.enter_room(sid, new_room)
-
-                db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_room, username], chat_room=False)
-
-                Server.send(str(['Fetch Room Messages', fetch_messages(new_room, 50, 0), new_room, db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[new_room], chat_room=False)[0][0]]), room=sid)
             else:
                 return # User not allowed in room
         else:
@@ -548,35 +613,15 @@ def Recv(message, sid):
         username = data['username']
         password = data['password']
         
-        if check_credentials(username, password, foolproof=True):
+        if check_credentials(username, password):
             Server.server.leave_room(sid, old_group)
             Server.server.enter_room(sid, new_dm)
             
-            primary_user_id, primaryGender = db_sql("""SELECT id, gender FROM accounts WHERE username = ?;""", 'accounts', params=[new_dm.split('.$@-@&.')[0]], chat_room=False)[0]
-            secondary_user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[new_dm.split('.$@-@&.')[1]], chat_room=False)[0][0]
-
-            id_to_username = {f"{primary_user_id}": new_dm.split('.$@-@&.')[0], f"{secondary_user_id}": new_dm.split('.$@-@&.')[1]}
-
-            genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
-            
-            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ?""", genderDict[primaryGender], params=[f"{primary_user_id}-{secondary_user_id}"], chat_room=False)
-
-            actual_user_dm_username = new_dm.split('.$@-@&.')[1] if new_dm.split('.$@-@&.')[0] == username else new_dm.split('.$@-@&.')[0]
-            
-            messages = []
-            for message in raw_messages:
-                messages.append({
-                    'id': message[0],
-                    'username': id_to_username[str(message[1])],
-                    'message': message[2],
-                    'timestamp': message[3],
-                    'reply_id': message[4],
-                    'upload': message[5]
-                })
+            messages, actual_user_dm_username = fetch_dm_messages(new_dm, username)
 
             db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_dm, username], chat_room=False)
             
-            Server.send(str(['Fetch DM Messages', messages, new_dm, f'/static/profile-pictures/{actual_user_dm_username}.png']), room=sid)
+            Server.send(str(['Fetch DM Messages', messages, new_dm, f'/static/profile-pictures/{actual_user_dm_username}.png'], False), room=sid)
             
         else:
             return 
@@ -593,11 +638,11 @@ def Recv(message, sid):
         password = data['password']
         roomtype = data['roomtype']
         
-        if check_credentials(username, password, foolproof=True):
+        if check_credentials(username, password):
                 all_rooms = db_sql("""SELECT room_name, room_type, description, owners, managers, curators, members, emoji FROM rooms;""", 'rooms', chat_room=False)
                 user_rooms = []
 
-                user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
+                user_id = find_account_id_or_password_or_gender(username, 'id')
                 
                 for room in all_rooms:
 
@@ -624,7 +669,7 @@ def Recv(message, sid):
         username = data['username']
         password = data['password']
         
-        if check_credentials(username, password, foolproof=True):
+        if check_credentials(username, password):
             dms = {'unread': [], 'read': []}
             dms_ids = split(db_sql("""SELECT dms FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0])
             
@@ -649,11 +694,11 @@ def Recv(message, sid):
         username = data['username']
         password = data['password']
 
-        queryResult = db_sql("""SELECT username, password FROM accounts WHERE LOWER(username) = ?;""", 'accounts', params=[remove_go_spaces(username.lower())], chat_room=False)
+        password = find_account_id_or_password_or_gender(username, 'password', RGS=True)
 
-        if queryResult:
-            if remove_go_spaces(queryResult[0][1].lower()) == remove_go_spaces(password.lower()):
-                Server.send(str(['Log In Results', queryResult[0][0], 'Success', queryResult[0][1]]), room=sid)
+        if password:
+            if remove_go_spaces(password.lower()) == remove_go_spaces(password.lower()):
+                Server.send(str(['Log In Results', username, 'Success', password]), room=sid)
 
             else:
                 return # Invalid password
@@ -667,11 +712,11 @@ def Recv(message, sid):
         username = data['username']
         password = data['password']
 
-        queryResult = db_sql("""SELECT username, password FROM accounts WHERE LOWER(username) = ?;""", 'accounts', params=[remove_go_spaces(username.lower())], chat_room=False)
+        username, password = find_account_id_or_password_or_gender(username, 'password', RGS=True, RU=True)
 
-        if queryResult:
-            if remove_go_spaces(queryResult[0][1].lower()) == remove_go_spaces(password.lower()):
-                Server.send(str(['Log In Results', queryResult[0][0], 'Success', queryResult[0][1]]), room=sid)
+        if password:
+            if remove_go_spaces(password.lower()) == remove_go_spaces(password.lower()):
+                Server.send(str(['Log In Results', username, 'Success', password]), room=sid)
 
             else:
                 Server.send(str(['Log In Results', username, 'Wrong Password']), room=sid)
@@ -685,9 +730,9 @@ def Recv(message, sid):
         password = data['password']
         user = data['user']
 
-        if check_credentials(username, password, foolproof=True):
-            username_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
-            user_id = db_sql("""SELECT id FROM accounts WHERE username = ?;""", 'accounts', params=[user], chat_room=False)[0][0]
+        if check_credentials(username, password):
+            username_id = find_account_id_or_password_or_gender(username, 'id')
+            user_id = find_account_id_or_password_or_gender(user, 'id')
 
             query = split(remove_go_spaces(db_sql("""SELECT dms FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]).replace('u', ''))
             if remove_go_spaces(str(user_id)) in query:
@@ -729,7 +774,7 @@ def Recv(message, sid):
         db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2'], chat_room=False)
 
         # Get new user ID and add to Server/Admin dms
-        new_id = str(db_sql("SELECT id FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0])
+        new_id = str(find_account_id_or_password_or_gender(username, 'id'))
         server_dms = split(db_sql("SELECT dms FROM accounts WHERE id = 1;", 'accounts', chat_room=False)[0][0])
         if new_id not in server_dms:
             server_dms.append(new_id)
@@ -752,7 +797,7 @@ def Recv(message, sid):
         emoji = data['emoji']
         roomtype = data['roomtype']
 
-        if check_credentials(username, password, foolproof=True):
+        if check_credentials(username, password):
             query = db_sql("""SELECT * FROM rooms WHERE room_name = ?;""", 'rooms', params=[roomname], chat_room=False)
             if query:
                 Server.send(str(['Create Room Results', 'Room Already Exists']), room=sid)
@@ -777,7 +822,7 @@ def Recv(message, sid):
 
                 room_dict[roomname] = {'filepath': f'rooms/{roomname}.db', 'lock': Lock()}
 
-                db_sql("""INSERT INTO rooms (room_name, description, room_type, owners, managers, curators, members, emoji) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", 'rooms', params=[roomname, description, roomtype, str(db_sql("SELECT id FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]), '', '', '', emoji], chat_room=False)
+                db_sql("""INSERT INTO rooms (room_name, description, room_type, owners, managers, curators, members, emoji) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", 'rooms', params=[roomname, description, roomtype, str(find_account_id_or_password_or_gender(username, 'id')), '', '', '', emoji], chat_room=False)
                 
                 Server.send(str(['Create Room Results', 'Room Created']), room=sid)
 

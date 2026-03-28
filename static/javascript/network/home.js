@@ -22,14 +22,8 @@ function recv(message) {
             appendMessage(data['username'], data['message'], data['timestamp'], data['username'] === username, data['reply_id'])
         }
     }
-    else if (msg[0] === 'Fetch Messages') {
-        // Reset bubble index so reply_id corresponds to nth message in this batch
-        messageBubbleIndex = 0;
-        data = msg[1]
-        for (var i in data) {
-            appendMessage(data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username, data[i]['reply_id'])
-        }
-    }
+
+    
     else if (msg[0] === 'Fetch Room Messages') {
         // Reset bubble index so reply_id corresponds to nth message in this batch
         messageBubbleIndex = 0;
@@ -41,7 +35,7 @@ function recv(message) {
         switch_room_mid_feed_toggle = false
         data = msg[1]
         for (var i in data) {
-            appendMessage(data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username, data[i]['reply_id'])
+            appendMessage(data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username, data[i]['reply_id'], false)
         }
         change_banner_picture(msg[3], false)
         document.querySelector('.room-title').textContent = msg[2].toUpperCase()
@@ -57,7 +51,7 @@ function recv(message) {
         switch_room_mid_feed_toggle = false
         data = msg[1]
         for (var i in data) {
-            appendMessage(data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username, data[i]['reply_id'])
+            appendMessage(data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username, data[i]['reply_id'], false)
         }
         change_banner_picture(msg[3], true)
         let dmParts = msg[2].split('.$@-@&.');
@@ -207,6 +201,18 @@ function create_chat_room(roomname, description, emoji, roomtype) {
     cl.send(JSON.stringify(['Create Room', {'username': username, 'password': password, 'roomname': roomname, 'description': description, 'emoji': emoji, 'roomtype': roomtype}]))
 }
 
+function fetch_overhead_messages(offset_id) {
+    // Fetch older messages before the message with offset_id
+    fetch_type = ROOM_TYPE === 'dm' ? 'Fetch DM Messages' : 'Fetch Room Messages'
+    cl.send(JSON.stringify([fetch_type, {
+        'username': username, 
+        'password': password, 
+        'room': ROOM, // ROOM holds the sorted dm string
+        'limit': 20, 
+        'offset': offset_id
+    }]));
+}
+
 
 document.getElementById('messenger-icon').addEventListener('click', function() {
     cl.send(JSON.stringify(['Get Dms', {'username': username, 'password': password}]))
@@ -330,13 +336,13 @@ if (ROOM_TYPE === 'public') {
 
 
 setTimeout(function() {
-    fetch_type = ROOM_TYPE === 'dm' ? 'Fetch DM Messages' : 'Fetch Messages'
+    fetch_type = ROOM_TYPE === 'dm' ? 'Fetch DM Messages' : 'Fetch Room Messages'
     cl.send(JSON.stringify([fetch_type, {
         'username': username, 
         'password': password, 
         'room': ROOM, // ROOM holds the sorted dm string
-        'limit': 50, 
-        'offset': 0
+        'limit': 20, 
+        'offset': -1
     }]));
 }, 300);
 });
