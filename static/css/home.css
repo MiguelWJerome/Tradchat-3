@@ -423,6 +423,12 @@
   gap: 12px;
 }
 
+/* Ensure #chat-feed has proper scroll behavior */
+#chat-feed {
+  height: 100%;
+  overflow-y: auto;
+}
+
 /* Individual message bubble (injected by home.js) */
 .message {
   display: flex;
@@ -1393,23 +1399,32 @@
    OVERHEAD LOADING SPINNER
    ========================================================================= */
 #overhead-spinner {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 3px solid var(--color-light);
-  border-top-color: var(--color-medium);
-  animation: overhead-spin 1s linear infinite;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-  z-index: 100;
+    width: 2px;
+    height: 2px;
+    opacity: 0;
+    padding-left: 15px;
+    padding-right: 15px;
+    position: absolute;
+    top: 93px;
+    border-radius: 20px;
+    border: 1px solid black;
+    font-size: 1.5em;
+    font-weight: bold;
+    font-family: math;
+    user-select: none;
+    cursor: pointer;
+    display: block;
+    align-self: center;
+    z-index: 2;
+    position: absolute;
+    top: 50px;
+    transition: opacity 0.5s, width 0.5s, height 0.5s, border 0.5s, border-radius 0.5s, border-top 0.5s, top 0.5s;
 }
-
-@keyframes overhead-spin {
-  0% { transform: translateX(-50%) rotate(0deg); }
-  100% { transform: translateX(-50%) rotate(360deg); }
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }

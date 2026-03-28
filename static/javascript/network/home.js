@@ -8,6 +8,8 @@ cl.send(JSON.stringify(['Join Room', {'room': 'mainroom', 'username': username, 
 let switch_room_mid_feed = []
 let switch_room_mid_feed_toggle = false
 
+let network_coast_clear_for_setting_fetching_messages_to_false = false
+
 function recv(message) {
     msg = eval(message)
     console.log(msg)
@@ -18,54 +20,69 @@ function recv(message) {
         }
         else {
             data = msg[1]
-            appendMessage(data['username'], data['message'], data['timestamp'], data['username'] === username, data['reply_id'])
+            appendMessage({'index': data['id'], 'username': data['username'], 'message': data['message'], 'timestamp': data['timestamp'], 'myself': data['username'] === username, 'replyIndex': data['reply_id']})
         }
     }
 
     
-    else if (msg[0] === 'Fetch Room Messages') {
-        // Reset bubble index so reply_id corresponds to nth message in this batch
-        data = msg[1]
+    else if (msg[0] === 'Fetch Room Messages' || msg[0] === 'Fetch DM Messages') {
+        // 1. LOCK IMMEDIATELY (Safety first)
+        FetchingMessages = true; 
+        
         messageBubbleIndex = 0;
-        if (data['overhead']) {
-            document.querySelector('#chat-feed').innerHTML = ''
+        data = msg[1];
+
+        if (!data['overhead']) {
+            document.querySelector('#message-container').innerHTML = '';
         }
+
+        // Process buffered messages
         while (switch_room_mid_feed.length > 0) {
-            var msg = switch_room_mid_feed.splice(0, 1)[0]
-            appendMessage(msg['id'], msg['username'], msg['message'], msg['timestamp'], msg['username'] === username, msg['reply_id'])
+            var m = switch_room_mid_feed.splice(0, 1)[0];
+            appendMessage({
+                'index': m['id'], 'username': m['username'], 'message': m['message'], 
+                'timestamp': m['timestamp'], 'myself': m['username'] === username, 
+                'replyIndex': m['reply_id']
+            });
         }
-        switch_room_mid_feed_toggle = false
-        messages = data['messages']
+        switch_room_mid_feed_toggle = false;
+
+        // Process batch messages
+        messages = data['messages'];
         for (var i in messages) {
-            appendMessage(messages[i]['id'], messages[i]['username'], messages[i]['message'], messages[i]['timestamp'], messages[i]['username'] === username, messages[i]['reply_id'], false)
+            appendMessage({
+                'index': messages[i]['id'], 'username': messages[i]['username'], 
+                'message': messages[i]['message'], 'timestamp': messages[i]['timestamp'], 
+                'myself': messages[i]['username'] === username, 
+                'replyIndex': messages[i]['reply_id'], 'overhead': false
+            });
         }
-        change_banner_picture(data['emoji'], false)
-        document.querySelector('.room-title').textContent = data['room'].toUpperCase()
+
+        // Handle UI Updates
+        if (msg[0] === 'Fetch Room Messages') {
+            change_banner_picture(data['emoji'], false);
+            document.querySelector('.room-title').textContent = data['room'].toUpperCase();
+        } else {
+            change_banner_picture(data['profile_picture'], true);
+            let dmParts = data['room'].split('.$@-@&.');
+            let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];
+            document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase();
+        }
+
         toggle_overhead_animation(false);
-        isFetchingOverhead = false;
-    }
-    else if (msg[0] === 'Fetch DM Messages') {
-        // Reset bubble index so reply_id corresponds to nth message in this batch
-        messageBubbleIndex = 0;
-        data = msg[1]
-        if (data['overhead']) {
-            document.querySelector('#chat-feed').innerHTML = ''
-        }
-        while (switch_room_mid_feed.length > 0) {
-            var msg = switch_room_mid_feed.splice(0, 1)[0]
-            appendMessage(msg['id'], msg['username'], msg['message'], msg['timestamp'], msg['username'] === username, msg['reply_id'])
-        }
-        switch_room_mid_feed_toggle = false
-        messages = data['messages']
-        for (var i in messages) {
-            appendMessage(messages[i]['id'], messages[i]['username'], messages[i]['message'], messages[i]['timestamp'], messages[i]['username'] === username, messages[i]['reply_id'], false)
-        }
-        change_banner_picture(data['profile_picture'], true)
-        let dmParts = data['room'].split('.$@-@&.');
-        let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];
-        document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase()
-        toggle_overhead_animation(false);
-        isFetchingOverhead = false;
+
+        // 1. Keep FetchingMessages = true right now. 
+        // Do NOT set it to false yet.
+
+        // 2. Use a timeout to wait for the browser to finish rendering 
+        // and for the scroll to stabilize.
+        setTimeout(() => {
+            FetchingMessages = false;
+            // Clear your helper flags here too
+            we_are_currently_appending_messages_rn = false;
+            network_coast_clear_for_setting_fetching_messages_to_false = false;
+            console.log("Sensor safely re-enabled.");
+        }, 150); // 150ms is the "sweet spot" for DOM reflow 
     }
     else if (msg[0] === 'Get Rooms') {
         clearAllChatRoomOptions()
@@ -138,12 +155,14 @@ chatInput.addEventListener('keypress', function(e) {
 })
 
 function switch_room(roomname) {
+    FetchingMessages = true; // Lock it IMMEDIATELY on click
     cl.send(JSON.stringify(['Switch Room', {'old-group': ROOM, 'room': roomname, 'username': username, 'password': password}]))
     switch_room_mid_feed_toggle = true
     ROOM = roomname
 }
 
 function switch_dm(dm_username) {
+    FetchingMessages = true; // Lock it IMMEDIATELY on click
     cl.send(JSON.stringify(['Switch DM', {'old-group': ROOM, 'new-dm': sortAndJoinStrings(dm_username, username), 'username': username, 'password': password}]))
     switch_room_mid_feed_toggle = true
     ROOM = sortAndJoinStrings(dm_username, username)
@@ -211,6 +230,9 @@ function create_chat_room(roomname, description, emoji, roomtype) {
 }
 
 function fetch_overhead_messages(offset_id) {
+    FetchingMessages = true; // Lock it immediately so it doesn't fire twice
+    toggle_overhead_animation(true);
+    
     // Fetch older messages before the message with offset_id
     fetch_type = ROOM_TYPE === 'dm' ? 'Fetch DM Messages' : 'Fetch Room Messages'
     cl.send(JSON.stringify([fetch_type, {
@@ -220,7 +242,6 @@ function fetch_overhead_messages(offset_id) {
         'limit': 20, 
         'offset': offset_id
     }]));
-    toggle_overhead_animation(true);
 }
 
 
@@ -346,11 +367,14 @@ if (ROOM_TYPE === 'public') {
 
 
 setTimeout(function() {
-    fetch_type = ROOM_TYPE === 'dm' ? 'Fetch DM Messages' : 'Fetch Room Messages'
+    // Set FetchingMessages to true BEFORE sending the request
+    FetchingMessages = true; 
+    
+    fetch_type = ROOM_TYPE === 'dm' ? 'Fetch DM Messages' : 'Fetch Room Messages';
     cl.send(JSON.stringify([fetch_type, {
         'username': username, 
         'password': password, 
-        'room': ROOM, // ROOM holds the sorted dm string
+        'room': ROOM, 
         'limit': 20, 
         'offset': -1
     }]));

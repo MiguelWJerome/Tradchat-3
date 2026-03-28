@@ -35,6 +35,9 @@ if (typeof $ === 'undefined') {
     console.error('[home.js] jQuery not found');
 }
 
+// Global flag to prevent multiple simultaneous overhead fetches
+var FetchingMessages = true;
+var we_are_currently_appending_messages_rn = false
 // Initialize sidebar tray functionality when document is ready
 $(document).ready(function() {
     // 2. Handle Tray Item Clicks
@@ -61,16 +64,17 @@ $(document).ready(function() {
         }
     });
 });
-
+var overhead_spinner = document.querySelector('#overhead-spinner');
 ;(function () {
   "use strict";
 
   // DOM element cache
-  var $sidebarList, $chatFeed;
+  var $sidebarList, $messageContainer, $chatFeed;
 
   // Initialize DOM references
   $(document).ready(function () {
     $sidebarList = $("#sidebar-list");
+    $messageContainer = $("#message-container");
     $chatFeed = $("#chat-feed");
   });
 
@@ -303,8 +307,17 @@ $(document).ready(function() {
    * @param {number} replyIndex - aria-index of message being replied to (-1 if not a reply)
    * @param {boolean} overhead - If true, inserts message at top for historical loading
    */
-  window.appendMessage = function (index, username, message, timestamp, myself, replyIndex=-1, overhead=false) {
-    if (!$chatFeed.length) return;
+  window.appendMessage = function (data) {
+    we_are_currently_appending_messages_rn = true;
+    let index = data['index'];
+    let username = data['username'];
+    let message = data['message'];
+    let timestamp = data['timestamp'];
+    let myself = data['myself'];
+    let replyIndex = data['replyIndex'];
+    let overhead = data['overhead'];
+    
+    if (!$messageContainer.length) return;
 
     // Use the provided index for aria-index (required parameter)
     const currentIdx = index;
@@ -346,7 +359,7 @@ $(document).ready(function() {
     
     if (overhead) {
         // When inserting at top, check against the FIRST message (the one beneath)
-        var $firstMsg = $chatFeed.find(".message").first();
+        var $firstMsg = $messageContainer.find(".message").first();
         var firstDateAttr = $firstMsg.attr("data-date");
         
         // If the date is different from the first message (or this is the first message ever)
@@ -367,7 +380,7 @@ $(document).ready(function() {
                         ${fullDateStr}
                     </span>
                 `);
-            $chatFeed.prepend($dateDivider);
+            $messageContainer.prepend($dateDivider);
         }
         
         var firstTimestamp = parseInt($firstMsg.attr("data-timestamp") || "0");
@@ -377,7 +390,7 @@ $(document).ready(function() {
         $targetMsgGroup = $firstMsg;
     } else {
         // Normal append mode - check against the LAST message
-        var $lastMsg = $chatFeed.find(".message").last();
+        var $lastMsg = $messageContainer.find(".message").last();
         var lastDateAttr = $lastMsg.attr("data-date");
 
         // If the date has changed since the last message (or this is the first message)
@@ -397,7 +410,7 @@ $(document).ready(function() {
                         ${fullDateStr}
                     </span>
                 `);
-            $chatFeed.append($dateDivider);
+            $messageContainer.append($dateDivider);
         }
         
         var lastTimestamp = parseInt($lastMsg.attr("data-timestamp") || "0");
@@ -512,9 +525,9 @@ $(document).ready(function() {
         
         if (overhead) {
             // Prepend the entire message group to the feed
-            $chatFeed.prepend($msg);
+            $messageContainer.prepend($msg);
         } else {
-            $chatFeed.append($msg);
+            $messageContainer.append($msg);
         }
         
         // Add reply button click handler
@@ -525,9 +538,17 @@ $(document).ready(function() {
         });
     }
 
-    if (!overhead) {
+    if (!data['overhead']) {
         scrollToBottom();
     }
+
+    // Check if we should set FetchingMessages to false
+    if (network_coast_clear_for_setting_fetching_messages_to_false) {
+        FetchingMessages = false;
+        network_coast_clear_for_setting_fetching_messages_to_false = false;
+    }
+
+    we_are_currently_appending_messages_rn = false;
 };
 
   /**
@@ -666,7 +687,7 @@ $(document).ready(function() {
     $(".convo-item[data-room='" + roomId + "']").addClass("active");
     
     // Clear current chat feed
-    $chatFeed.empty();
+    $messageContainer.empty();
   }
 
   /**
@@ -675,11 +696,19 @@ $(document).ready(function() {
    * Smoothly scrolls chat feed to show the most recent message.
    */
   function scrollToBottom() {
-    if ($chatFeed.length) {
-      var feed = $chatFeed[0];
-      feed.scrollTo({ top: feed.scrollHeight, behavior: "smooth" });
-    }
+  // Target the parent 'chat-feed' instead of the message-container
+  var feed = document.getElementById('chat-feed'); 
+  
+  if (feed) {
+    // Use setTimeout to allow the browser to render the new message first
+    setTimeout(function() {
+      feed.scrollTo({ 
+        top: feed.scrollHeight, 
+        behavior: "smooth" 
+      });
+    }, 50); 
   }
+};
 
   /**
    * =========================================================================
@@ -825,14 +854,20 @@ $(document).ready(function() {
      * and call fetch_overhead_messages() to load older messages
      */
     if ($chatFeed.length) {
-      var isFetchingOverhead = false; // Prevent multiple simultaneous calls
-      
       $chatFeed.on("scroll", function() {
         // Check if scrolled to top (with small threshold for tolerance)
-        if ($chatFeed.scrollTop() <= 10 && !isFetchingOverhead) {
+        if ($chatFeed.scrollTop() <= 10) {
+          // --- THIS IS THE CRITICAL GUARD ---
+          if (FetchingMessages) {
+            console.log("Scroll sensor triggered, but blocked by FetchingMessages lock.");
+            return; 
+          }
+          
+          console.log("Scroll sensor triggered: Loading older messages...");
+          
           // Get the topmost message ID (aria-index of the first message bubble)
           var topmost_id = -1;
-          var $firstBubble = $chatFeed.find(".message__bubble").first();
+          var $firstBubble = $("#message-container").find(".message__bubble").first();
           if ($firstBubble.length) {
             var firstIdx = parseInt($firstBubble.attr("aria-index"));
             if (!isNaN(firstIdx)) {
@@ -840,11 +875,10 @@ $(document).ready(function() {
             }
           }
           
-          isFetchingOverhead = true;
-          
           // Call the function defined in network/home.js with the topmost message ID
           if (typeof fetch_overhead_messages === "function") {
             fetch_overhead_messages(topmost_id);
+            console.log('Called fetch_overhead_messages with ID:', topmost_id);
           }
         }
       });
@@ -864,7 +898,31 @@ $(document).ready(function() {
    * @param {boolean} toggle - true to show, false to hide
    */
   window.toggle_overhead_animation = function(toggle) {
-    $("#overhead-spinner").css("opacity", toggle ? "1" : "0");
+    if (toggle === true)
+    {
+        overhead_spinner.style.width = '70px'
+        overhead_spinner.style.height = '70px'
+        overhead_spinner.style.animation = 'spin 1s linear infinite'
+        overhead_spinner.style.borderRadius = '50%'
+        overhead_spinner.style.border = '5px solid var(--color-medium)'
+        overhead_spinner.style.borderTop = '5px solid var(--color-dark)'
+        overhead_spinner.style.display = 'block'
+        overhead_spinner.style.opacity = '1'
+        overhead_spinner.style.top = '140px'
+    }
+    else
+    {
+        setTimeout(function(){
+            overhead_spinner.style.width = ''
+            overhead_spinner.style.height = ''
+            overhead_spinner.style.borderRadius = ''
+            overhead_spinner.style.border = ''
+            overhead_spinner.style.borderTop = ''
+            overhead_spinner.style.opacity = ''
+            overhead_spinner.style.animation = ''
+            overhead_spinner.style.top = '50px'
+        }, 700)
+    }
   };
 
   /**
