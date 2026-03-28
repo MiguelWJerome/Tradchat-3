@@ -287,7 +287,7 @@ $(document).ready(function() {
   // Global message bubble index counter
 
   /**
-   * appendMessage(username, timestamp, message, myself, replyIndex=-1, overhead=false)
+   * appendMessage(index, username, message, timestamp, myself, replyIndex=-1, overhead=false)
    * -----------------------------------------
    * Appends a message to the chat feed with the provided parameters.
    * Creates proper message structure with avatar, name, and bubble.
@@ -295,18 +295,19 @@ $(document).ready(function() {
    * If replyIndex is provided (not -1), shows a reply indicator that links to the original message.
    * If overhead is true, inserts the message at the TOP of the chat (for loading historical messages).
    *
+   * @param {number} index - The global message ID for aria-index (server-client identifier)
    * @param {string} username - The username of the message sender
-   * @param {string} timestamp - The timestamp for the message
    * @param {string} message - The message content
+   * @param {string} timestamp - The timestamp for the message
    * @param {boolean} myself - Set to true if this is your own message (appears on right)
    * @param {number} replyIndex - aria-index of message being replied to (-1 if not a reply)
    * @param {boolean} overhead - If true, inserts message at top for historical loading
    */
-  window.appendMessage = function (username, message, timestamp, myself, replyIndex=-1, overhead=false) {
+  window.appendMessage = function (index, username, message, timestamp, myself, replyIndex=-1, overhead=false) {
     if (!$chatFeed.length) return;
 
-    // Important: Count EXISTING bubbles to get the next index
-    const currentIdx = $('.message__bubble').length + 1;
+    // Use the provided index for aria-index (required parameter)
+    const currentIdx = index;
     
     // If overhead mode, increment all existing aria-index values by 1
     if (overhead) {

@@ -9,7 +9,6 @@ let switch_room_mid_feed = []
 let switch_room_mid_feed_toggle = false
 
 function recv(message) {
-    console.log(message)
     msg = eval(message)
     console.log(msg)
     if (msg[0] === 'Message') {
@@ -26,37 +25,47 @@ function recv(message) {
     
     else if (msg[0] === 'Fetch Room Messages') {
         // Reset bubble index so reply_id corresponds to nth message in this batch
+        data = msg[1]
         messageBubbleIndex = 0;
-        document.querySelector('#chat-feed').innerHTML = ''
+        if (data['overhead']) {
+            document.querySelector('#chat-feed').innerHTML = ''
+        }
         while (switch_room_mid_feed.length > 0) {
             var msg = switch_room_mid_feed.splice(0, 1)[0]
-            appendMessage(msg['username'], msg['message'], msg['timestamp'], msg['username'] === username, msg['reply_id'])
+            appendMessage(msg['id'], msg['username'], msg['message'], msg['timestamp'], msg['username'] === username, msg['reply_id'])
         }
         switch_room_mid_feed_toggle = false
-        data = msg[1]
-        for (var i in data) {
-            appendMessage(data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username, data[i]['reply_id'], false)
+        messages = data['messages']
+        for (var i in messages) {
+            appendMessage(messages[i]['id'], messages[i]['username'], messages[i]['message'], messages[i]['timestamp'], messages[i]['username'] === username, messages[i]['reply_id'], false)
         }
-        change_banner_picture(msg[3], false)
-        document.querySelector('.room-title').textContent = msg[2].toUpperCase()
+        change_banner_picture(data['emoji'], false)
+        document.querySelector('.room-title').textContent = data['room'].toUpperCase()
+        toggle_overhead_animation(false);
+        isFetchingOverhead = false;
     }
     else if (msg[0] === 'Fetch DM Messages') {
         // Reset bubble index so reply_id corresponds to nth message in this batch
         messageBubbleIndex = 0;
-        document.querySelector('#chat-feed').innerHTML = ''
+        data = msg[1]
+        if (data['overhead']) {
+            document.querySelector('#chat-feed').innerHTML = ''
+        }
         while (switch_room_mid_feed.length > 0) {
             var msg = switch_room_mid_feed.splice(0, 1)[0]
-            appendMessage(msg['username'], msg['message'], msg['timestamp'], msg['username'] === username, msg['reply_id'])
+            appendMessage(msg['id'], msg['username'], msg['message'], msg['timestamp'], msg['username'] === username, msg['reply_id'])
         }
         switch_room_mid_feed_toggle = false
-        data = msg[1]
-        for (var i in data) {
-            appendMessage(data[i]['username'], data[i]['message'], data[i]['timestamp'], data[i]['username'] === username, data[i]['reply_id'], false)
+        messages = data['messages']
+        for (var i in messages) {
+            appendMessage(messages[i]['id'], messages[i]['username'], messages[i]['message'], messages[i]['timestamp'], messages[i]['username'] === username, messages[i]['reply_id'], false)
         }
-        change_banner_picture(msg[3], true)
-        let dmParts = msg[2].split('.$@-@&.');
+        change_banner_picture(data['profile_picture'], true)
+        let dmParts = data['room'].split('.$@-@&.');
         let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];
         document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase()
+        toggle_overhead_animation(false);
+        isFetchingOverhead = false;
     }
     else if (msg[0] === 'Get Rooms') {
         clearAllChatRoomOptions()
@@ -211,6 +220,7 @@ function fetch_overhead_messages(offset_id) {
         'limit': 20, 
         'offset': offset_id
     }]));
+    toggle_overhead_animation(true);
 }
 
 

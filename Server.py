@@ -573,8 +573,9 @@ def Recv(message, sid):
         
         if check_credentials(username, password) and check_room_access(room, username):
             messages = fetch_room_messages(room, limit, offset)
-            messages.reverse()
-            Server.send(str(['Fetch Room Messages', messages, room, db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[room], chat_room=False)[0][0]]), room=sid)
+            if (offset == -1):
+                messages.reverse()
+            Server.send(str(['Fetch Room Messages', {'messages': messages, 'room': room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[room], chat_room=False)[0][0], 'overhead': (offset == -1)}]), room=sid)
 
     elif msg[0] == 'Fetch DM Messages':
         username = msg[1]['username']
@@ -587,9 +588,10 @@ def Recv(message, sid):
 
         db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_dm, username], chat_room=False)
         
-        messages.reverse()
+        if (offset == -1):
+            messages.reverse()
         
-        Server.send(str(['Fetch DM Messages', messages, new_dm, f'/static/profile-pictures/{actual_user_dm_username}.png']), room=sid)
+        Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': new_dm, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'overhead': (offset == -1)}]), room=sid)
     
 
     elif msg[0] == 'Join Room':
@@ -606,6 +608,26 @@ def Recv(message, sid):
         else:
             return 
 
+    elif msg[0] == 'Switch Room':
+        data = msg[1]
+        old_group = data['old-group']
+        new_room = data['room']
+        username = data['username']
+        password = data['password']
+        
+        if check_credentials(username, password, foolproof=True):
+            if check_room_access(new_room, username):
+                Server.server.leave_room(sid, old_group)
+                Server.server.enter_room(sid, new_room)
+
+                db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_room, username], chat_room=False)
+
+                Server.send(str(['Fetch Room Messages', {'messages': fetch_room_messages(new_room, 50, -1), 'room': new_room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[new_room], chat_room=False)[0][0], 'clear': False}]), room=sid)
+            else:
+                return # User not allowed in room
+        else:
+            return 
+
     elif msg[0] == 'Switch DM':
         data = msg[1]
         old_group = data['old-group']
@@ -617,11 +639,11 @@ def Recv(message, sid):
             Server.server.leave_room(sid, old_group)
             Server.server.enter_room(sid, new_dm)
             
-            messages, actual_user_dm_username = fetch_dm_messages(new_dm, username)
+            messages, actual_user_dm_username = fetch_dm_messages(new_dm, username, 50, -1)
 
             db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_dm, username], chat_room=False)
             
-            Server.send(str(['Fetch DM Messages', messages, new_dm, f'/static/profile-pictures/{actual_user_dm_username}.png'], False), room=sid)
+            Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': new_dm, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'clear': False}]), room=sid)
             
         else:
             return 
