@@ -610,7 +610,7 @@ def Recv(message, sid):
         username = data['username']
         password = data['password']
         
-        if check_credentials(username, password, foolproof=True):
+        if check_credentials(username, password):
             if check_room_access(new_room, username):
                 Server.server.leave_room(sid, old_group)
                 Server.server.enter_room(sid, new_room)

@@ -357,6 +357,14 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
     var currentTimestamp = msgDate.getTime();
     var fiveMinutesMs = 5 * 60 * 1000; // 5 minutes in milliseconds
     
+    // SCROLL ANCHOR: Save scroll position before prepending (for overhead mode)
+    var feed = document.getElementById('chat-feed');
+    var oldScrollHeight, oldScrollTop;
+    if (overhead && feed) {
+        oldScrollHeight = feed.scrollHeight;
+        oldScrollTop = feed.scrollTop;
+    }
+    
     if (overhead) {
         // When inserting at top, check against the FIRST message (the one beneath)
         var $firstMsg = $messageContainer.find(".message").first();
@@ -540,6 +548,13 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
 
     if (!data['overhead']) {
         scrollToBottom();
+    }
+
+    // SCROLL ANCHOR: Restore scroll position after prepending (for overhead mode)
+    if (overhead && feed) {
+        var newScrollHeight = feed.scrollHeight;
+        var heightAdded = newScrollHeight - oldScrollHeight;
+        feed.scrollTop = oldScrollTop + heightAdded;
     }
 
     // Check if we should set FetchingMessages to false

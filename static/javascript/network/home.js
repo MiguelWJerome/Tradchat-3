@@ -35,54 +35,59 @@ function recv(message) {
         if (!data['overhead']) {
             document.querySelector('#message-container').innerHTML = '';
         }
+        
+        function fullfill_room_fetching_request()
+        {
+            // Process buffered messages
+            while (switch_room_mid_feed.length > 0) {
+                var m = switch_room_mid_feed.splice(0, 1)[0];
+                appendMessage({
+                    'index': m['id'], 'username': m['username'], 'message': m['message'], 
+                    'timestamp': m['timestamp'], 'myself': m['username'] === username, 
+                    'replyIndex': m['reply_id']
+                });
+            }
+            switch_room_mid_feed_toggle = false;
 
-        // Process buffered messages
-        while (switch_room_mid_feed.length > 0) {
-            var m = switch_room_mid_feed.splice(0, 1)[0];
-            appendMessage({
-                'index': m['id'], 'username': m['username'], 'message': m['message'], 
-                'timestamp': m['timestamp'], 'myself': m['username'] === username, 
-                'replyIndex': m['reply_id']
-            });
+            // Process batch messages
+            messages = data['messages'];
+            for (var i in messages) {
+                appendMessage({
+                    'index': messages[i]['id'], 'username': messages[i]['username'], 
+                    'message': messages[i]['message'], 'timestamp': messages[i]['timestamp'], 
+                    'myself': messages[i]['username'] === username, 
+                    'replyIndex': messages[i]['reply_id'], 'overhead': data['overhead']
+                });
+            }
+
+            // Handle UI Updates
+            if (msg[0] === 'Fetch Room Messages') {
+                change_banner_picture(data['emoji'], false);
+                document.querySelector('.room-title').textContent = data['room'].toUpperCase();
+            } else {
+                change_banner_picture(data['profile_picture'], true);
+                let dmParts = data['room'].split('.$@-@&.');
+                let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];
+                document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase();
+            }
+
+            toggle_overhead_animation(false);
+
+            // 1. Keep FetchingMessages = true right now. 
+            // Do NOT set it to false yet.
+
+            // 2. Use a timeout to wait for the browser to finish rendering 
+            // and for the scroll to stabilize.
+            setTimeout(() => {
+                FetchingMessages = false;
+                // Clear your helper flags here too
+                we_are_currently_appending_messages_rn = false;
+                network_coast_clear_for_setting_fetching_messages_to_false = false;
+                console.log("Sensor safely re-enabled.");
+            }, 150); // 150ms is the "sweet spot" for DOM reflow 
         }
-        switch_room_mid_feed_toggle = false;
-
-        // Process batch messages
-        messages = data['messages'];
-        for (var i in messages) {
-            appendMessage({
-                'index': messages[i]['id'], 'username': messages[i]['username'], 
-                'message': messages[i]['message'], 'timestamp': messages[i]['timestamp'], 
-                'myself': messages[i]['username'] === username, 
-                'replyIndex': messages[i]['reply_id'], 'overhead': false
-            });
-        }
-
-        // Handle UI Updates
-        if (msg[0] === 'Fetch Room Messages') {
-            change_banner_picture(data['emoji'], false);
-            document.querySelector('.room-title').textContent = data['room'].toUpperCase();
-        } else {
-            change_banner_picture(data['profile_picture'], true);
-            let dmParts = data['room'].split('.$@-@&.');
-            let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];
-            document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase();
-        }
-
-        toggle_overhead_animation(false);
-
-        // 1. Keep FetchingMessages = true right now. 
-        // Do NOT set it to false yet.
-
-        // 2. Use a timeout to wait for the browser to finish rendering 
-        // and for the scroll to stabilize.
-        setTimeout(() => {
-            FetchingMessages = false;
-            // Clear your helper flags here too
-            we_are_currently_appending_messages_rn = false;
-            network_coast_clear_for_setting_fetching_messages_to_false = false;
-            console.log("Sensor safely re-enabled.");
-        }, 150); // 150ms is the "sweet spot" for DOM reflow 
+        let timeout = data['overhead'] ? 800 : 0;
+        setTimeout(fullfill_room_fetching_request, timeout);
     }
     else if (msg[0] === 'Get Rooms') {
         clearAllChatRoomOptions()
