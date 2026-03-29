@@ -148,12 +148,18 @@ def find_account_id_or_password_or_gender(user, id_or_password_or_gender='id', R
 
     try:
         if id_or_password_or_gender == 'id':
+            if RU:
+                return [user, accounts_dict[user]['id']]
             return accounts_dict[user]['id']
             
         elif id_or_password_or_gender == 'password':
+            if RU:
+                return [user, accounts_dict[user]['password']]
             return accounts_dict[user]['password']
 
         elif id_or_password_or_gender == 'gender':
+            if RU:
+                return [user, accounts_dict[user]['gender']]
             return accounts_dict[user]['gender']
         
 
