@@ -548,7 +548,24 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
     }
 
     if (!data['overhead']) {
-        scrollToBottom();
+        // Check if user is at the bottom (within 100px tolerance)
+        var feed = document.getElementById('chat-feed');
+        var isAtBottom = false;
+        if (feed) {
+            var scrollPosition = feed.scrollTop + feed.clientHeight;
+            var scrollHeight = feed.scrollHeight;
+            isAtBottom = scrollHeight - scrollPosition <= 100;
+        }
+        
+        // Always scroll to bottom for user's own messages, or if already at bottom
+        if (isAtBottom || data['myself']) {
+            scrollToBottom();
+            // Hide the new messages button when at bottom
+            toggle_new_messages_btn(false);
+        } else {
+            // Show floating button for new messages
+            toggle_new_messages_btn(true);
+        }
     }
 
     // SCROLL ANCHOR: Restore scroll position after prepending (for overhead mode)
@@ -861,6 +878,12 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
       }
     });
 
+    // Add click handler for new messages button
+    $('#new-messages-btn').on('click', function() {
+        scrollToBottom();
+        toggle_new_messages_btn(false);
+    });
+
     // =========================================================================
     // SCROLL TO TOP DETECTION FOR LOADING OLDER MESSAGES
     // =========================================================================
@@ -944,9 +967,48 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
             overhead_spinner.style.opacity = ''
             overhead_spinner.style.animation = ''
             overhead_spinner.style.top = '5px'
-        }, 700)
+        }, 0)
     }
   };
+
+  /**
+   * toggle_new_messages_btn(toggle)
+   * ---------------------------------
+   * Shows or hides the new messages floating button.
+   * Tracks count of new messages for display.
+   *
+   * @param {boolean} toggle - true to show, false to hide
+   */
+  var newMessageCount = 0;
+  
+  window.toggle_new_messages_btn = function(toggle) {
+    var btn = document.getElementById('new-messages-btn');
+    if (!btn) return;
+    
+    if (toggle === true) {
+      newMessageCount++;
+      var textSpan = btn.querySelector('span');
+      if (textSpan) {
+        var messageText = newMessageCount === 1 ? 'New Message' : 'New Messages';
+        textSpan.textContent = newMessageCount + ' ' + messageText;
+      }
+      btn.style.display = 'flex'
+      setTimeout(function(){
+        btn.style.opacity = '1';
+        btn.style.bottom = '105px';
+      }, 200)
+    } else {
+      newMessageCount = 0;
+      btn.style.opacity = '0';
+      btn.style.bottom = '20px';
+      setTimeout(function(){
+        btn.style.display = 'none'
+      }, 200)
+    }
+  };
+  setTimeout(function(){
+    toggle_new_messages_btn(false)
+  }, 800)
 
   /**
    * =========================================================================

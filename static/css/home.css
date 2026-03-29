@@ -119,6 +119,41 @@
   overflow: hidden;
 }
 
+/* New Messages Floating Button */
+.new-messages-btn {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-dark);
+  color: var(--color-light);
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  z-index: 2147483647;
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 0.3s ease;
+  white-space: nowrap;
+  transition: bottom 0.3s, opacity 0.3s;
+}
+
+.new-messages-btn:hover {
+  opacity: 0.9;
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.new-messages-btn i {
+  font-size: 0.8rem;
+}
+
 /* =========================================================================
    3. SIDEBAR
    Left column with tray icons, search bar, and conversation list.
@@ -435,6 +470,7 @@
   align-items: flex-start;
   gap: 10px;
   animation: msgFadeIn 0.2s ease both;
+  margin-bottom: 30px;
 }
 
 /* Own messages pushed to right */

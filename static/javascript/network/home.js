@@ -3,10 +3,9 @@ cl = io()
 username = localStorage['username']
 password = localStorage['password']
 
-cl.send(JSON.stringify(['Join Room', {'room': ROOM, 'username': username, 'password': password}]))
+let currentUpload = null;
 
-let switch_room_mid_feed = []
-let switch_room_mid_feed_toggle = false
+cl.send(JSON.stringify(['Join Room', {'room': ROOM, 'username': username, 'password': password}]))
 
 let network_coast_clear_for_setting_fetching_messages_to_false = false
 
@@ -14,14 +13,10 @@ function recv(message) {
     msg = eval(message)
     console.log(msg)
     if (msg[0] === 'Message') {
-        if (switch_room_mid_feed_toggle) {
-            switch_room_mid_feed.push(msg[1])
-            return
-        }
-        else {
-            data = msg[1]
-            appendMessage({'index': data['id'], 'username': data['username'], 'message': data['message'], 'timestamp': data['timestamp'], 'myself': data['username'] === username, 'replyIndex': data['reply_id']})
-        }
+        // Only process messages for the current room
+        
+        data = msg[1]
+        appendMessage({'index': data['id'], 'username': data['username'], 'message': data['message'], 'timestamp': data['timestamp'], 'myself': data['username'] === username, 'replyIndex': data['reply_id']})
     }
 
     
@@ -38,17 +33,6 @@ function recv(message) {
         
         function fullfill_room_fetching_request()
         {
-            // Process buffered messages
-            while (switch_room_mid_feed.length > 0) {
-                var m = switch_room_mid_feed.splice(0, 1)[0];
-                appendMessage({
-                    'index': m['id'], 'username': m['username'], 'message': m['message'], 
-                    'timestamp': m['timestamp'], 'myself': m['username'] === username, 
-                    'replyIndex': m['reply_id']
-                });
-            }
-            switch_room_mid_feed_toggle = false;
-
             // Process batch messages
             messages = data['messages'];
             for (var i in messages) {
@@ -162,14 +146,12 @@ chatInput.addEventListener('keypress', function(e) {
 function switch_room(roomname) {
     FetchingMessages = true; // Lock it IMMEDIATELY on click
     cl.send(JSON.stringify(['Switch Room', {'old-group': ROOM, 'room': roomname, 'username': username, 'password': password}]))
-    switch_room_mid_feed_toggle = true
     ROOM = roomname
 }
 
 function switch_dm(dm_username) {
     FetchingMessages = true; // Lock it IMMEDIATELY on click
     cl.send(JSON.stringify(['Switch DM', {'old-group': ROOM, 'new-dm': sortAndJoinStrings(dm_username, username), 'username': username, 'password': password}]))
-    switch_room_mid_feed_toggle = true
     ROOM = sortAndJoinStrings(dm_username, username)
 }
 
