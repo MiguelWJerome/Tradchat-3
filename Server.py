@@ -110,15 +110,14 @@ def fetch_dm_messages(dm_string, username, limit, offset):
     primaryGender = find_account_id_or_password_or_gender(dm_string.split('.$@-@&.')[0], 'gender')
     secondary_user_id = find_account_id_or_password_or_gender(dm_string.split('.$@-@&.')[1], 'id')
 
-    id_to_username = {f"{primary_user_id}": dm_string.split('.$@-@&.')[0], f"{secondary_user_id}": dm_string.split('.$@-@&.')[1]}
-
     genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
-    
+
+    convo_hash = f"{primary_user_id}-{secondary_user_id}"
 
     if offset == -1:
-        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[f"{primary_user_id}-{secondary_user_id}", limit], chat_room=False)
+        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, limit], chat_room=False)
     else:
-        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ? AND id < ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[f"{primary_user_id}-{secondary_user_id}", offset, limit], chat_room=False)
+        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ? AND id < ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, offset, limit], chat_room=False)
 
     actual_user_dm_username = dm_string.split('.$@-@&.')[1] if dm_string.split('.$@-@&.')[0] == username else dm_string.split('.$@-@&.')[0]
     
@@ -126,7 +125,7 @@ def fetch_dm_messages(dm_string, username, limit, offset):
     for message in raw_messages:
         messages.append({
             'id': message[0],
-            'username': id_to_username[str(message[1])],
+            'username': find_username_from_id(message[1]),
             'message': message[2],
             'timestamp': message[3],
             'reply_id': message[4],
@@ -630,6 +629,7 @@ def Recv(message, sid):
         new_room = data['room']
         username = data['username']
         password = data['password']
+        limit = data['limit']
         
         if check_credentials(username, password):
             if check_room_access(new_room, username):
@@ -638,7 +638,7 @@ def Recv(message, sid):
 
                 db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_room, username], chat_room=False)
 
-                Server.send(str(['Fetch Room Messages', {'messages': fetch_room_messages(new_room, 50, -1), 'room': new_room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[new_room], chat_room=False)[0][0], 'clear': False}]), room=sid)
+                Server.send(str(['Fetch Room Messages', {'messages': fetch_room_messages(new_room, limit, -1), 'room': new_room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[new_room], chat_room=False)[0][0], 'clear': False}]), room=sid)
             else:
                 return # User not allowed in room
         else:
@@ -650,12 +650,13 @@ def Recv(message, sid):
         new_dm = data['new-dm']
         username = data['username']
         password = data['password']
+        limit = data['limit']
         
         if check_credentials(username, password) and check_dm_access(new_dm, username):
             Server.server.leave_room(sid, old_group)
             Server.server.enter_room(sid, new_dm)
             
-            messages, actual_user_dm_username = fetch_dm_messages(new_dm, username, 50, -1)
+            messages, actual_user_dm_username = fetch_dm_messages(new_dm, username, limit, -1)
 
             db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_dm, username], chat_room=False)
             
@@ -726,6 +727,111 @@ def Recv(message, sid):
             
             Server.send(str(['Get Dms', dms]), room=sid)
             
+
+    elif msg[0] == 'Fetch Special Reply Message':
+        data = msg[1]
+        print(data)
+        username = data['username']
+        password = data['password']
+        index = data['index']
+        orgIndex = data['orgIndex']
+        room = data['room']
+
+        if check_credentials(username, password):
+            if '.$@-@&.' in room:
+                if check_dm_access(room, username):
+                    user_id, message_text, timestamp, reply_id, upload = db_sql("""SELECT user_id, message, timestamp, reply_id, upload FROM messages WHERE id = ?;""", room, params=[index], chat_room=True)[0]
+
+                    original_username = find_username_from_id(user_id)
+                    message = {
+                        'id': index,
+                        'username': original_username,
+                        'message': message_text,
+                        'timestamp': timestamp,
+                        'reply_id': reply_id,
+                        'upload': upload
+                    }
+                    Server.send(str(['Fetch Special Reply Message', {'message': message, 'orgIndex': orgIndex}]), room=sid)
+            else:
+                if check_room_access(room, username):
+                    user_id, message_text, timestamp, reply_id, upload = db_sql("""SELECT user_id, message, timestamp, reply_id, upload FROM messages WHERE id = ?;""", room, params=[index], chat_room=True)[0]
+                    original_username = find_username_from_id(user_id)
+                    message = {
+                        'id': index,
+                        'username': original_username,
+                        'message': message_text,
+                        'timestamp': timestamp,
+                        'reply_id': reply_id,
+                        'upload': upload
+                    }
+                    Server.send(str(['Fetch Special Reply Message', {'message': message, 'orgIndex': orgIndex}]), room=sid)
+
+    elif msg[0] == 'Fetch Special Reply Messages':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        index = data['index']
+        room = data['room']
+        limit = data['limit']
+        
+        if check_credentials(username, password):
+            if '.$@-@&.' in room:
+                if check_dm_access(room, username):
+                    primary_user_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'id')
+                    primary_gender = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'gender')
+                    secondary_user_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[1], 'id')
+
+                    convo_hash = f"{primary_user_id}-{secondary_user_id}"
+
+                    genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
+
+
+                    # The 'index' is your anchor, 'limit' is 10, and 'room' is the target .db string
+                    raw_messages = db_sql(f"""
+                        SELECT * FROM (
+                            SELECT id, user_id, message, timestamp, reply_id, upload 
+                            FROM {genderDict[primary_gender]} WHERE convo_hash = ? AND id < ? 
+                            ORDER BY id DESC LIMIT ?
+                        )
+                        UNION ALL
+                        SELECT id, user_id, message, timestamp, reply_id, upload 
+                        FROM {genderDict[primary_gender]} WHERE convo_hash = ? AND id = ?
+                        UNION ALL
+                        SELECT * FROM (
+                            SELECT id, user_id, message, timestamp, reply_id, upload 
+                            FROM {genderDict[primary_gender]} WHERE convo_hash = ? AND id > ? 
+                            ORDER BY id ASC LIMIT ?
+                        )
+                        ORDER BY id ASC;
+                    """, genderDict[primary_gender], params=[convo_hash, index, limit, convo_hash, index, convo_hash, index, limit], chat_room=False)
+                                        
+
+                    messages = []
+                    for msg in raw_messages:
+                        messages.append({
+                            'id': msg[0],
+                            'username': find_username_from_id(msg[1]),
+                            'message': msg[2],
+                            'timestamp': msg[3],
+                            'reply_id': msg[4],
+                            'upload': msg[5]
+                        })
+                    Server.send(str(['Fetch Special Reply Messages', {'messages': messages, 'index': index}]), room=sid)
+            else:
+                if check_room_access(room, username):
+                    raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages WHERE id >= ? AND id <= ?;""", room, params=[index - limit, index + limit], chat_room=True)
+                    messages = []
+                    for msg in raw_messages:
+                        messages.append({
+                            'id': msg[0],
+                            'username': find_username_from_id(msg[1]),
+                            'message': msg[2],
+                            'timestamp': msg[3],
+                            'reply_id': msg[4],
+                            'upload': msg[5]
+                        })
+                    Server.send(str(['Fetch Special Reply Messages', {'messages': messages, 'index': index}]), room=sid)
+
 
     elif msg[0] == 'Secret Log In':
         data = msg[1]
@@ -863,6 +969,7 @@ def Recv(message, sid):
                 db_sql("""INSERT INTO rooms (room_name, description, room_type, owners, managers, curators, members, emoji) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", 'rooms', params=[roomname, description, roomtype, str(find_account_id_or_password_or_gender(username, 'id')), '', '', '', emoji], chat_room=False)
                 
                 Server.send(str(['Create Room Results', 'Room Created']), room=sid)
+
 
 @Server.on('message')
 def recv(message):

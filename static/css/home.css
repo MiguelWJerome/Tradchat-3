@@ -1262,6 +1262,11 @@
   border-radius: 12px;
   height: fit-content;
   padding: 5px;
+  cursor: pointer;
+}
+
+.reply-container:hover {
+  transform: scale(1.1);
 }
 
 /* The "Hook" */

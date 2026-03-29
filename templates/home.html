@@ -256,10 +256,13 @@
   let ROOM = '{{ room }}'.replaceAll('amp;', '');
   let ROOM_TYPE = '{{ room_type }}';
   let ROOM_EMOJI = '{{ room_emoji }}';
+  let INITIAL_LIMIT = 20;
+  let FETCH_LIMIT = 50;
+  let SPECIAL_REPLY_LIMIT = Math.ceil(FETCH_LIMIT / 2);
 </script>
 <script src="/static/javascript/tradchat.js"           defer></script>
 <script src="/static/javascript/socketio.js"           defer></script>
-<script src="/static/javascript/jquery.js"             defer></script>
+<script src="/static/javascript/jQuery.js"             defer></script>
 <script src="/static/javascript/emoji.js"           defer></script>
 <script src="/static/javascript/looks/home.js"         defer></script>
 <script src="/static/javascript/network/home.js"       defer></script>

@@ -9,6 +9,8 @@ cl.send(JSON.stringify(['Join Room', {'room': ROOM, 'username': username, 'passw
 
 let network_coast_clear_for_setting_fetching_messages_to_false = false
 
+let is_not_attached_to_bottom = false
+
 function recv(message) {
     msg = eval(message)
     console.log(msg)
@@ -107,6 +109,45 @@ function recv(message) {
         }
     }
 
+    else if (msg[0] === 'Fetch Special Reply Message')
+    {
+        const data = msg[1];
+        const message = data['message'];
+        const orgIndex = data['orgIndex'];
+        
+        // Find the reply indicator that was waiting for this data
+
+        const $indicator = $(`.message__bubble[aria-index="${orgIndex}"]`);
+        
+        if ($indicator.length) {
+            // Update the username
+            $indicator.find('.reply-username').text(message.username);
+            
+            // Update the message preview text
+            $indicator.find('.reply-preview-text').text(message.message);
+            
+            // Update the avatar image
+            $indicator.find('.reply-avatar').attr('src', `/static/profile-pictures/${message.username}.png`);
+        }
+    }
+
+    else if (msg[0] === 'Fetch Special Reply Messages')
+    {
+        document.querySelector('#message-container').innerHTML = '';
+
+        const data = msg[1];
+
+        const messages = data['messages'];
+        
+        for (var i in messages)
+        {
+            let message = messages[i];
+            appendMessage({'index': message['id'], 'username': message['username'], 'message': message['message'], 'timestamp': message['timestamp'], 'myself': message['username'] === username, 'replyIndex': message['reply_id']}, {'scrollToBottom': false, 'specialScrollTo': data['index']})
+        }
+
+        toggle_overhead_animation(false)
+    }
+
     else if (msg[0] === 'Create Room Results')
     {
         if (msg[1] === 'Room Already Exists')
@@ -145,13 +186,13 @@ chatInput.addEventListener('keypress', function(e) {
 
 function switch_room(roomname) {
     FetchingMessages = true; // Lock it IMMEDIATELY on click
-    cl.send(JSON.stringify(['Switch Room', {'old-group': ROOM, 'room': roomname, 'username': username, 'password': password}]))
+    cl.send(JSON.stringify(['Switch Room', {'old-group': ROOM, 'room': roomname, 'username': username, 'password': password, 'limit': INITIAL_LIMIT}]))
     ROOM = roomname
 }
 
 function switch_dm(dm_username) {
     FetchingMessages = true; // Lock it IMMEDIATELY on click
-    cl.send(JSON.stringify(['Switch DM', {'old-group': ROOM, 'new-dm': sortAndJoinStrings(dm_username, username), 'username': username, 'password': password}]))
+    cl.send(JSON.stringify(['Switch DM', {'old-group': ROOM, 'new-dm': sortAndJoinStrings(dm_username, username), 'username': username, 'password': password, 'limit': INITIAL_LIMIT}]))
     ROOM = sortAndJoinStrings(dm_username, username)
 }
 
@@ -226,11 +267,19 @@ function fetch_overhead_messages(offset_id) {
         'username': username, 
         'password': password, 
         'room': ROOM, // ROOM holds the sorted dm string
-        'limit': 20, 
+        'limit': FETCH_LIMIT, 
         'offset': offset_id
     }]));
 }
 
+function fetch_special_reply_message(index, orgIndex) {
+    cl.send(JSON.stringify(['Fetch Special Reply Message', {'username': username, 'password': password, 'index': index, 'orgIndex': orgIndex, 'room': ROOM}]))
+}
+
+function fetch_special_reply_messages(index) {
+    cl.send(JSON.stringify(['Fetch Special Reply Messages', {'username': username, 'password': password, 'index': index, 'room': ROOM, 'limit': SPECIAL_REPLY_LIMIT}]))
+    toggle_overhead_animation(true)
+}
 
 document.getElementById('messenger-icon').addEventListener('click', function() {
     cl.send(JSON.stringify(['Get Dms', {'username': username, 'password': password}]))
@@ -362,7 +411,7 @@ setTimeout(function() {
         'username': username, 
         'password': password, 
         'room': ROOM, 
-        'limit': 20, 
+        'limit': INITIAL_LIMIT, 
         'offset': -1
     }]));
 }, 300);

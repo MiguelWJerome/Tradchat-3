@@ -307,7 +307,7 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
    * @param {number} replyIndex - aria-index of message being replied to (-1 if not a reply)
    * @param {boolean} overhead - If true, inserts message at top for historical loading
    */
-  window.appendMessage = function (data) {
+  window.appendMessage = function (data, scrollData={'scrollToBottom': true, 'specialScrollTo': null}) {
     we_are_currently_appending_messages_rn = true;
     let index = data['index'];
     let username = data['username'];
@@ -447,7 +447,7 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
         
         // If this is a reply, add reply indicator before the text
         if (replyIndex !== -1) {
-            var $replyIndicator = createReplyIndicator(replyIndex);
+            var $replyIndicator = createReplyIndicator(replyIndex, currentIdx);
             $newText.prepend($replyIndicator);
         }
         
@@ -517,7 +517,7 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
         
         // If this is a reply, add reply indicator
         if (replyIndex !== -1) {
-            var $replyIndicator = createReplyIndicator(replyIndex);
+            var $replyIndicator = createReplyIndicator(replyIndex, currentIdx);
             $bubble.append($replyIndicator);
         }
         
@@ -559,7 +559,10 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
         
         // Always scroll to bottom for user's own messages, or if already at bottom
         if (isAtBottom || data['myself']) {
-            scrollToBottom();
+            if (scrollData['scrollToBottom']) {
+                scrollToBottom();
+            }
+             
             // Hide the new messages button when at bottom
             toggle_new_messages_btn(false);
         } else {
@@ -573,6 +576,22 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
         var newScrollHeight = feed.scrollHeight;
         var heightAdded = newScrollHeight - oldScrollHeight;
         feed.scrollTop = oldScrollTop + heightAdded;
+    }
+
+    if (typeof(scrollData['specialScrollTo']) === 'number') {
+        try {
+          console.log('Scrolling to special element: ' + scrollData['specialScrollTo']);
+          var specialElement = $('.message__bubble[aria-index="' + scrollData['specialScrollTo'] + '"]')[0];
+          if (specialElement) {
+            setTimeout(function() {
+              specialElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              specialElement.classList.add('message-highlight');
+            }, 100);
+          }
+        }
+        catch (e) {
+          
+        }
     }
 
     // Check if we should set FetchingMessages to false
@@ -589,20 +608,25 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
    * ---------------------------------
    * Creates a reply indicator element that shows the user and message being replied to.
    * Uses CSS classes for styling with stacked text layout.
+   * If the original message is not in the feed, calls fetch_special_reply_message() 
+   * and marks the indicator with aria-backtrace_reply="true".
    *
    * @param {number} replyIndex - The aria-index of the message being replied to
    * @returns {jQuery} The reply indicator jQuery element
    */
-  function createReplyIndicator(targetIndex) {
+  function createReplyIndicator(targetIndex, currentIdx) {
     const $targetBubble = $(`.message__bubble[aria-index="${targetIndex}"]`);
     
+    // Check if target message exists in the feed
+    const messageExists = $targetBubble.length > 0;
+    
     // Safety check: find data from the target
-    const originalText = $targetBubble.attr('data-message-text') || "...";
-    const originalUser = $targetBubble.attr('aria-username');
+    const originalText = messageExists ? ($targetBubble.attr('data-message-text') || "...") : "...";
+    const originalUser = messageExists ? $targetBubble.attr('aria-username') : "...";
     const avatarSrc = `/static/profile-pictures/${originalUser}.png`;
 
-    // Re-structured HTML for the flex alignment
-    return $(`
+    // Create the reply container
+    const $container = $(`
         <div class="reply-container">
             <div class="reply-curve"></div>
             <div class="reply-content">
@@ -613,16 +637,39 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
                 </div>
             </div>
         </div>
-    `).on('click', function() {
-        const $target = $(`.message__bubble[aria-index="${targetIndex}"]`);
-        if ($target.length) {
-            $target[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-            $target.addClass('message-highlight');
-            setTimeout(() => {
-                $(document).one('click', () => $target.removeClass('message-highlight'));
-            }, 100);
+    `);
+    
+    // If message doesn't exist in feed, mark it for backtrace and fetch it
+    if (!messageExists) {
+      $container.attr('aria-backtrace_reply', 'true');
+      $container.attr('data-reply-index', targetIndex);
+      
+      // Call the fetch function to get the original message from server
+      if (typeof fetch_special_reply_message === 'function') {
+        fetch_special_reply_message(targetIndex, currentIdx);
+      }
+    }
+    
+    // Add click handler
+    $container.on('click', function() {
+        if (this.getAttribute('aria-backtrace_reply') === 'true') {
+            fetch_special_reply_messages(targetIndex);
         }
+        else
+        {
+          const $target = $(`.message__bubble[aria-index="${targetIndex}"]`);
+          if ($target.length) {
+              $target[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+              $target.addClass('message-highlight');
+              setTimeout(() => {
+                  $(document).one('click', () => $target.removeClass('message-highlight'));
+              }, 100);
+          }
+        }
+        
     });
+    
+    return $container;
   }
 
   /**
@@ -951,7 +998,7 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
         overhead_spinner.style.borderRadius = '50%'
         overhead_spinner.style.border = '5px solid var(--color-medium)'
         overhead_spinner.style.borderTop = '5px solid var(--color-dark)'
-         overhead_spinner.style.background = 'var(--color-light)'
+        overhead_spinner.style.background = 'var(--color-light)'
         overhead_spinner.style.display = 'block'
         overhead_spinner.style.opacity = '1'
         overhead_spinner.style.top = '90px'
