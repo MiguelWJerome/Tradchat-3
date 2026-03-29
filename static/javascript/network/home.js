@@ -3,7 +3,7 @@ cl = io()
 username = localStorage['username']
 password = localStorage['password']
 
-cl.send(JSON.stringify(['Join Room', {'room': 'mainroom', 'username': username, 'password': password}]))
+cl.send(JSON.stringify(['Join Room', {'room': ROOM, 'username': username, 'password': password}]))
 
 let switch_room_mid_feed = []
 let switch_room_mid_feed_toggle = false
@@ -86,7 +86,7 @@ function recv(message) {
                 console.log("Sensor safely re-enabled.");
             }, 150); // 150ms is the "sweet spot" for DOM reflow 
         }
-        let timeout = data['overhead'] ? 800 : 0;
+        let timeout = data['overhead'] ? 700 : 0;
         setTimeout(fullfill_room_fetching_request, timeout);
     }
     else if (msg[0] === 'Get Rooms') {
@@ -367,7 +367,7 @@ if (ROOM_TYPE === 'public') {
     changeSelectedRoomOption(ROOM)
 
     cl.send(JSON.stringify(['Get Dms', {'username': username, 'password': password}]))
-
+    
 }
 
 

@@ -71,6 +71,13 @@ def check_room_access(room_name, username):
     else:
         return True
 
+def check_dm_access(dm_room, username):
+    """Check if user is a participant in the DM conversation."""
+    if '.$@-@&.' not in dm_room:
+        return False
+    dm_parts = dm_room.split('.$@-@&.')
+    return username == dm_parts[0] or username == dm_parts[1]
+
 def check_credentials(username, password):
     password = find_account_id_or_password_or_gender(username, 'password', RGS=True)
     return (password and password == password)
@@ -109,7 +116,7 @@ def fetch_dm_messages(dm_string, username, limit, offset):
     genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
     
 
-    if offset != -1:
+    if offset == -1:
         raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[f"{primary_user_id}-{secondary_user_id}", limit], chat_room=False)
     else:
         raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ? AND id < ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[f"{primary_user_id}-{secondary_user_id}", offset, limit], chat_room=False)
@@ -127,6 +134,9 @@ def fetch_dm_messages(dm_string, username, limit, offset):
             'upload': message[5]
         })
 
+    if offset == -1:
+        messages.reverse()
+    
     return messages, actual_user_dm_username
 
 
@@ -547,21 +557,24 @@ def Recv(message, sid):
                     Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index)}]), room=room)
             
             elif setting == 'dm':
-                actual_user_dm_username = room.split('.$@-@&.')[1] if room.split('.$@-@&.')[0] == username else room.split('.$@-@&.')[0]
+                # Verify user is a participant in this DM before sending
+                if check_dm_access(room, username):
+                    actual_user_dm_username = room.split('.$@-@&.')[1] if room.split('.$@-@&.')[0] == username else room.split('.$@-@&.')[0]
 
-                username_id = find_account_id_or_password_or_gender(username, 'id')
+                    username_id = find_account_id_or_password_or_gender(username, 'id')
 
-                important_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'id')
-                important_gender = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'gender')
-                un_important_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[1], 'id')
+                    important_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'id')
+                    important_gender = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'gender')
+                    un_important_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[1], 'id')
 
-                fm_to_gb = {'female': 'girl', 'male': 'boy'}
+                    fm_to_gb = {'female': 'girl', 'male': 'boy'}
 
-                gmt_timestamp = convert_to_gmt(timestamp)
+                    gmt_timestamp = convert_to_gmt(timestamp)
 
-                message_id = db_sql(f"""INSERT INTO {fm_to_gb[important_gender]}s_dm (convo_hash, sender_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?, ?);""", f"{fm_to_gb[important_gender]}s_dm", params=[f"{important_id}-{un_important_id}", username_id, user_message, gmt_timestamp, reply_index, upload], chat_room=False, provide_id=True)
-                Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index)}]), room=room)
-                
+                    message_id = db_sql(f"""INSERT INTO {fm_to_gb[important_gender]}s_dm (convo_hash, sender_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?, ?);""", f"{fm_to_gb[important_gender]}s_dm", params=[f"{important_id}-{un_important_id}", username_id, user_message, gmt_timestamp, reply_index, upload], chat_room=False, provide_id=True)
+                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index)}]), room=room)
+                else:
+                    return # User not part of this DM or invalid DM
 
     elif msg[0] == 'Fetch Room Messages':
         username = msg[1]['username']
@@ -580,14 +593,14 @@ def Recv(message, sid):
         password = msg[1]['password']
         limit = msg[1]['limit']
         offset = msg[1]['offset']
-        new_dm = db_sql("""SELECT room FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0]
+        room = msg[1]['room']
         
-        messages, actual_user_dm_username = fetch_dm_messages(new_dm, username, limit, offset)
-
-        db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_dm, username], chat_room=False)
-        
-        Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': new_dm, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'overhead': (offset != -1)}]), room=sid)
-    
+        if check_credentials(username, password) and check_dm_access(room, username):
+            messages, actual_user_dm_username = fetch_dm_messages(room, username, limit, offset)
+            
+            db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[room, username], chat_room=False)
+            
+            Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': room, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'overhead': (offset != -1)}]), room=sid)
 
     elif msg[0] == 'Join Room':
         data = msg[1]
@@ -596,7 +609,10 @@ def Recv(message, sid):
         password = data['password']
         
         if check_credentials(username, password):
-            if check_room_access(room, username):
+            # DMs don't need room access check - but we must verify user is a participant
+            if check_dm_access(room, username):
+                Server.server.enter_room(sid, room)
+            elif check_room_access(room, username):
                 Server.server.enter_room(sid, room)
             else:
                 return # User not allowed in room
@@ -630,7 +646,7 @@ def Recv(message, sid):
         username = data['username']
         password = data['password']
         
-        if check_credentials(username, password):
+        if check_credentials(username, password) and check_dm_access(new_dm, username):
             Server.server.leave_room(sid, old_group)
             Server.server.enter_room(sid, new_dm)
             
@@ -639,15 +655,15 @@ def Recv(message, sid):
             db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_dm, username], chat_room=False)
             
             Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': new_dm, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'clear': False}]), room=sid)
-            
-        else:
-            return 
 
     elif msg[0] == 'Leave Room':
         data = msg[1]
         room = data['room']
-        Server.server.leave_room(sid, room)
-
+        username = data['username']
+        password = data['password']
+        
+        if check_credentials(username, password):
+            Server.server.leave_room(sid, room)
 
     elif msg[0] == 'Get Rooms':
         data = msg[1]

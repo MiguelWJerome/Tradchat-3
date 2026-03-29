@@ -324,12 +324,8 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
     
     // If overhead mode, increment all existing aria-index values by 1
     if (overhead) {
-        $('.message__bubble').each(function() {
-            const idx = parseInt($(this).attr('aria-index'));
-            if (!isNaN(idx)) {
-                $(this).attr('aria-index', idx + 1);
-            }
-        });
+        // Note: This logic is now simplified - each message keeps its actual server-provided index
+        // The scroll sensor uses the topmost message's aria-index to determine what to fetch next
     }
     
     // Find the avatar from the wrapper (or use a default)
@@ -432,7 +428,7 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
         // Grouped bubble - add to existing message group
         
         // Grouped bubble with message actions and data stamps
-        var $newBubble = $("<div>").addClass("message__bubble").attr("aria-index", overhead ? 1 : currentIdx)
+        var $newBubble = $("<div>").addClass("message__bubble").attr("aria-index", currentIdx)
             .attr("aria-username", username)
             .attr("data-message-text", message)
         
@@ -448,8 +444,6 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
         $newBubble.append($actions);
         
         var $newText = $("<div>").addClass("message__text").text(message);
-        // Small side stamp
-        var $sideTime = $("<span>").css({ "font-size": "0.7rem", "color": "#999", "margin-left": "8px" }).text(timeStr);
         
         // If this is a reply, add reply indicator before the text
         if (replyIndex !== -1) {
@@ -457,7 +451,7 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
             $newText.prepend($replyIndicator);
         }
         
-        $newBubble.append($newText, $sideTime);
+        $newBubble.append($newText);
         
         if (overhead) {
             // Prepend bubble to the existing group's content (before the first bubble)
@@ -497,9 +491,16 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
             .css({ "margin-left": "8px", "font-size": "0.8rem", "color": "#777" })
             .text(" " + headerStamp); // No dot before date
 
-        $nameWrapper.append($nameBox, $timestampLabel);
+        // For own messages (right side), put timestamp first, then name
+        // For others' messages (left side), put name first, then timestamp
+        if (myself) {
+            $timestampLabel.css({ "margin-left": "0", "margin-right": "8px" });
+            $nameWrapper.append($timestampLabel, $nameBox);
+        } else {
+            $nameWrapper.append($nameBox, $timestampLabel);
+        }
 
-        var $bubble = $("<div>").addClass("message__bubble").attr("aria-index", overhead ? 1 : currentIdx)
+        var $bubble = $("<div>").addClass("message__bubble").attr("aria-index", currentIdx)
             .attr("aria-username", username)
             .attr("data-message-text", message)
         
@@ -878,8 +879,6 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
             return; 
           }
           
-          console.log("Scroll sensor triggered: Loading older messages...");
-          
           // Get the topmost message ID (aria-index of the first message bubble)
           var topmost_id = -1;
           var $firstBubble = $("#message-container").find(".message__bubble").first();
@@ -889,6 +888,14 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
               topmost_id = firstIdx;
             }
           }
+          
+          // If top message is index 1, we've reached the beginning - don't fetch
+          if (topmost_id === 1) {
+            console.log("Scroll sensor: Reached beginning of chat (index 1).");
+            return;
+          }
+          
+          console.log("Scroll sensor triggered: Loading older messages...");
           
           // Call the function defined in network/home.js with the topmost message ID
           if (typeof fetch_overhead_messages === "function") {
@@ -921,9 +928,10 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
         overhead_spinner.style.borderRadius = '50%'
         overhead_spinner.style.border = '5px solid var(--color-medium)'
         overhead_spinner.style.borderTop = '5px solid var(--color-dark)'
+         overhead_spinner.style.background = 'var(--color-light)'
         overhead_spinner.style.display = 'block'
         overhead_spinner.style.opacity = '1'
-        overhead_spinner.style.top = '140px'
+        overhead_spinner.style.top = '90px'
     }
     else
     {
@@ -935,7 +943,7 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
             overhead_spinner.style.borderTop = ''
             overhead_spinner.style.opacity = ''
             overhead_spinner.style.animation = ''
-            overhead_spinner.style.top = '50px'
+            overhead_spinner.style.top = '5px'
         }, 700)
     }
   };
