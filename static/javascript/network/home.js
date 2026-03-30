@@ -33,47 +33,43 @@ function recv(message) {
             document.querySelector('#message-container').innerHTML = '';
         }
         
-        function fullfill_room_fetching_request()
-        {
-            // Process batch messages
-            messages = data['messages'];
-            for (var i in messages) {
-                appendMessage({
-                    'index': messages[i]['id'], 'username': messages[i]['username'], 
-                    'message': messages[i]['message'], 'timestamp': messages[i]['timestamp'], 
-                    'myself': messages[i]['username'] === username, 
-                    'replyIndex': messages[i]['reply_id'], 'overhead': data['overhead']
-                });
-            }
-
-            // Handle UI Updates
-            if (msg[0] === 'Fetch Room Messages') {
-                change_banner_picture(data['emoji'], false);
-                document.querySelector('.room-title').textContent = data['room'].toUpperCase();
-            } else {
-                change_banner_picture(data['profile_picture'], true);
-                let dmParts = data['room'].split('.$@-@&.');
-                let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];
-                document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase();
-            }
-
-            toggle_overhead_animation(false);
-
-            // 1. Keep FetchingMessages = true right now. 
-            // Do NOT set it to false yet.
-
-            // 2. Use a timeout to wait for the browser to finish rendering 
-            // and for the scroll to stabilize.
-            setTimeout(() => {
-                FetchingMessages = false;
-                // Clear your helper flags here too
-                we_are_currently_appending_messages_rn = false;
-                network_coast_clear_for_setting_fetching_messages_to_false = false;
-                console.log("Sensor safely re-enabled.");
-            }, 150); // 150ms is the "sweet spot" for DOM reflow 
+        // Process batch messages
+        messages = data['messages'];
+        for (var i in messages) {
+            appendMessage({
+                'index': messages[i]['id'], 'username': messages[i]['username'], 
+                'message': messages[i]['message'], 'timestamp': messages[i]['timestamp'], 
+                'myself': messages[i]['username'] === username, 
+                'replyIndex': messages[i]['reply_id'], 'overhead': data['overhead']
+            });
         }
-        let timeout = data['overhead'] ? 700 : 0;
-        setTimeout(fullfill_room_fetching_request, timeout);
+
+        // Handle UI Updates
+        if (msg[0] === 'Fetch Room Messages') {
+            change_banner_picture(data['emoji'], false);
+            document.querySelector('.room-title').textContent = data['room'].toUpperCase();
+        } else {
+            change_banner_picture(data['profile_picture'], true);
+            let dmParts = data['room'].split('.$@-@&.');
+            let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];
+            document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase();
+        }
+
+        toggle_overhead_animation(false);
+
+        // 1. Keep FetchingMessages = true right now. 
+        // Do NOT set it to false yet.
+
+        // 2. Use a timeout to wait for the browser to finish rendering 
+        // and for the scroll to stabilize.
+        setTimeout(() => {
+            FetchingMessages = false;
+            // Clear your helper flags here too
+            we_are_currently_appending_messages_rn = false;
+            network_coast_clear_for_setting_fetching_messages_to_false = false;
+            console.log("Sensor safely re-enabled.");
+        }, 150); // 150ms is the "sweet spot" for DOM reflow 
+        
     }
     else if (msg[0] === 'Get Rooms') {
         clearAllChatRoomOptions()
