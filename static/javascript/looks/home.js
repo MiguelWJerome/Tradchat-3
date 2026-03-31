@@ -65,6 +65,24 @@ $(document).ready(function() {
     });
 });
 var overhead_spinner = document.querySelector('#overhead-spinner');
+let specialElement_queue = [];
+let highlited_messages_to_unhighlight = [];
+let there_be_highlited_messages_to_unhighlight = false
+var btn_queue = [];
+
+document.body.onclick = function(){
+    if (!there_be_highlited_messages_to_unhighlight){return}
+    setTimeout(function(){
+      for (var i in highlited_messages_to_unhighlight)
+      {
+        highlited_message = highlited_messages_to_unhighlight[i]
+        highlited_message.classList.remove('message-highlight');
+      }
+      there_be_highlited_messages_to_unhighlight = false
+  }, 100)
+}
+
+
 ;(function () {
   "use strict";
 
@@ -307,6 +325,7 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
    * @param {number} replyIndex - aria-index of message being replied to (-1 if not a reply)
    * @param {boolean} overhead - If true, inserts message at top for historical loading
    */
+
   window.appendMessage = function (data, scrollData={'scrollToBottom': true, 'specialScrollTo': null}) {
     we_are_currently_appending_messages_rn = true;
     let index = data['index'];
@@ -362,15 +381,22 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
     }
     
     if (overhead) {
-        // When inserting at top, check against the FIRST message (the one beneath)
-        var $firstMsg = $messageContainer.find(".message").first();
+        // When inserting at top, check against the FIRST message (skip any existing date dividers)
+        var $firstElement = $messageContainer.children().first();
+        var $firstMsg = $firstElement.hasClass('chat-date-divider') ? $firstElement.next('.message') : $firstElement;
         var firstDateAttr = $firstMsg.attr("data-date");
         
+        // Check if there's already a date divider with this date at the top
+        var $existingDivider = $firstElement.hasClass('chat-date-divider') ? $firstElement : null;
+        var dividerHasSameDate = $existingDivider && $existingDivider.attr('data-date') === fullDateStr;
+        
         // If the date is different from the first message (or this is the first message ever)
+        // AND we don't already have a date divider for this date at the top
         // we need a date divider ABOVE this message
-        if ($firstMsg.length === 0 || firstDateAttr !== fullDateStr) {
+        if (($firstMsg.length === 0 || firstDateAttr !== fullDateStr) && !dividerHasSameDate) {
             var $dateDivider = $("<div>")
                 .addClass("chat-date-divider")
+                .attr("data-date", fullDateStr)
                 .css({
                     "display": "flex",
                     "align-items": "center",
@@ -390,6 +416,7 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
         var firstTimestamp = parseInt($firstMsg.attr("data-timestamp") || "0");
         var firstUser = $firstMsg.attr("data-user");
         var timeDiffMs = firstTimestamp - currentTimestamp;
+        // Only group with existing message if same user AND same date AND within 5 minutes
         isSameUser = (firstUser === (myself ? "You" : username)) && (firstDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs) && (timeDiffMs >= 0);
         $targetMsgGroup = $firstMsg;
     } else {
@@ -547,7 +574,15 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
         });
     }
 
-    if (!data['overhead']) {
+    if (!data['overhead'] && !data['underhead']) {
+        // For realtime messages when attached to bottom, just scroll (counter handled elsewhere)
+        if (data['realtime'] && attached_to_bottom) {
+            if (scrollData['scrollToBottom']) {
+                scrollToBottom();
+            }
+            return;
+        }
+        
         // Check if user is at the bottom (within 100px tolerance)
         var feed = document.getElementById('chat-feed');
         var isAtBottom = false;
@@ -582,10 +617,15 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
         try {
           console.log('Scrolling to special element: ' + scrollData['specialScrollTo']);
           var specialElement = $('.message__bubble[aria-index="' + scrollData['specialScrollTo'] + '"]')[0];
+          
           if (specialElement) {
+            specialElement_queue.push(specialElement);
             setTimeout(function() {
+              specialElement = specialElement_queue.splice(0, 1)[0];
               specialElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
               specialElement.classList.add('message-highlight');
+              highlited_messages_to_unhighlight.push(specialElement)
+              there_be_highlited_messages_to_unhighlight = true
             }, 100);
           }
         }
@@ -651,7 +691,8 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
     }
     
     // Add click handler
-    $container.on('click', function() {
+    $container.on('click', function(e) {
+        e.stopPropagation();
         if (this.getAttribute('aria-backtrace_reply') === 'true') {
             fetch_special_reply_messages(targetIndex);
         }
@@ -661,9 +702,8 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
           if ($target.length) {
               $target[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
               $target.addClass('message-highlight');
-              setTimeout(() => {
-                  $(document).one('click', () => $target.removeClass('message-highlight'));
-              }, 100);
+              highlited_messages_to_unhighlight.push($target[0])
+              there_be_highlited_messages_to_unhighlight = true
           }
         }
         
@@ -692,19 +732,12 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
     
     // Add highlight using CSS class
     $targetBubble.addClass("message-highlight");
+
+    highlited_messages_to_unhighlight.push($targetBubble[0])
+    there_be_highlited_messages_to_unhighlight = true
     
     // Smooth scroll to the bubble
     $targetBubble[0].scrollIntoView({ behavior: "smooth", block: "center" });
-    
-    // Set up one-time click handler to remove highlight when user clicks anywhere
-    var removeHighlight = function() {
-      $(".message__bubble").removeClass("message-highlight");
-    };
-    
-    // Use setTimeout to avoid immediate trigger from the click that started the scroll
-    setTimeout(function() {
-      $(document).one("click", removeHighlight);
-    }, 100);
   }
 
   /**
@@ -926,8 +959,33 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
     });
 
     // Add click handler for new messages button
-    $('#new-messages-btn').on('click', function() {
-        scrollToBottom();
+    $('#new-messages-btn').on('click', function(){
+        var feed = document.getElementById('chat-feed');
+        var isAtBottom = false;
+        if (feed) {
+            var scrollPosition = feed.scrollTop + feed.clientHeight;
+            var scrollHeight = feed.scrollHeight;
+            isAtBottom = scrollHeight - scrollPosition <= 100;
+        }
+        
+        if (attached_to_bottom || isAtBottom) {
+            // Already attached/near bottom - just scroll to bottom
+            scrollToBottom();
+        } else {
+            // Not attached - fetch fresh messages (avoids underhead fetch issues)
+            document.querySelector('#message-container').innerHTML = '';
+            
+            fetch_type = ROOM_TYPE === 'dm' ? 'Fetch DM Messages' : 'Fetch Room Messages';
+            cl.send(JSON.stringify([fetch_type, {
+                'username': username, 
+                'password': password, 
+                'room': ROOM, 
+                'limit': INITIAL_LIMIT, 
+                'offset': -1
+            }]));
+            attached_to_bottom = true;
+        }
+        
         toggle_new_messages_btn(false);
     });
 
@@ -969,8 +1027,36 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
           
           // Call the function defined in network/home.js with the topmost message ID
           if (typeof fetch_overhead_messages === "function") {
-            fetch_overhead_messages(topmost_id);
-            console.log('Called fetch_overhead_messages with ID:', topmost_id);
+            if (topmost_id !== -1) {
+              fetch_overhead_messages(topmost_id);
+              console.log('Called fetch_overhead_messages with ID:', topmost_id);
+            }
+          }
+        }
+        
+        // Check if scrolled to bottom
+        var scrollHeight = $chatFeed[0].scrollHeight;
+        var scrollTop = $chatFeed.scrollTop();
+        var clientHeight = $chatFeed[0].clientHeight;
+        var isAtBottom = scrollHeight - scrollTop - clientHeight <= 10;
+        
+        if (isAtBottom) {
+          // Check if we're not attached to bottom (need to fetch newer messages)
+          if (!attached_to_bottom) {
+            // Get the bottommost message ID
+            var bottommost_id = -1;
+            var $lastBubble = $("#message-container").find(".message__bubble").last();
+            if ($lastBubble.length) {
+              var lastIdx = parseInt($lastBubble.attr("aria-index"));
+              if (!isNaN(lastIdx)) {
+                bottommost_id = lastIdx;
+              }
+            }
+            
+            if (bottommost_id !== -1 && typeof fetch_underhead_messages === "function") {
+              fetch_underhead_messages(bottommost_id);
+              console.log('Called fetch_underhead_messages with ID:', bottommost_id);
+            }
           }
         }
       });
@@ -1014,7 +1100,7 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
             overhead_spinner.style.opacity = ''
             overhead_spinner.style.animation = ''
             overhead_spinner.style.top = '5px'
-        }, 0)
+        }, OVERHEAD_LOADER_DELAY)
     }
   };
 
@@ -1033,14 +1119,21 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
     if (!btn) return;
     
     if (toggle === true) {
-      newMessageCount++;
+      // Only increment if button is not already visible (prevents batch increments)
+      if (btn.style.display === 'none' || btn.style.display === '') {
+        newMessageCount = 1;
+      } else {
+        newMessageCount++;
+      }
       var textSpan = btn.querySelector('span');
       if (textSpan) {
         var messageText = newMessageCount === 1 ? 'New Message' : 'New Messages';
         textSpan.textContent = newMessageCount + ' ' + messageText;
       }
       btn.style.display = 'flex'
+      btn_queue.push(btn)
       setTimeout(function(){
+        btn = btn_queue.splice(0, 1)[0]
         btn.style.opacity = '1';
         btn.style.bottom = '105px';
       }, 200)
@@ -1048,7 +1141,9 @@ var overhead_spinner = document.querySelector('#overhead-spinner');
       newMessageCount = 0;
       btn.style.opacity = '0';
       btn.style.bottom = '20px';
+      btn_queue.push(btn)
       setTimeout(function(){
+        btn = btn_queue.splice(0, 1)[0]
         btn.style.display = 'none'
       }, 200)
     }

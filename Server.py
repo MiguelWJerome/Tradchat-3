@@ -32,24 +32,28 @@ def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
             db_path = 'dms/girls_dm.db'
     
     with lock:
-        conn = sqlite3.connect(db_path)
-
-        cursor = conn.cursor()
-        
-        cursor.execute(sql, params)
-
-        result = None
-        
-        if remove_go_spaces(sql.lower()).startswith("select"):
-            result = cursor.fetchall()
-        else:
-            conn.commit()
-            result = True
-            if chat_room or provide_id:
-                result = cursor.lastrowid
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
             
-        conn.close()
-        return result
+            result = None
+            if remove_go_spaces(sql.lower()).strip().startswith("select"):
+                result = cursor.fetchall()
+            else:
+                conn.commit()
+                result = True
+                if chat_room or provide_id:
+                    result = cursor.lastrowid
+            
+            conn.close()
+            return result
+        except Exception as e:
+            print(f"DB ERROR: {e}")
+            print(f"SQL: {sql[:100]}...")
+            print(f"Params: {params}")
+            conn.close()
+            return []
 
 def check_room_access(room_name, username):
     user_id = find_account_id_or_password_or_gender(username, 'id')
@@ -82,15 +86,18 @@ def check_credentials(username, password):
     return (password and password == password)
 
 
-def fetch_room_messages(room_name, limit, offset):
+def fetch_room_messages(room_name, limit, offset, underhead):
     messages = []
     
-    if offset == -1:
-        query = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages ORDER BY id DESC LIMIT ?""", room_name, params=[limit], chat_room=True)
+    if underhead:
+        raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages WHERE id > ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)
     else:
-        query = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages WHERE id < ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)    
+        if offset == -1:
+            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages ORDER BY id DESC LIMIT ?""", room_name, params=[limit], chat_room=True)
+        else:
+            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages WHERE id < ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)    
 
-    for t in query:
+    for t in raw_messages:
         message = {}
         message['id'] = t[0]
         message['username'] = find_username_from_id(t[1])
@@ -100,12 +107,13 @@ def fetch_room_messages(room_name, limit, offset):
         message['upload'] = t[5]
         messages.append(message)
 
-    if offset == -1: messages.reverse()
+    if offset == -1 or underhead:
+        messages.reverse()
     
     return messages
 
 
-def fetch_dm_messages(dm_string, username, limit, offset):
+def fetch_dm_messages(dm_string, username, limit, offset, underhead):
     primary_user_id = find_account_id_or_password_or_gender(dm_string.split('.$@-@&.')[0], 'id')
     primaryGender = find_account_id_or_password_or_gender(dm_string.split('.$@-@&.')[0], 'gender')
     secondary_user_id = find_account_id_or_password_or_gender(dm_string.split('.$@-@&.')[1], 'id')
@@ -113,11 +121,15 @@ def fetch_dm_messages(dm_string, username, limit, offset):
     genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
 
     convo_hash = f"{primary_user_id}-{secondary_user_id}"
+    anti_convo_hash = f"{secondary_user_id}-{primary_user_id}"
 
-    if offset == -1:
-        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, limit], chat_room=False)
+    if underhead:
+        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id > ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
     else:
-        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE convo_hash = ? AND id < ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, offset, limit], chat_room=False)
+        if offset == -1:
+            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, limit], chat_room=False)
+        else:
+            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id < ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
 
     actual_user_dm_username = dm_string.split('.$@-@&.')[1] if dm_string.split('.$@-@&.')[0] == username else dm_string.split('.$@-@&.')[0]
     
@@ -132,7 +144,7 @@ def fetch_dm_messages(dm_string, username, limit, offset):
             'upload': message[5]
         })
 
-    if offset == -1:
+    if offset == -1 or underhead:
         messages.reverse()
     
     return messages, actual_user_dm_username
@@ -575,36 +587,45 @@ def Recv(message, sid):
 
                     gmt_timestamp = convert_to_gmt(timestamp)
 
-                    message_id = db_sql(f"""INSERT INTO {fm_to_gb[important_gender]}s_dm (convo_hash, sender_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?, ?);""", f"{fm_to_gb[important_gender]}s_dm", params=[f"{important_id}-{un_important_id}", username_id, user_message, gmt_timestamp, reply_index, upload], chat_room=False, provide_id=True)
+                    convo_hash = f"{important_id}-{un_important_id}"
+                    anti_convo_hash = f"{un_important_id}-{important_id}"
+
+                    message_id = db_sql(f"""INSERT INTO {fm_to_gb[important_gender]}s_dm (convo_hash, sender_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?, ?);""", f"{fm_to_gb[important_gender]}s_dm", params=[convo_hash, username_id, user_message, gmt_timestamp, reply_index, upload], chat_room=False, provide_id=True)
                     Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index)}]), room=room)
                 else:
                     return # User not part of this DM or invalid DM
 
-    elif msg[0] == 'Fetch Room Messages':
-        username = msg[1]['username']
-        password = msg[1]['password']
+    elif msg[0] == 'Fetch Room Messages' or msg[0] == 'Fetch DM Messages':
         data = msg[1]
+        username = data['username']
+        password = data['password']
         room = data['room']
         limit = data['limit']
         offset = data['offset']
-        
-        if check_credentials(username, password) and check_room_access(room, username):
-            messages = fetch_room_messages(room, limit, offset)
-            Server.send(str(['Fetch Room Messages', {'messages': messages, 'room': room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[room], chat_room=False)[0][0], 'overhead': (offset != -1)}]), room=sid)
 
-    elif msg[0] == 'Fetch DM Messages':
-        username = msg[1]['username']
-        password = msg[1]['password']
-        limit = msg[1]['limit']
-        offset = msg[1]['offset']
-        room = msg[1]['room']
+        underhead = False
+
+        if str(offset).startswith('>'):
+            offset = int(offset[1:])
+            underhead = True
+
         
-        if check_credentials(username, password) and check_dm_access(room, username):
-            messages, actual_user_dm_username = fetch_dm_messages(room, username, limit, offset)
+        if not check_credentials(username, password):
+            return
             
+        is_dm = '.$@-@&.' in room
+        
+        if is_dm:
+            if not check_dm_access(room, username):
+                return
+            messages, actual_user_dm_username = fetch_dm_messages(room, username, limit, offset, underhead)
             db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[room, username], chat_room=False)
-            
-            Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': room, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'overhead': (offset != -1)}]), room=sid)
+            Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': room, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'overhead': (offset != -1), 'underhead': underhead}]), room=sid)
+        else:
+            if not check_room_access(room, username):
+                return
+            messages = fetch_room_messages(room, limit, offset, underhead)
+            Server.send(str(['Fetch Room Messages', {'messages': messages, 'room': room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[room], chat_room=False)[0][0], 'overhead': (offset != -1), 'underhead': underhead}]), room=sid)
 
     elif msg[0] == 'Join Room':
         data = msg[1]
@@ -638,7 +659,7 @@ def Recv(message, sid):
 
                 db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_room, username], chat_room=False)
 
-                Server.send(str(['Fetch Room Messages', {'messages': fetch_room_messages(new_room, limit, -1), 'room': new_room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[new_room], chat_room=False)[0][0], 'clear': False}]), room=sid)
+                Server.send(str(['Fetch Room Messages', {'messages': fetch_room_messages(new_room, limit, -1, False), 'room': new_room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[new_room], chat_room=False)[0][0], 'clear': False}]), room=sid)
             else:
                 return # User not allowed in room
         else:
@@ -656,7 +677,7 @@ def Recv(message, sid):
             Server.server.leave_room(sid, old_group)
             Server.server.enter_room(sid, new_dm)
             
-            messages, actual_user_dm_username = fetch_dm_messages(new_dm, username, limit, -1)
+            messages, actual_user_dm_username = fetch_dm_messages(new_dm, username, limit, -1, False)
 
             db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_dm, username], chat_room=False)
             
@@ -740,7 +761,16 @@ def Recv(message, sid):
         if check_credentials(username, password):
             if '.$@-@&.' in room:
                 if check_dm_access(room, username):
-                    user_id, message_text, timestamp, reply_id, upload = db_sql("""SELECT user_id, message, timestamp, reply_id, upload FROM messages WHERE id = ?;""", room, params=[index], chat_room=True)[0]
+                    primary_user_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'id')
+                    primary_gender = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'gender')
+                    secondary_user_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[1], 'id')
+
+                    convo_hash = f"{primary_user_id}-{secondary_user_id}"
+                    anti_convo_hash = f"{secondary_user_id}-{primary_user_id}"
+
+                    genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
+
+                    user_id, message_text, timestamp, reply_id, upload = db_sql(f"""SELECT sender_id, message, timestamp, reply_id, upload FROM {genderDict[primary_gender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id = ?;""", genderDict[primary_gender], params=[convo_hash, anti_convo_hash, index], chat_room=False)[0]
 
                     original_username = find_username_from_id(user_id)
                     message = {
@@ -782,28 +812,16 @@ def Recv(message, sid):
                     secondary_user_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[1], 'id')
 
                     convo_hash = f"{primary_user_id}-{secondary_user_id}"
+                    anti_convo_hash = f"{secondary_user_id}-{primary_user_id}"
 
                     genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
 
-
-                    # The 'index' is your anchor, 'limit' is 10, and 'room' is the target .db string
                     raw_messages = db_sql(f"""
-                        SELECT * FROM (
-                            SELECT id, user_id, message, timestamp, reply_id, upload 
-                            FROM {genderDict[primary_gender]} WHERE convo_hash = ? AND id < ? 
-                            ORDER BY id DESC LIMIT ?
-                        )
-                        UNION ALL
-                        SELECT id, user_id, message, timestamp, reply_id, upload 
-                        FROM {genderDict[primary_gender]} WHERE convo_hash = ? AND id = ?
-                        UNION ALL
-                        SELECT * FROM (
-                            SELECT id, user_id, message, timestamp, reply_id, upload 
-                            FROM {genderDict[primary_gender]} WHERE convo_hash = ? AND id > ? 
-                            ORDER BY id ASC LIMIT ?
-                        )
+                        SELECT id, sender_id, message, timestamp, reply_id, upload 
+                        FROM {genderDict[primary_gender]} 
+                        WHERE (convo_hash = ? OR convo_hash = ?) AND id >= ? AND id <= ?
                         ORDER BY id ASC;
-                    """, genderDict[primary_gender], params=[convo_hash, index, limit, convo_hash, index, convo_hash, index, limit], chat_room=False)
+                    """, genderDict[primary_gender], params=[convo_hash, anti_convo_hash, index - limit, index + limit], chat_room=False)
                                         
 
                     messages = []

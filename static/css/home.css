@@ -338,10 +338,10 @@
   transition: border-color var(--transition);
 }
 .search-input:focus {
-  border-color: var(--color-accent);
+  border-color: var(--color-medium);
 }
 .search-input::placeholder { 
-  color: var(--color-medium); 
+  color: #000; 
   font-size: 0.8rem;
   font-family: var(--font-body);
 }
@@ -685,14 +685,14 @@
   background: transparent;  /* Removed color-light background */
   font-family: var(--font-body);
   font-size: calc(1rem * 1.1);  /* 1.1x larger text */
-  color: var(--color-dark);
+  color: black;
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition);
   height: calc(50px * 1.1);  /* 1.1x taller input */
 }
 .inputbar__text:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px rgba(192,57,43,0.15);
+  border-color: var(--color-medium);
+  box-shadow: 0 0 0 3px var(--color-medium);
 }
 .inputbar__text::placeholder { color: #000; }  /* Black placeholder text */
 
@@ -986,13 +986,14 @@
   background: white;
   font-family: var(--font-body);
   font-size: 0.9rem;
-  color: var(--color-dark);
+  color: black;
   outline: none;
   transition: border-color 0.2s ease;
 }
 
 .modal-input:focus {
-  border-color: var(--color-accent);
+  border-color: var(--color-medium);
+  box-shadow: 0 0 0 3px var(--color-medium);
 }
 
 /* Emoji Selector */
