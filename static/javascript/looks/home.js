@@ -372,55 +372,36 @@ document.body.onclick = function(){
     var currentTimestamp = msgDate.getTime();
     var fiveMinutesMs = 5 * 60 * 1000; // 5 minutes in milliseconds
     
-    // SCROLL ANCHOR: Save scroll position before prepending (for overhead mode)
+    // 1. Capture current scroll state for anchor logic
     var feed = document.getElementById('chat-feed');
-    var oldScrollHeight, oldScrollTop;
-    if (overhead && feed) {
-        oldScrollHeight = feed.scrollHeight;
-        oldScrollTop = feed.scrollTop;
-    }
-    
+    var oldScrollHeight = feed ? feed.scrollHeight : 0;
+    var oldScrollTop = feed ? feed.scrollTop : 0;
+
     if (overhead) {
-        // When inserting at top, check against the FIRST message (skip any existing date dividers)
-        var $firstElement = $messageContainer.children().first();
-        var $firstMsg = $firstElement.hasClass('chat-date-divider') ? $firstElement.next('.message') : $firstElement;
-        var firstDateAttr = $firstMsg.attr("data-date");
+        // STEP A: Remove the current "Roof" (the topmost date divider)
+        // We remove it so we can re-evaluate the grouping against the actual messages.
+        var $topDivider = $messageContainer.children('.chat-date-divider').first();
+        var originalRoofDate = $topDivider.attr('data-date');
+        $topDivider.remove();
+
+        // STEP B: Identify the first actual message group
+        var $firstMsg = $messageContainer.children('.message').first();
         
-        // Check if there's already a date divider with this date at the top
-        var $existingDivider = $firstElement.hasClass('chat-date-divider') ? $firstElement : null;
-        var dividerHasSameDate = $existingDivider && $existingDivider.attr('data-date') === fullDateStr;
-        
-        // If the date is different from the first message (or this is the first message ever)
-        // AND we don't already have a date divider for this date at the top
-        // we need a date divider ABOVE this message
-        if (($firstMsg.length === 0 || firstDateAttr !== fullDateStr) && !dividerHasSameDate) {
-            var $dateDivider = $("<div>")
-                .addClass("chat-date-divider")
-                .attr("data-date", fullDateStr)
-                .css({
-                    "display": "flex",
-                    "align-items": "center",
-                    "justify-content": "center",
-                    "margin": "20px 0",
-                    "position": "relative"
-                })
-                .html(`
-                    <div style="position: absolute; width: 100%; height: 1px; background: rgba(0,0,0,0.1); z-index: 1;"></div>
-                    <span style="background: var(--color-light); padding: 0 15px; z-index: 2; color: #777; font-size: 0.85rem; font-weight: 500;">
-                        ${fullDateStr}
-                    </span>
-                `);
-            $messageContainer.prepend($dateDivider);
+        if ($firstMsg.length > 0) {
+            var firstDateAttr = $firstMsg.attr("data-date");
+            var firstTimestamp = parseInt($firstMsg.attr("data-timestamp") || "0");
+            var firstUser = $firstMsg.attr("data-user");
+            var timeDiffMs = firstTimestamp - currentTimestamp;
+
+            // Grouping logic: Same user, same date, and the existing message is NEWER (timeDiff >= 0)
+            isSameUser = (firstUser === (myself ? "You" : username)) && 
+                         (firstDateAttr === fullDateStr) && 
+                         (timeDiffMs < fiveMinutesMs) && 
+                         (timeDiffMs >= 0);
+            $targetMsgGroup = $firstMsg;
         }
-        
-        var firstTimestamp = parseInt($firstMsg.attr("data-timestamp") || "0");
-        var firstUser = $firstMsg.attr("data-user");
-        var timeDiffMs = firstTimestamp - currentTimestamp;
-        // Only group with existing message if same user AND same date AND within 5 minutes
-        isSameUser = (firstUser === (myself ? "You" : username)) && (firstDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs) && (timeDiffMs >= 0);
-        $targetMsgGroup = $firstMsg;
     } else {
-        // Normal append mode - check against the LAST message
+        // Normal / Underhead logic (stays mostly same)
         var $lastMsg = $messageContainer.find(".message").last();
         var lastDateAttr = $lastMsg.attr("data-date");
 
@@ -560,7 +541,6 @@ document.body.onclick = function(){
         $msg.append($avatar, $content);
         
         if (overhead) {
-            // Prepend the entire message group to the feed
             $messageContainer.prepend($msg);
         } else {
             $messageContainer.append($msg);
@@ -606,10 +586,45 @@ document.body.onclick = function(){
         }
     }
 
-    // SCROLL ANCHOR: Restore scroll position after prepending (for overhead mode)
-    if (overhead && feed) {
+    // STEP C: Clean up and Re-apply Dividers for Overhead
+    if (overhead) {
+        // Helper function to create date divider
+        function createDateDividerHtml(dateStr) {
+            return $("<div>")
+                .addClass("chat-date-divider")
+                .attr("data-date", dateStr)
+                .css({ "display": "flex", "align-items": "center", "justify-content": "center", "margin": "20px 0", "position": "relative" })
+                .html(`
+                    <div style="position: absolute; width: 100%; height: 1px; background: rgba(0,0,0,0.1); z-index: 1;"></div>
+                    <span style="background: var(--color-light); padding: 0 15px; z-index: 2; color: #777; font-size: 0.85rem; font-weight: 500;">
+                        ${dateStr}
+                    </span>
+                `);
+        }
+
+        // 1. Get the date of the message that is NOW at the very top
+        var $newTopMsg = $messageContainer.children('.message').first();
+        var newTopDate = $newTopMsg.attr('data-date');
+
+        // 2. Prepend a divider for the new roof date
+        // (Remove any existing divider for this date first to avoid duplicates)
+        $messageContainer.children('.chat-date-divider[data-date="' + newTopDate + '"]').remove();
+        $messageContainer.prepend(createDateDividerHtml(newTopDate));
+
+        // 3. If the original roof was a different date, make sure it still has a divider
+        if (originalRoofDate && originalRoofDate !== newTopDate) {
+            var $firstMsgOfOldDate = $messageContainer.children('.message[data-date="' + originalRoofDate + '"]').first();
+            if ($firstMsgOfOldDate.length && !$firstMsgOfOldDate.prev().hasClass('chat-date-divider')) {
+                $firstMsgOfOldDate.before(createDateDividerHtml(originalRoofDate));
+            }
+        }
+
+        // 2. RESTORE: The "Anti-Jump" Calculation
+        // We calculate the delta (difference) and apply it instantly.
         var newScrollHeight = feed.scrollHeight;
         var heightAdded = newScrollHeight - oldScrollHeight;
+        
+        // This shifts the scrollbar down by exactly the amount of content added
         feed.scrollTop = oldScrollTop + heightAdded;
     }
 
@@ -1040,9 +1055,23 @@ document.body.onclick = function(){
         var clientHeight = $chatFeed[0].clientHeight;
         var isAtBottom = scrollHeight - scrollTop - clientHeight <= 10;
         
+        // Update attached_to_bottom based on actual scroll position
+        if (isAtBottom) {
+          attached_to_bottom = true;
+        } else if (scrollTop < scrollHeight - clientHeight - 100) {
+          // User has scrolled up more than 100px from bottom - detach
+          attached_to_bottom = false;
+        }
+        
         if (isAtBottom) {
           // Check if we're not attached to bottom (need to fetch newer messages)
           if (!attached_to_bottom) {
+            // --- CRITICAL GUARD: Prevent multiple underhead fetches ---
+            if (FetchingMessages) {
+              console.log("Underhead scroll sensor triggered, but blocked by FetchingMessages lock.");
+              return; 
+            }
+            
             // Get the bottommost message ID
             var bottommost_id = -1;
             var $lastBubble = $("#message-container").find(".message__bubble").last();
