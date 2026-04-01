@@ -90,12 +90,12 @@ def fetch_room_messages(room_name, limit, offset, underhead):
     messages = []
     
     if underhead:
-        raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages WHERE id > ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)
+        raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions FROM messages WHERE id > ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)
     else:
         if offset == -1:
-            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages ORDER BY id DESC LIMIT ?""", room_name, params=[limit], chat_room=True)
+            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions FROM messages ORDER BY id DESC LIMIT ?""", room_name, params=[limit], chat_room=True)
         else:
-            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages WHERE id < ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)    
+            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions FROM messages WHERE id < ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)    
 
     for t in raw_messages:
         message = {}
@@ -105,6 +105,7 @@ def fetch_room_messages(room_name, limit, offset, underhead):
         message['timestamp'] = t[3]
         message['reply_id'] = t[4]
         message['upload'] = t[5]
+        message['reactions'] = get_reactions_with_usernames(t[6])
         messages.append(message)
 
     if offset == -1 or underhead:
@@ -124,12 +125,12 @@ def fetch_dm_messages(dm_string, username, limit, offset, underhead):
     anti_convo_hash = f"{secondary_user_id}-{primary_user_id}"
 
     if underhead:
-        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id > ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
+        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id > ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
     else:
         if offset == -1:
-            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, limit], chat_room=False)
+            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, limit], chat_room=False)
         else:
-            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id < ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
+            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id < ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
 
     actual_user_dm_username = dm_string.split('.$@-@&.')[1] if dm_string.split('.$@-@&.')[0] == username else dm_string.split('.$@-@&.')[0]
     
@@ -141,7 +142,8 @@ def fetch_dm_messages(dm_string, username, limit, offset, underhead):
             'message': message[2],
             'timestamp': message[3],
             'reply_id': message[4],
-            'upload': message[5]
+            'upload': message[5],
+            'reactions': get_reactions_with_usernames(message[6])
         })
 
     if offset == -1 or underhead:
@@ -234,6 +236,40 @@ def join(lst):
     return '-'.join(clean_list) if clean_list else ''
 
 
+def parse_reactions_ids(reaction_str):
+    if not reaction_str:
+        return {}
+    reactions = {}
+    parts = reaction_str.split(',')
+    for part in parts:
+        if part:
+            emoji = part[0]
+            ids = part[1:].split('-')
+            reactions[emoji] = [uid for uid in ids if uid]
+    return reactions
+
+def encode_reactions_ids(reaction_dict):
+    parts = []
+    for emoji, ids in reaction_dict.items():
+        if ids:
+            parts.append(emoji + '-'.join(ids))
+    return ','.join(parts)
+
+def get_reactions_with_usernames(reaction_str):
+    parsed = parse_reactions_ids(reaction_str)
+    result = []
+    for emoji, ids in parsed.items():
+        users = []
+        for uid in ids:
+            username = find_username_from_id(int(uid))
+            if username:
+                users.append(username)
+        if users:
+            result.append({'emoji': emoji, 'users': users})
+    return result
+
+
+
 # Create application and Server
 
 app = Flask(__name__)
@@ -256,6 +292,7 @@ if not os.path.exists("mainroom.db"):
             message TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             reply_id INTEGER NOT NULL,
+            reactions TEXT NOT NULL,
             upload TEXT NOT NULL
         );
     ''')
@@ -314,6 +351,7 @@ if not os.path.exists("dms/boys_dm.db"):
             message TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             reply_id INTEGER NOT NULL,
+            reactions TEXT NOT NULL,
             upload TEXT NOT NULL
         );
     ''')
@@ -330,6 +368,7 @@ if not os.path.exists("dms/girls_dm.db"):
             message TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             reply_id INTEGER NOT NULL,
+            reactions TEXT NOT NULL,
             upload TEXT NOT NULL
         );
     ''')
@@ -569,8 +608,8 @@ def Recv(message, sid):
                     user_id = find_account_id_or_password_or_gender(username, 'id')
                     gmt_timestamp = convert_to_gmt(timestamp)
 
-                    message_id = db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, reply_index, upload], chat_room=True)
-                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index)}]), room=room)
+                    message_id = db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload, reactions) VALUES (?, ?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, reply_index, upload, ""], chat_room=True)
+                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': []}]), room=room)
             
             elif setting == 'dm':
                 # Verify user is a participant in this DM before sending
@@ -590,8 +629,8 @@ def Recv(message, sid):
                     convo_hash = f"{important_id}-{un_important_id}"
                     anti_convo_hash = f"{un_important_id}-{important_id}"
 
-                    message_id = db_sql(f"""INSERT INTO {fm_to_gb[important_gender]}s_dm (convo_hash, sender_id, message, timestamp, reply_id, upload) VALUES (?, ?, ?, ?, ?, ?);""", f"{fm_to_gb[important_gender]}s_dm", params=[convo_hash, username_id, user_message, gmt_timestamp, reply_index, upload], chat_room=False, provide_id=True)
-                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index)}]), room=room)
+                    message_id = db_sql(f"""INSERT INTO {fm_to_gb[important_gender]}s_dm (convo_hash, sender_id, message, timestamp, reply_id, upload, reactions) VALUES (?, ?, ?, ?, ?, ?, ?);""", f"{fm_to_gb[important_gender]}s_dm", params=[convo_hash, username_id, user_message, gmt_timestamp, reply_index, upload, ""], chat_room=False, provide_id=True)
+                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': []}]), room=room)
                 else:
                     return # User not part of this DM or invalid DM
 
@@ -747,7 +786,98 @@ def Recv(message, sid):
                 
             
             Server.send(str(['Get Dms', dms]), room=sid)
-            
+
+    elif msg[0] == 'Added Reaction':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        index = data['index']
+        room = data['room']
+        reaction = data['emoji']
+
+        if check_credentials(username, password):
+            user_id = str(find_account_id_or_password_or_gender(username, 'id'))
+            if '.$@-@&.' in room:
+                if check_dm_access(room, username):
+                    primary_user_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'id')
+                    primary_gender = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'gender')
+                    secondary_user_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[1], 'id')
+
+                    convo_hash = f"{primary_user_id}-{secondary_user_id}"
+                    anti_convo_hash = f"{secondary_user_id}-{primary_user_id}"
+
+                    genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
+
+                    current_str = db_sql(f"""SELECT reactions FROM {genderDict[primary_gender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id = ?;""", genderDict[primary_gender], params=[convo_hash, anti_convo_hash, index], chat_room=False)[0][0]
+                    reactions_dict = parse_reactions_ids(current_str)
+                    if reaction not in reactions_dict:
+                        reactions_dict[reaction] = []
+                    if user_id not in reactions_dict[reaction]:
+                        reactions_dict[reaction].append(user_id)
+                    new_str = encode_reactions_ids(reactions_dict)
+                    
+                    db_sql(f"""UPDATE {genderDict[primary_gender]} SET reactions = ? WHERE (convo_hash = ? OR convo_hash = ?) AND id = ?;""", genderDict[primary_gender], params=[new_str, convo_hash, anti_convo_hash, index], chat_room=False)
+
+                    Server.send(str(['Added Reaction', {'emoji': reaction, 'username': username, 'index': index}]), room=room)
+            else:
+                if check_room_access(room, username):
+                    current_str = db_sql("""SELECT reactions FROM messages WHERE id = ?;""", room, params=[index], chat_room=True)[0][0]
+                    reactions_dict = parse_reactions_ids(current_str)
+                    if reaction not in reactions_dict:
+                        reactions_dict[reaction] = []
+                    if user_id not in reactions_dict[reaction]:
+                        reactions_dict[reaction].append(user_id)
+                    new_str = encode_reactions_ids(reactions_dict)
+                    
+                    db_sql("""UPDATE messages SET reactions = ? WHERE id = ?;""", room, params=[new_str, index], chat_room=True)
+                    
+                    Server.send(str(['Added Reaction', {'emoji': reaction, 'username': username, 'index': index}]), room=room)
+
+    elif msg[0] == 'Removed Reaction':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        index = data['index']
+        room = data['room']
+        reaction = data['emoji']
+
+        if check_credentials(username, password):
+            user_id = str(find_account_id_or_password_or_gender(username, 'id'))
+            if '.$@-@&.' in room:
+                if check_dm_access(room, username):
+                    primary_user_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'id')
+                    primary_gender = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'gender')
+                    secondary_user_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[1], 'id')
+
+                    convo_hash = f"{primary_user_id}-{secondary_user_id}"
+                    anti_convo_hash = f"{secondary_user_id}-{primary_user_id}"
+
+                    genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
+
+                    current_str = db_sql(f"""SELECT reactions FROM {genderDict[primary_gender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id = ?;""", genderDict[primary_gender], params=[convo_hash, anti_convo_hash, index], chat_room=False)[0][0]
+                    reactions_dict = parse_reactions_ids(current_str)
+                    if reaction in reactions_dict and user_id in reactions_dict[reaction]:
+                        reactions_dict[reaction].remove(user_id)
+                        if not reactions_dict[reaction]:
+                            del reactions_dict[reaction]
+                    new_str = encode_reactions_ids(reactions_dict)
+
+                    db_sql(f"""UPDATE {genderDict[primary_gender]} SET reactions = ? WHERE (convo_hash = ? OR convo_hash = ?) AND id = ?;""", genderDict[primary_gender], params=[new_str, convo_hash, anti_convo_hash, index], chat_room=False)
+
+                    Server.send(str(['Removed Reaction', {'emoji': reaction, 'username': username, 'index': index}]), room=room)  
+            else:
+                if check_room_access(room, username):
+                    current_str = db_sql("""SELECT reactions FROM messages WHERE id = ?;""", room, params=[index], chat_room=True)[0][0]
+                    reactions_dict = parse_reactions_ids(current_str)
+                    if reaction in reactions_dict and user_id in reactions_dict[reaction]:
+                        reactions_dict[reaction].remove(user_id)
+                        if not reactions_dict[reaction]:
+                            del reactions_dict[reaction]
+                    new_str = encode_reactions_ids(reactions_dict)
+                    
+                    db_sql("""UPDATE messages SET reactions = ? WHERE id = ?;""", room, params=[new_str, index], chat_room=True)
+                    
+                    Server.send(str(['Removed Reaction', {'emoji': reaction, 'username': username, 'index': index}]), room=room)  
 
     elif msg[0] == 'Fetch Special Reply Message':
         data = msg[1]
@@ -770,7 +900,7 @@ def Recv(message, sid):
 
                     genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
 
-                    user_id, message_text, timestamp, reply_id, upload = db_sql(f"""SELECT sender_id, message, timestamp, reply_id, upload FROM {genderDict[primary_gender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id = ?;""", genderDict[primary_gender], params=[convo_hash, anti_convo_hash, index], chat_room=False)[0]
+                    user_id, message_text, timestamp, reply_id, upload, reactions = db_sql(f"""SELECT sender_id, message, timestamp, reply_id, upload, reactions FROM {genderDict[primary_gender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id = ?;""", genderDict[primary_gender], params=[convo_hash, anti_convo_hash, index], chat_room=False)[0]
 
                     original_username = find_username_from_id(user_id)
                     message = {
@@ -779,12 +909,13 @@ def Recv(message, sid):
                         'message': message_text,
                         'timestamp': timestamp,
                         'reply_id': reply_id,
-                        'upload': upload
+                        'upload': upload,
+                        'reactions': get_reactions_with_usernames(reactions)
                     }
                     Server.send(str(['Fetch Special Reply Message', {'message': message, 'orgIndex': orgIndex}]), room=sid)
             else:
                 if check_room_access(room, username):
-                    user_id, message_text, timestamp, reply_id, upload = db_sql("""SELECT user_id, message, timestamp, reply_id, upload FROM messages WHERE id = ?;""", room, params=[index], chat_room=True)[0]
+                    user_id, message_text, timestamp, reply_id, upload, reactions = db_sql("""SELECT user_id, message, timestamp, reply_id, upload, reactions FROM messages WHERE id = ?;""", room, params=[index], chat_room=True)[0]
                     original_username = find_username_from_id(user_id)
                     message = {
                         'id': index,
@@ -792,7 +923,8 @@ def Recv(message, sid):
                         'message': message_text,
                         'timestamp': timestamp,
                         'reply_id': reply_id,
-                        'upload': upload
+                        'upload': upload,
+                        'reactions': get_reactions_with_usernames(reactions)
                     }
                     Server.send(str(['Fetch Special Reply Message', {'message': message, 'orgIndex': orgIndex}]), room=sid)
 
@@ -817,7 +949,7 @@ def Recv(message, sid):
                     genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
 
                     raw_messages = db_sql(f"""
-                        SELECT id, sender_id, message, timestamp, reply_id, upload 
+                        SELECT id, sender_id, message, timestamp, reply_id, upload, reactions 
                         FROM {genderDict[primary_gender]} 
                         WHERE (convo_hash = ? OR convo_hash = ?) AND id >= ? AND id <= ?
                         ORDER BY id ASC;
@@ -832,12 +964,13 @@ def Recv(message, sid):
                             'message': msg[2],
                             'timestamp': msg[3],
                             'reply_id': msg[4],
-                            'upload': msg[5]
+                            'upload': msg[5],
+                            'reactions': get_reactions_with_usernames(msg[6])
                         })
                     Server.send(str(['Fetch Special Reply Messages', {'messages': messages, 'index': index}]), room=sid)
             else:
                 if check_room_access(room, username):
-                    raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload FROM messages WHERE id >= ? AND id <= ?;""", room, params=[index - limit, index + limit], chat_room=True)
+                    raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions FROM messages WHERE id >= ? AND id <= ?;""", room, params=[index - limit, index + limit], chat_room=True)
                     messages = []
                     for msg in raw_messages:
                         messages.append({
@@ -846,7 +979,8 @@ def Recv(message, sid):
                             'message': msg[2],
                             'timestamp': msg[3],
                             'reply_id': msg[4],
-                            'upload': msg[5]
+                            'upload': msg[5],
+                            'reactions': get_reactions_with_usernames(msg[6])
                         })
                     Server.send(str(['Fetch Special Reply Messages', {'messages': messages, 'index': index}]), room=sid)
 
@@ -976,6 +1110,7 @@ def Recv(message, sid):
                         message TEXT NOT NULL,
                         timestamp TEXT NOT NULL,
                         reply_id INTEGER NOT NULL,
+                        reactions TEXT NOT NULL,
                         upload TEXT NOT NULL
                     );
                 ''')
