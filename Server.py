@@ -1123,6 +1123,145 @@ def Recv(message, sid):
                 
                 Server.send(str(['Create Room Results', 'Room Created']), room=sid)
 
+    elif msg[0] == 'Get Room Members':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        room = data['room']
+        
+        if check_credentials(username, password) and check_room_access(room, username):
+            room_info = db_sql("SELECT owners, managers, curators, members, room_type FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
+            if room_info:
+                owners_list = split(room_info[0][0])
+                managers_list = split(room_info[0][1])
+                curators_list = split(room_info[0][2])
+                members_list = split(room_info[0][3])
+                room_type = room_info[0][4]
+                
+                my_id = str(find_account_id_or_password_or_gender(username, 'id'))
+                my_role = 'Member'
+                if my_id in owners_list: my_role = 'Owner'
+                elif my_id in managers_list: my_role = 'Manager'
+                elif my_id in curators_list: my_role = 'Curator'
+                
+                members_data = []
+                # Fetch usernames and names for each id
+                def append_users(id_list, role_name):
+                    for uid in id_list:
+                        if not uid.strip(): continue
+                        u_info = db_sql("SELECT username, first_name, last_name FROM accounts WHERE id = ?;", 'accounts', params=[uid], chat_room=False)
+                        if u_info:
+                            members_data.append({
+                                'username': u_info[0][0],
+                                'firstName': u_info[0][1],
+                                'lastName': u_info[0][2],
+                                'role': role_name
+                            })
+                
+                append_users(owners_list, 'Owner')
+                append_users(managers_list, 'Manager')
+                append_users(curators_list, 'Curator')
+                append_users(members_list, 'Member')
+                
+                Server.send(str(['Get Room Members Results', {'members': members_data, 'myRole': my_role, 'roomType': room_type}]), room=sid)
+
+    elif msg[0] == 'Update Room Member':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        room = data['room']
+        target_username = data['target_username']
+        action = data['action'] # 'promote', 'demote', 'remove'
+        
+        if check_credentials(username, password) and check_room_access(room, username):
+            room_info = db_sql("SELECT owners, managers, curators, members, room_type FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
+            if room_info:
+                owners_list = split(room_info[0][0])
+                managers_list = split(room_info[0][1])
+                curators_list = split(room_info[0][2])
+                members_list = split(room_info[0][3])
+                room_type = room_info[0][4]
+                
+                my_id = str(find_account_id_or_password_or_gender(username, 'id'))
+                target_id = str(find_account_id_or_password_or_gender(target_username, 'id'))
+                
+                if not target_id: return
+                
+                my_role = 'Member'
+                if my_id in owners_list: my_role = 'Owner'
+                elif my_id in managers_list: my_role = 'Manager'
+                elif my_id in curators_list: my_role = 'Curator'
+                
+                target_role = 'Member'
+                if target_id in owners_list: target_role = 'Owner'
+                elif target_id in managers_list: target_role = 'Manager'
+                elif target_id in curators_list: target_role = 'Curator'
+                
+                # Check permissions and linearity
+                success = False
+                
+                if action == 'promote':
+                    if target_role == 'Member' and ((room_type == 'public' and my_role in ['Owner', 'Manager']) or (room_type == 'private' and my_role in ['Owner', 'Manager', 'Curator'])):
+                        members_list.remove(target_id)
+                        if room_type == 'public': managers_list.append(target_id)
+                        else: curators_list.append(target_id)
+                        success = True
+                    elif target_role == 'Curator' and room_type == 'private' and my_role in ['Owner', 'Manager']:
+                        curators_list.remove(target_id)
+                        managers_list.append(target_id)
+                        success = True
+                    elif target_role == 'Manager' and my_role == 'Owner':
+                        managers_list.remove(target_id)
+                        owners_list.append(target_id)
+                        success = True
+                        
+                elif action == 'demote':
+                    if target_role == 'Owner' and my_role == 'Owner':
+                        owners_list.remove(target_id)
+                        managers_list.append(target_id)
+                        success = True
+                    elif target_role == 'Manager' and my_role in ['Owner', 'Manager']:
+                        managers_list.remove(target_id)
+                        if room_type == 'public': members_list.append(target_id)
+                        else: curators_list.append(target_id)
+                        success = True
+                    elif target_role == 'Curator' and room_type == 'private' and my_role in ['Owner', 'Manager', 'Curator']:
+                        curators_list.remove(target_id)
+                        members_list.append(target_id)
+                        success = True
+                        
+                elif action == 'remove':
+                    if target_role == 'Member' and ((room_type == 'public' and my_role in ['Owner', 'Manager']) or (room_type == 'private' and my_role in ['Owner', 'Manager', 'Curator'])):
+                        members_list.remove(target_id)
+                        success = True
+                        
+                if success:
+                    db_sql("UPDATE rooms SET owners=?, managers=?, curators=?, members=? WHERE room_name=?;", 'rooms', params=[join(owners_list), join(managers_list), join(curators_list), join(members_list), room], chat_room=False)
+                    Server.send(str(['Room Member Updated', {}]), room=room)
+
+    elif msg[0] == 'Add Room Member':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        room = data['room']
+        new_username = data['new_username']
+        
+        if check_credentials(username, password) and check_room_access(room, username):
+            room_info = db_sql("SELECT owners, managers, curators, members, room_type FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
+            if room_info:
+                owners_list = split(room_info[0][0])
+                managers_list = split(room_info[0][1])
+                curators_list = split(room_info[0][2])
+                members_list = split(room_info[0][3])
+                
+                my_id = str(find_account_id_or_password_or_gender(username, 'id'))
+                new_id = str(find_account_id_or_password_or_gender(new_username, 'id'))
+                
+                if my_id in owners_list or my_id in managers_list or my_id in curators_list:
+                    if new_id and new_id not in owners_list and new_id not in managers_list and new_id not in curators_list and new_id not in members_list:
+                        members_list.append(new_id)
+                        db_sql("UPDATE rooms SET members=? WHERE room_name=?;", 'rooms', params=[join(members_list), room], chat_room=False)
+                        Server.send(str(['Room Member Updated', {}]), room=room)
 
 @Server.on('message')
 def recv(message):

@@ -249,6 +249,19 @@ function recv(message) {
             location.reload();
         }
     }
+    else if (msg[0] === 'Get Room Members Results') {
+        const data = msg[1];
+        if (typeof renderRoomMembers === 'function') {
+            // Pass network callbacks so looks/home.js never calls cl.send directly
+            renderRoomMembers(data.members, data.myRole, data.roomType, roomMemberCallbacks);
+        }
+    }
+    else if (msg[0] === 'Room Member Updated') {
+        // Broadcast received — refresh the member list if details panel is open
+        if (window.isRoomDetailsOpen) {
+            cl.send(JSON.stringify(['Get Room Members', { 'username': username, 'password': password, 'room': ROOM }]));
+        }
+    }
 }
 
 
@@ -521,3 +534,35 @@ $(document).ready(function () {
         }]));
     }, 300);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROOM MEMBERS — all socket I/O is defined here; looks/home.js receives
+// these as callbacks so it never touches cl.send directly.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Callbacks object passed into renderRoomMembers by recv() */
+const roomMemberCallbacks = {
+    onPromoteDemote: function(targetUsername, action) {
+        cl.send(JSON.stringify(['Update Room Member', {
+            'username': username, 'password': password,
+            'room': ROOM, 'target_username': targetUsername, 'action': action
+        }]));
+    },
+    onRemove: function(targetUsername) {
+        cl.send(JSON.stringify(['Update Room Member', {
+            'username': username, 'password': password,
+            'room': ROOM, 'target_username': targetUsername, 'action': 'remove'
+        }]));
+    },
+    onAdd: function(newUsername) {
+        cl.send(JSON.stringify(['Add Room Member', {
+            'username': username, 'password': password,
+            'room': ROOM, 'new_username': newUsername
+        }]));
+    }
+};
+
+/** Called by looks/home.js when the banner is clicked to open details */
+window.onOpenRoomDetails = function() {
+    cl.send(JSON.stringify(['Get Room Members', { 'username': username, 'password': password, 'room': ROOM }]));
+};

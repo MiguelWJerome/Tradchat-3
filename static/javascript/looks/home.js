@@ -98,6 +98,242 @@ document.body.onclick = function () {
     // Track the currently selected room ID (string)
     var selectedRoomId = null;
 
+    // Room Details View State Tracker
+    window.isRoomDetailsOpen = false;
+
+    $(document).ready(function () {
+      $('#chat-panel-header').on('click', function () {
+        // Do not allow opening room details for direct messages
+        if (typeof ROOM !== 'undefined' && ROOM.includes('.$@-@&.')) {
+          console.log("Room details not available for DMs.");
+          return;
+        }
+
+        let header = this;
+        header.style.transform = 'scale(0.95)';
+
+        setTimeout(() => {
+          header.style.transform = 'scale(1)';
+
+          if (!window.isRoomDetailsOpen) {
+            // Open details
+            $('#chat-feed').hide();
+            $('#chat-panel-inputbar').hide();
+            $('#new-messages-btn').hide();
+            $('#room-details-view').css('display', 'flex');
+            window.isRoomDetailsOpen = true;
+
+            // Update title
+            const roomTitleText = $(".room-title").text();
+            $("#details-room-title").text(roomTitleText);
+
+            // Delegate fetching to the network layer via the registered hook
+            if (typeof window.onOpenRoomDetails === 'function') {
+              window.onOpenRoomDetails();
+            }
+          } else {
+            // Close details
+            $('#room-details-view').hide();
+            $('#chat-feed').show();
+            $('#chat-panel-inputbar').show();
+            window.isRoomDetailsOpen = false;
+
+            // Check scroll bottom condition to re-show new messages btn if needed
+            var feed = document.getElementById('chat-feed');
+            if (feed) {
+              var isAtBottom = (feed.scrollHeight - (feed.scrollTop + feed.clientHeight)) <= 100;
+              if (!isAtBottom) {
+                $('#new-messages-btn').show();
+              }
+            }
+          }
+        }, 150);
+      });
+
+      // Basic setup for search filter
+      $('#member-search-input').on('input', function () {
+        const term = $(this).val().toLowerCase();
+        $('.member-row').each(function () {
+          const name = $(this).find('.member-name-col').text().toLowerCase();
+          const user = $(this).find('.member-username-col').text().toLowerCase();
+          if (name.includes(term) || user.includes(term)) {
+            $(this).show();
+          } else {
+            $(this).hide();
+          }
+        });
+      });
+    });
+
+    /**
+     * renderRoomMembers(membersList, myRole)
+     * Renders the members into the table.
+     */
+    /**
+     * renderRoomMembers(membersList, myRole, roomType, callbacks)
+     * callbacks: { onPromoteDemote(username, action), onRemove(username), onAdd(username) }
+     * All socket communication is done via those callbacks, supplied by network/home.js.
+     */
+    window.renderRoomMembers = function (membersList, myRole, roomType, callbacks) {
+      callbacks = callbacks || {};
+      const $container = $('#members-list-container');
+      $container.empty();
+
+      // Show/hide ADD button based on role
+      const canIAdd = myRole === 'Owner' || myRole === 'Manager' || myRole === 'Curator';
+      if (canIAdd) {
+        $('#add-member-btn').show();
+      } else {
+        $('#add-member-btn').hide();
+      }
+
+      // Wire ADD button — calls network callback, no cl.send here
+      $('#add-member-btn').off('click').on('click', function () {
+        const userToAdd = prompt("Enter the username to add:");
+        if (userToAdd && userToAdd.trim() !== '' && typeof callbacks.onAdd === 'function') {
+          callbacks.onAdd(userToAdd.trim());
+        }
+      });
+
+      membersList.forEach((member) => {
+        // Can I edit this user?
+        // Rules: Check progression logic.
+        // Nobody can edit Owners except Owners.
+        // Managers can edit below
+        // Curators can edit below
+        let canEdit = false;
+        if (myRole === 'Owner') canEdit = true;
+        else if (myRole === 'Manager' && ['Manager', 'Curator', 'Member'].includes(member.role)) canEdit = true;
+        else if (myRole === 'Curator' && ['Curator', 'Member'].includes(member.role)) canEdit = true;
+
+        let $row = $('<div>').addClass('member-row').css({
+          'display': 'grid',
+          'grid-template-columns': '2fr 3fr 2fr 40px',
+          'padding': '12px 0',
+          'border-bottom': '1px solid #eee',
+          'align-items': 'center'
+        });
+
+        // Column 1: Avatar + Username
+        let $col1 = $('<div>').addClass('member-username-col').css({ 'display': 'flex', 'align-items': 'center', 'gap': '10px' });
+        $col1.append($('<img>').attr('src', '/static/profile-pictures/' + member.username + '.png')
+          .css({ 'width': '35px', 'height': '35px', 'border-radius': '50%', 'object-fit': 'cover' })
+          .on('error', function () { $(this).attr('src', '/static/graphics/defaultMale.png'); }));
+        $col1.append($('<span>').text(member.username));
+
+        // Column 2: Full Name
+        let $col2 = $('<div>').addClass('member-name-col').text(member.firstName + ' ' + member.lastName);
+
+        // Column 3: Type with SVG
+        let $col3 = $('<div>').css({ 'display': 'flex', 'align-items': 'center', 'gap': '8px' });
+        let svgHtml = '';
+        if (member.role === 'Owner') svgHtml = $('#svg-owner').html();
+        else if (member.role === 'Manager') svgHtml = $('#svg-manager').html();
+        else if (member.role === 'Curator') svgHtml = $('#svg-curator').html();
+
+        if (svgHtml) $col3.append(svgHtml);
+        $col3.append($('<span>').text(member.role));
+
+        // Column 4: Actions (3 dots)
+        let $col4 = $('<div>').css({ 'position': 'relative', 'display': 'flex', 'justify-content': 'center' });
+        let $dots = $('<i>').addClass('fa-solid fa-ellipsis-vertical').css({
+          'cursor': canEdit ? 'pointer' : 'not-allowed',
+          'opacity': canEdit ? '1' : '0.3',
+          'padding': '5px 10px'
+        });
+
+        if (canEdit) {
+          $dots.on('click', function (e) {
+            e.stopPropagation();
+            $('.member-dropdown-menu').remove(); // close any open menus
+
+            let $menu = $('<div>').addClass('member-dropdown-menu').css({
+              'position': 'absolute', 'right': '0', 'top': '100%', 'background': 'white', 'border': '1px solid #ccc',
+              'border-radius': '4px', 'box-shadow': '0 2px 5px rgba(0,0,0,0.2)', 'z-index': '100', 'min-width': '120px'
+            });
+
+            // Linear progression rules:
+            // Owner <-> Manager <-> Curator <-> Member <-> Remove
+            // For public rooms: Owner <-> Manager <-> Member <-> Remove
+
+            let possibleDemote = null;
+            let possiblePromote = null;
+            let canRemove = false;
+
+            if (roomType === 'public') {
+              if (member.role === 'Owner') { possibleDemote = 'Manager'; }
+              else if (member.role === 'Manager') { possiblePromote = 'Owner'; possibleDemote = 'Member'; }
+              else if (member.role === 'Member') { possiblePromote = 'Manager'; canRemove = true; }
+            } else {
+              if (member.role === 'Owner') { possibleDemote = 'Manager'; }
+              else if (member.role === 'Manager') { possiblePromote = 'Owner'; possibleDemote = 'Curator'; }
+              else if (member.role === 'Curator') { possiblePromote = 'Manager'; possibleDemote = 'Member'; }
+              else if (member.role === 'Member') { possiblePromote = 'Curator'; canRemove = true; }
+            }
+
+            // Only owners can promote someone to Owner, or demote an Owner
+            if (myRole !== 'Owner') {
+              if (possiblePromote === 'Owner') possiblePromote = null;
+              if (member.role === 'Owner') possibleDemote = null;
+            }
+
+            if (possiblePromote) {
+              let $btn = $('<div>').css({ 'padding': '8px 12px', 'cursor': 'pointer' }).text('Promote to ' + possiblePromote)
+                .hover(function () { $(this).css('background', '#f5f5f5'); }, function () { $(this).css('background', 'white'); });
+              $btn.on('click', function () {
+                if (typeof callbacks.onPromoteDemote === 'function') callbacks.onPromoteDemote(member.username, 'promote');
+                $menu.remove();
+              });
+              $menu.append($btn);
+            }
+            if (possibleDemote) {
+              let $btn = $('<div>').css({ 'padding': '8px 12px', 'cursor': 'pointer' }).text('Demote to ' + possibleDemote)
+                .hover(function () { $(this).css('background', '#f5f5f5'); }, function () { $(this).css('background', 'white'); });
+              $btn.on('click', function () {
+                if (typeof callbacks.onPromoteDemote === 'function') callbacks.onPromoteDemote(member.username, 'demote');
+                $menu.remove();
+              });
+              $menu.append($btn);
+            }
+            if (canRemove) {
+              let $btn = $('<div>').css({ 'padding': '8px 12px', 'cursor': 'pointer', 'color': 'red' }).text('Remove')
+                .hover(function () { $(this).css('background', '#fef2f2'); }, function () { $(this).css('background', 'white'); });
+              $btn.on('click', function () {
+                if (confirm('Are you sure you want to remove ' + member.username + '?')) {
+                  if (typeof callbacks.onRemove === 'function') callbacks.onRemove(member.username);
+                }
+                $menu.remove();
+              });
+              $menu.append($btn);
+            }
+
+            if ($menu.children().length > 0) {
+              $col4.append($menu);
+            } else {
+              // Should not happen if logic is correct, but just in case
+              let $noAction = $('<div>').css({ 'padding': '8px 12px', 'color': '#aaa' }).text('No actions available');
+              $menu.append($noAction);
+              $col4.append($menu);
+            }
+
+            // Close menu on click outside
+            const closeMenuHandler = (evt) => {
+              if (!$col4[0].contains(evt.target)) {
+                $menu.remove();
+                document.removeEventListener('click', closeMenuHandler);
+              }
+            };
+            setTimeout(() => document.addEventListener('click', closeMenuHandler), 10);
+          });
+        }
+        $col4.append($dots);
+
+        $row.append($col1, $col2, $col3, $col4);
+        $container.append($row);
+      });
+    };
+
+
     /**
      * createChatRoomOption(id, name, description, action=null, picture=null, unread=false, emoji=null, active=false)
      * ----------------------------------------------------------------------------------------------------------
@@ -475,13 +711,13 @@ document.body.onclick = function () {
         });
 
         // Add reaction button click handler
-        $newBubble.find('.reaction-btn').on('click', function(e) {
+        $newBubble.find('.reaction-btn').on('click', function (e) {
           e.stopPropagation();
           const target = this;
           const index = $(this).closest('.message__bubble').attr('aria-index');
           if (typeof emojiPicker !== 'undefined' && emojiPicker.re_attach) {
             const selector = `.message__bubble[aria-index="${index}"] .reaction-btn`;
-            emojiPicker.re_attach(selector, function(selectedEmoji) {
+            emojiPicker.re_attach(selector, function (selectedEmoji) {
               if (typeof broadcast_added_reaction === 'function') {
                 broadcast_added_reaction(index, selectedEmoji);
               }
@@ -489,7 +725,7 @@ document.body.onclick = function () {
               if (picker) {
                 picker.showing = false;
                 picker.style.opacity = '0';
-                setTimeout(function(){
+                setTimeout(function () {
                   picker.style.top = '-9999px';
                   picker.style.opacity = '1';
                   picker.style.transform = 'scale(0.85)';
@@ -498,8 +734,8 @@ document.body.onclick = function () {
               emojiPicker.re_attach('#emoji-btn', function (emoji) { document.querySelector('#chat-input').value += emoji; });
             });
             emojiPicker.show_picker(target);
-            
-            const restorePicker = function(evt) {
+
+            const restorePicker = function (evt) {
               let picker = document.querySelector("#lc-emoji-picker");
               if (picker && !picker.contains(evt.target) && evt.target !== target && !target.contains(evt.target)) {
                 setTimeout(() => {
@@ -604,13 +840,13 @@ document.body.onclick = function () {
         });
 
         // Add reaction button click handler
-        $bubble.find('.reaction-btn').on('click', function(e) {
+        $bubble.find('.reaction-btn').on('click', function (e) {
           e.stopPropagation();
           const target = this;
           const index = $(this).closest('.message__bubble').attr('aria-index');
           if (typeof emojiPicker !== 'undefined' && emojiPicker.re_attach) {
             const selector = `.message__bubble[aria-index="${index}"] .reaction-btn`;
-            emojiPicker.re_attach(selector, function(selectedEmoji) {
+            emojiPicker.re_attach(selector, function (selectedEmoji) {
               if (typeof broadcast_added_reaction === 'function') {
                 broadcast_added_reaction(index, selectedEmoji);
               }
@@ -618,7 +854,7 @@ document.body.onclick = function () {
               if (picker) {
                 picker.showing = false;
                 picker.style.opacity = '0';
-                setTimeout(function(){
+                setTimeout(function () {
                   picker.style.top = '-9999px';
                   picker.style.opacity = '1';
                   picker.style.transform = 'scale(0.85)';
@@ -627,8 +863,8 @@ document.body.onclick = function () {
               emojiPicker.re_attach('#emoji-btn', function (emoji) { document.querySelector('#chat-input').value += emoji; });
             });
             emojiPicker.show_picker(target);
-            
-            const restorePicker = function(evt) {
+
+            const restorePicker = function (evt) {
               let picker = document.querySelector("#lc-emoji-picker");
               if (picker && !picker.contains(evt.target) && evt.target !== target && !target.contains(evt.target)) {
                 setTimeout(() => {
@@ -937,7 +1173,7 @@ document.body.onclick = function () {
         $badge.on('click', function () {
           const currentUsers = $(this).attr('data-users').split(',').filter(Boolean);
           const messageIndex = $bubble.attr('aria-index');
-          
+
           if (currentUsers.includes(username)) {
             if (typeof broadcast_removed_reaction === 'function') {
               broadcast_removed_reaction(messageIndex, reaction_emoji);
