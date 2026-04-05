@@ -1688,3 +1688,202 @@
   visibility: visible;
   opacity: 1;
 }
+
+/* =========================================================================
+   ROOM DETAILS PANEL
+   Fills the full remaining height of .chat-panel (below the header).
+   No input bar is visible while this panel is open.
+   Background matches the chat panel's own translucent aesthetic.
+   ========================================================================= */
+
+.room-details-view {
+  /* Takes all remaining panel height between header and bottom edge */
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px;
+  /* Fully transparent — child card carries the glass look */
+  background: transparent;
+}
+
+/* The frosted glass inner card — matches chat panel / sidebar aesthetic */
+.room-details-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Same translucency recipe as .chat-panel and .sidebar */
+  background: rgba(232, 228, 220, 0.82);
+  border: 1.5px solid rgba(184, 169, 154, 0.6);
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(44, 36, 22, 0.12);
+}
+
+/* Inner room-name banner — color-medium background */
+.room-details-inner-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--color-medium);
+  border-radius: 8px 8px 0 0;
+  border-bottom: 1.5px solid var(--color-dark);
+  position: relative;
+}
+
+.room-details-title {
+  margin: 0;
+  font-family: var(--font-display, 'Bebas Neue', sans-serif);
+  font-size: 1.4rem;
+  letter-spacing: 0.12em;
+  color: var(--color-dark);
+  font-weight: normal;
+  text-transform: uppercase;
+}
+
+.room-details-gear {
+  font-size: 32px;
+  color: var(--color-dark);
+  opacity: 0.35;
+  flex-shrink: 0;
+}
+
+/* Outer row that holds [gear] [tabs] [gear] */
+.room-details-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid rgba(44, 36, 22, 0.12);
+}
+
+/* Tabs group inside the row */
+.room-details-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex: 1;
+}
+
+/* Base tab — matches .btn-soft style from tradchat.css */
+.room-details-tab {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.8rem;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1.5px solid var(--color-dark);
+  background: transparent;
+  color: var(--color-dark);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.room-details-tab:hover:not(:disabled) {
+  background: var(--color-medium);
+  border-color: var(--color-dark);
+}
+
+.room-details-tab--active {
+  background: var(--color-dark);
+  color: var(--color-light);
+}
+
+.room-details-tab--active:hover {
+  background: var(--color-dark);
+  opacity: 0.9;
+}
+
+.room-details-tab--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Search + Add toolbar */
+.room-details-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 40px;
+  gap: 12px;
+}
+
+.room-details-search-wrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.room-details-search {
+  width: 100%;
+  max-width: 420px;
+  padding: 7px 36px 7px 14px;
+  border: 1.5px solid var(--color-dark);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--color-dark);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.room-details-search:focus {
+  border-color: var(--color-medium);
+  box-shadow: 0 0 0 2px var(--color-medium);
+}
+
+.room-details-search::placeholder {
+  color: rgba(44, 36, 22, 0.45);
+}
+
+.room-details-search-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-dark);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Override: the search wrap needs relative for the icon */
+.room-details-search-wrap {
+  position: relative;
+}
+
+.room-details-search-wrap .room-details-search-icon {
+  right: calc(50% - 210px + 10px);
+}
+
+/* Table header */
+.room-details-table-header {
+  display: grid;
+  grid-template-columns: 2fr 3fr 2fr 44px;
+  padding: 8px 40px;
+  border-bottom: 1.5px solid var(--color-medium);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-dark);
+  opacity: 0.7;
+  background: rgba(44, 36, 22, 0.04);
+}
+
+/* Members scrollable list */
+.room-details-members-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 40px 16px;
+}

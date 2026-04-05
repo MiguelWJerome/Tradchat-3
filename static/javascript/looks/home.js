@@ -101,7 +101,38 @@ document.body.onclick = function () {
     // Room Details View State Tracker
     window.isRoomDetailsOpen = false;
 
+    /**
+     * _closeRoomDetailsUI()
+     * Internal: hides the room details panel and restores the chat view.
+     * Only has effect if the panel is currently open.
+     */
+    function _closeRoomDetailsUI() {
+      if (!window.isRoomDetailsOpen) return;
+      $('#room-details-view').hide();
+      $('#chat-feed').show();
+      $('#chat-panel-inputbar').show();
+      window.isRoomDetailsOpen = false;
+
+      // Re-show new-messages button if user was not at the bottom
+      var feed = document.getElementById('chat-feed');
+      if (feed) {
+        var isAtBottom = (feed.scrollHeight - (feed.scrollTop + feed.clientHeight)) <= 100;
+        if (!isAtBottom) {
+          $('#new-messages-btn').show();
+        }
+      }
+    }
+
+    /**
+     * window.closeRoomDetails()
+     * Public API used by network/home.js (switch_room / switch_dm)
+     * to return the user to the chat view without any animation delay.
+     */
+    window.closeRoomDetails = _closeRoomDetailsUI;
+
     $(document).ready(function () {
+      // Logic moved to switch functions in network layer
+      
       $('#chat-panel-header').on('click', function () {
         // Do not allow opening room details for direct messages
         if (typeof ROOM !== 'undefined' && ROOM.includes('.$@-@&.')) {
@@ -133,19 +164,7 @@ document.body.onclick = function () {
             }
           } else {
             // Close details
-            $('#room-details-view').hide();
-            $('#chat-feed').show();
-            $('#chat-panel-inputbar').show();
-            window.isRoomDetailsOpen = false;
-
-            // Check scroll bottom condition to re-show new messages btn if needed
-            var feed = document.getElementById('chat-feed');
-            if (feed) {
-              var isAtBottom = (feed.scrollHeight - (feed.scrollTop + feed.clientHeight)) <= 100;
-              if (!isAtBottom) {
-                $('#new-messages-btn').show();
-              }
-            }
+            window.closeRoomDetails();
           }
         }, 150);
       });
@@ -187,11 +206,31 @@ document.body.onclick = function () {
         $('#add-member-btn').hide();
       }
 
+      // Show/hide DELETE ROOM button based on role (Owners only)
+      const canIDelete = myRole === 'Owner' && typeof ROOM !== 'undefined' && ROOM.toLowerCase() !== 'mainroom';
+      if (canIDelete) {
+        $('#delete-room-btn').show();
+      } else {
+        $('#delete-room-btn').hide();
+      }
+
       // Wire ADD button — calls network callback, no cl.send here
       $('#add-member-btn').off('click').on('click', function () {
         const userToAdd = prompt("Enter the username to add:");
         if (userToAdd && userToAdd.trim() !== '' && typeof callbacks.onAdd === 'function') {
           callbacks.onAdd(userToAdd.trim());
+        }
+      });
+
+      // Wire DELETE button
+      $('#delete-room-btn').off('click').on('click', function () {
+        if (confirm("Are you sure you want to PERMANENTLY DELETE this room and all its messages? This cannot be undone.")) {
+          const confirmation = prompt(`To confirm, please type the room name exactly: ${ROOM}`);
+          if (confirmation === ROOM && typeof callbacks.onDeleteRoom === 'function') {
+            callbacks.onDeleteRoom();
+          } else if (confirmation !== null) {
+            alert("Room name did not match. Deletion cancelled.");
+          }
         }
       });
 
@@ -202,15 +241,19 @@ document.body.onclick = function () {
         // Managers can edit below
         // Curators can edit below
         let canEdit = false;
-        if (myRole === 'Owner') canEdit = true;
-        else if (myRole === 'Manager' && ['Manager', 'Curator', 'Member'].includes(member.role)) canEdit = true;
-        else if (myRole === 'Curator' && ['Curator', 'Member'].includes(member.role)) canEdit = true;
+        const isMyself = member.username === username;
+        
+        if (!isMyself) {
+          if (myRole === 'Owner') canEdit = true;
+          else if (myRole === 'Manager' && (member.role === 'Curator' || member.role === 'Member')) canEdit = true;
+          else if (myRole === 'Curator' && member.role === 'Member') canEdit = true;
+        }
 
         let $row = $('<div>').addClass('member-row').css({
           'display': 'grid',
-          'grid-template-columns': '2fr 3fr 2fr 40px',
-          'padding': '12px 0',
-          'border-bottom': '1px solid #eee',
+          'grid-template-columns': '2fr 3fr 2fr 44px',
+          'padding': '10px 0',
+          'border-bottom': '1px solid rgba(44,36,22,0.08)',
           'align-items': 'center'
         });
 
@@ -230,6 +273,7 @@ document.body.onclick = function () {
         if (member.role === 'Owner') svgHtml = $('#svg-owner').html();
         else if (member.role === 'Manager') svgHtml = $('#svg-manager').html();
         else if (member.role === 'Curator') svgHtml = $('#svg-curator').html();
+        else if (member.role === 'Member') svgHtml = $('#svg-member').html();
 
         if (svgHtml) $col3.append(svgHtml);
         $col3.append($('<span>').text(member.role));
@@ -271,14 +315,50 @@ document.body.onclick = function () {
               else if (member.role === 'Member') { possiblePromote = 'Curator'; canRemove = true; }
             }
 
-            // Only owners can promote someone to Owner, or demote an Owner
+            // Strict Hierarchy Rules:
+            // 1. Owners can edit Other Owners and below.
+            // 2. Managers can edit Curators and Members.
+            // 3. Curators can edit Members.
+            // 4. Managers/Curators cannot promote anyone to their own rank.
+            
+            if (myRole === 'Manager') {
+              if (possiblePromote === 'Manager') possiblePromote = null;
+            }
+            if (myRole === 'Curator') {
+              if (possiblePromote === 'Curator') possiblePromote = null;
+            }
             if (myRole !== 'Owner') {
               if (possiblePromote === 'Owner') possiblePromote = null;
               if (member.role === 'Owner') possibleDemote = null;
             }
 
+            function getIconHtml(roleObj, isLarge = false) {
+              let $svg;
+              if (roleObj === 'Owner') $svg = $($('#svg-owner').html());
+              else if (roleObj === 'Manager') $svg = $($('#svg-manager').html());
+              else if (roleObj === 'Curator') $svg = $($('#svg-curator').html());
+              else if (roleObj === 'Member') $svg = $($('#svg-member').html());
+              else return '';
+
+              if (isLarge) {
+                $svg.css({ 'width': '44px', 'height': '44px' });
+                // Also ensure path fills match the color if they don't already
+              }
+              return $svg[0].outerHTML;
+            }
+            
+            function getRoleColor(roleObj) {
+              if (roleObj === 'Owner') return '#c6c600';
+              if (roleObj === 'Manager') return '#0000bc';
+              if (roleObj === 'Curator') return '#009900';
+              if (roleObj === 'Member') return '#000000';
+              return 'inherit';
+            }
+
             if (possiblePromote) {
-              let $btn = $('<div>').css({ 'padding': '8px 12px', 'cursor': 'pointer' }).text('Promote to ' + possiblePromote)
+              let color = getRoleColor(possiblePromote);
+              let $btn = $('<div>').css({ 'padding': '8px 12px', 'cursor': 'pointer', 'display': 'flex', 'align-items': 'center', 'gap': '12px', 'color': color })
+                .html(getIconHtml(possiblePromote, true) + '<span style="font-weight: bold;">Promote to ' + possiblePromote + '</span>')
                 .hover(function () { $(this).css('background', '#f5f5f5'); }, function () { $(this).css('background', 'white'); });
               $btn.on('click', function () {
                 if (typeof callbacks.onPromoteDemote === 'function') callbacks.onPromoteDemote(member.username, 'promote');
@@ -287,7 +367,9 @@ document.body.onclick = function () {
               $menu.append($btn);
             }
             if (possibleDemote) {
-              let $btn = $('<div>').css({ 'padding': '8px 12px', 'cursor': 'pointer' }).text('Demote to ' + possibleDemote)
+              let color = getRoleColor(possibleDemote);
+              let $btn = $('<div>').css({ 'padding': '8px 12px', 'cursor': 'pointer', 'display': 'flex', 'align-items': 'center', 'gap': '12px', 'color': color })
+                .html(getIconHtml(possibleDemote, true) + '<span style="font-weight: bold;">Demote to ' + possibleDemote + '</span>')
                 .hover(function () { $(this).css('background', '#f5f5f5'); }, function () { $(this).css('background', 'white'); });
               $btn.on('click', function () {
                 if (typeof callbacks.onPromoteDemote === 'function') callbacks.onPromoteDemote(member.username, 'demote');
@@ -296,7 +378,8 @@ document.body.onclick = function () {
               $menu.append($btn);
             }
             if (canRemove) {
-              let $btn = $('<div>').css({ 'padding': '8px 12px', 'cursor': 'pointer', 'color': 'red' }).text('Remove')
+              let $btn = $('<div>').css({ 'padding': '8px 12px', 'cursor': 'pointer', 'color': 'red', 'display': 'flex', 'align-items': 'center', 'gap': '8px' })
+                .html('<i class="fa-solid fa-user-minus" style="font-size: 18px; width: 22px; text-align: center;"></i><span>Remove</span>')
                 .hover(function () { $(this).css('background', '#fef2f2'); }, function () { $(this).css('background', 'white'); });
               $btn.on('click', function () {
                 if (confirm('Are you sure you want to remove ' + member.username + '?')) {
@@ -467,7 +550,7 @@ document.body.onclick = function () {
     window.changeSelectedRoomOption = function (roomId) {
       // Deselect the current room if one exists
       if (selectedRoomId) {
-        $(".convo-item[data-room='" + selectedRoomId + "']").removeClass("active");
+        $(".convo-item").filter(function() { return $(this).attr("data-room") === selectedRoomId; }).removeClass("active");
       }
 
       // Update the selected room ID
@@ -475,7 +558,7 @@ document.body.onclick = function () {
 
       // Select the new room if roomId is provided
       if (roomId) {
-        $(".convo-item[data-room='" + roomId + "']").addClass("active");
+        $(".convo-item").filter(function() { return $(this).attr("data-room") === roomId; }).addClass("active");
       }
     };
 
@@ -606,6 +689,7 @@ document.body.onclick = function () {
       var isSameUser, $targetMsgGroup;
       var currentTimestamp = msgDate.getTime();
       var fiveMinutesMs = 5 * 60 * 1000; // 5 minutes in milliseconds
+      const isDeleted = data['deleted'];
 
       // 1. Capture current scroll state for anchor logic
       var feed = document.getElementById('chat-feed');
@@ -627,9 +711,13 @@ document.body.onclick = function () {
           var firstTimestamp = parseInt($firstMsg.attr("data-timestamp") || "0");
           var firstUser = $firstMsg.attr("data-user");
           var timeDiffMs = firstTimestamp - currentTimestamp;
+          
+          // Check if the first message bubble is deleted
+          var firstBubbleIsDeleted = $firstMsg.find(".message__bubble").first().find(".message__text").text() === "(message has been deleted)";
 
-          // Grouping logic: Same user, same date, and the existing message is NEWER (timeDiff >= 0)
-          isSameUser = (firstUser === (myself ? "You" : username)) &&
+          // Grouping logic: Not deleted, same user, same date, and the existing message is NEWER (timeDiff >= 0)
+          isSameUser = !isDeleted && !firstBubbleIsDeleted && 
+            (firstUser === (myself ? "You" : username)) &&
             (firstDateAttr === fullDateStr) &&
             (timeDiffMs < fiveMinutesMs) &&
             (timeDiffMs >= 0);
@@ -663,7 +751,11 @@ document.body.onclick = function () {
         var lastTimestamp = parseInt($lastMsg.attr("data-timestamp") || "0");
         var lastUser = $lastMsg.attr("data-user");
         var timeDiffMs = currentTimestamp - lastTimestamp;
-        isSameUser = (lastUser === (myself ? "You" : username)) && (lastDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs);
+        
+        // Check if the last message bubble is deleted
+        var lastBubbleIsDeleted = $lastMsg.find(".message__bubble").last().find(".message__text").text() === "(message has been deleted)";
+
+        isSameUser = !isDeleted && !lastBubbleIsDeleted && (lastUser === (myself ? "You" : username)) && (lastDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs);
         $targetMsgGroup = $lastMsg;
       }
 
@@ -675,18 +767,30 @@ document.body.onclick = function () {
           .attr("aria-username", username)
           .attr("data-message-text", message)
 
+        // Role-based actions
+        const isDM = typeof ROOM !== 'undefined' && ROOM.includes('.$@-@&.');
+        const isMod = window.myRole === 'Owner' || window.myRole === 'Manager';
+        const canDelete = myself || (!isDM && isMod);
+
         // Add message actions hover menu
         var $actions = $("<div>").addClass("message-actions");
-        $actions.html(
-          '<div class="action-item reaction-btn" title="React">😊</div>' +
-          '<div class="action-divider"></div>' +
-          '<div class="action-item delete-btn" title="Delete">🗑️</div>' +
-          '<div class="action-divider"></div>' +
-          '<div class="action-item reply-btn" title="Reply">↩️</div>'
-        );
-        $newBubble.append($actions);
+        
+        if (!isDeleted) {
+            let actionsHtml = '<div class="action-item reaction-btn" title="React">😊</div>' +
+                              '<div class="action-divider"></div>';
+            
+            if (canDelete) {
+                actionsHtml += '<div class="action-item delete-btn" title="Delete">🗑️</div>' +
+                               '<div class="action-divider"></div>';
+            }
+            
+            actionsHtml += '<div class="action-item reply-btn" title="Reply">↩️</div>';
+            $actions.html(actionsHtml);
+            $newBubble.append($actions);
+        }
 
-        var $newText = $("<div>").addClass("message__text").text(message);
+        var $newText = $("<div>").addClass("message__text").text(isDeleted ? "(message has been deleted)" : message);
+        if (isDeleted) $newText.css("font-style", "italic").css("color", "#777");
 
         // If this is a reply, add reply indicator before the text
         if (replyIndex !== -1) {
@@ -708,6 +812,15 @@ document.body.onclick = function () {
           e.stopPropagation();
           const index = $(this).closest('.message__bubble').attr('aria-index');
           showReplyPreview(index);
+        });
+
+        // Add delete button click handler
+        $newBubble.find('.delete-btn').on('click', function (e) {
+          e.stopPropagation();
+          const index = $(this).closest('.message__bubble').attr('aria-index');
+          if (confirm("Delete this message?")) {
+            broadcast_delete_message(index);
+          }
         });
 
         // Add reaction button click handler
@@ -778,27 +891,44 @@ document.body.onclick = function () {
 
         // For own messages (right side), put timestamp first, then name
         // For others' messages (left side), put name first, then timestamp
-        if (myself) {
-          $timestampLabel.css({ "margin-left": "0", "margin-right": "8px" });
-          $nameWrapper.append($timestampLabel, $nameBox);
+        if (isDeleted) {
+          $nameWrapper.append($timestampLabel);
         } else {
-          $nameWrapper.append($nameBox, $timestampLabel);
+          if (myself) {
+            $timestampLabel.css({ "margin-left": "0", "margin-right": "8px" });
+            $nameWrapper.append($timestampLabel, $nameBox);
+          } else {
+            $nameWrapper.append($nameBox, $timestampLabel);
+          }
         }
 
         var $bubble = $("<div>").addClass("message__bubble").attr("aria-index", currentIdx)
           .attr("aria-username", username)
-          .attr("data-message-text", message)
+          .attr("data-message-text", message);
 
         // Add message actions hover menu
         var $actions = $("<div>").addClass("message-actions");
-        $actions.html(
-          '<div class="action-item reaction-btn" title="React">😊</div>' +
-          '<div class="action-divider"></div>' +
-          '<div class="action-item delete-btn" title="Delete">🗑️</div>' +
-          '<div class="action-divider"></div>' +
-          '<div class="action-item reply-btn" title="Reply">↩️</div>'
-        );
-        $bubble.append($actions);
+        
+        // Role-based delete button visibility
+        // Can delete if: 1. It's your message 2. It's a room and you are Owner/Manager
+        const isDM = typeof ROOM !== 'undefined' && ROOM.includes('.$@-@&.');
+        const isMod = window.myRole === 'Owner' || window.myRole === 'Manager';
+        const canDelete = myself || (!isDM && isMod);
+
+        if (!isDeleted) {
+            let actionsHtml = '<div class="action-item reaction-btn" title="React">😊</div>' +
+                              '<div class="action-divider"></div>';
+            
+            if (canDelete) {
+                actionsHtml += '<div class="action-item delete-btn" title="Delete">🗑️</div>' +
+                               '<div class="action-divider"></div>';
+            }
+            
+            actionsHtml += '<div class="action-item reply-btn" title="Reply">↩️</div>';
+            
+            $actions.html(actionsHtml);
+            $bubble.append($actions);
+        }
 
         // If this is a reply, add reply indicator
         if (replyIndex !== -1) {
@@ -806,7 +936,8 @@ document.body.onclick = function () {
           $bubble.append($replyIndicator);
         }
 
-        var $text = $("<div>").addClass("message__text").css({ "color": "black" }).text(message); // Always black text
+        var $text = $("<div>").addClass("message__text").css({ "color": "black" }).text(isDeleted ? "(message has been deleted)" : message); // Always black text
+        if (isDeleted) $text.css("font-style", "italic").css("color", "#777");
 
         // Style bubble background based on sender
         if (!myself) {
@@ -815,7 +946,11 @@ document.body.onclick = function () {
 
         $bubble.append($text);
         $content.append($nameWrapper, $bubble);
-        $msg.append($avatar, $content);
+        if (!isDeleted) {
+          $msg.append($avatar, $content);
+        } else {
+          $msg.append($content);
+        }
 
         if (overhead) {
           $messageContainer.prepend($msg);
@@ -1626,6 +1761,13 @@ document.body.onclick = function () {
         $modal.css('display', 'flex').attr('aria-hidden', 'false');
         // Reset form when showing
         resetRoomModal();
+        // Attach emoji picker to the modal selector
+        if (typeof emojiPicker !== 'undefined' && emojiPicker.re_attach) {
+          emojiPicker.re_attach('#selected-emoji', function (emoji) { 
+            $("#selected-emoji").html(emoji);
+            $("#room-emoji").val(emoji);
+          });
+        }
       } else if (action === 'hide') {
         $modal.css('display', 'none').attr('aria-hidden', 'true');
         // Reattach emoji picker back to chat input
@@ -1651,103 +1793,54 @@ document.body.onclick = function () {
       selectedInvitees = [];
     }
 
-    // Track selected invitees
-    var selectedInvitees = [];
-
-    /**
-     * loadInviteList()
-     * ---------------
-     * Loads the list of users available to invite.
-     * Populates the invitations dropdown.
-     */
-    function loadInviteList() {
-      var $inviteList = $("#invite-list");
-      $inviteList.empty();
-
-      // Sample users - replace with actual user list from your backend
-      var users = [
-        { id: 1, name: "Alice Johnson" },
-        { id: 2, name: "Bob Smith" },
-        { id: 3, name: "Charlie Brown" },
-        { id: 4, name: "Diana Prince" },
-        { id: 5, name: "Eve Davis" }
-      ];
-
-      users.forEach(function (user) {
-        var $item = $("<li>").addClass("invite-list-item");
-        var $checkbox = $("<input>")
-          .attr("type", "checkbox")
-          .attr("id", "invite-" + user.id)
-          .attr("value", user.id)
-          .on("change", function () {
-            if ($(this).is(":checked")) {
-              selectedInvitees.push(user.id);
-            } else {
-              selectedInvitees = selectedInvitees.filter(function (id) {
-                return id !== user.id;
-              });
-            }
-          });
-
-        var $label = $("<label>")
-          .attr("for", "invite-" + user.id)
-          .text(user.name);
-
-        $item.append($checkbox, $label);
-        $inviteList.append($item);
-      });
-    }
-
     /**
      * submitRoomCreation()
      * ------------------
      * Handles form submission for creating a new room.
      */
-    function submitRoomCreation() {
+    function submitRoomCreation(e) {
+      if (e) e.preventDefault();
+      
       var roomName = $("#room-name").val().trim();
       var roomDescription = $("#room-description").val().trim();
-      var roomEmoji = $("#selected-emoji").text().trim() || $("#selected-emoji i").length ? '❌' : $("#selected-emoji").text();
-      var roomStatus = $("input[name='room-status']:checked").val();
+      var roomEmojiText = $("#selected-emoji").text().trim();
+      var roomEmoji = (roomEmojiText && roomEmojiText.indexOf('xmark') === -1 && roomEmojiText !== '❌') ? roomEmojiText : '💬';
+      var roomStatus = $("input[name='roomtype']:checked").val() || 'public';
 
-      if (!roomName) {
-        console.log("Please enter a room name.");
+      if (!roomName || !roomDescription) {
+        alert("Please enter both a room name and description.");
         return;
       }
 
       var roomData = {
         name: roomName,
         description: roomDescription,
-        emoji: roomEmoji === '❌' ? '📢' : roomEmoji, // Default emoji if X
-        status: roomStatus,
-        invitees: roomStatus === 'invite' ? selectedInvitees : []
+        emoji: roomEmoji,
+        type: roomStatus
       };
 
       console.log("Creating room:", roomData);
 
-      // TODO: Send to backend
-      // $.ajax({
-      //   url: '/api/create-room',
-      //   method: 'POST',
-      //   data: JSON.stringify(roomData),
-      //   contentType: 'application/json',
-      //   success: function(response) {
-      //     console.log("Room created:", response);
-      //     roomModal('hide');
-      //   },
-      //   error: function(xhr, status, error) {
-      //     console.error("Error creating room:", error);
-      //     console.log("Failed to create room. Please try again.");
-      //   }
-      // });
-
-      // For now, just close the modal
+      // Delegate the socket call to the network layer
+      if (typeof window.emitCreateRoom === 'function') {
+        window.emitCreateRoom(roomData.name, roomData.description, roomData.emoji, roomData.type);
+      } else {
+        console.error("emitCreateRoom not found in network layer.");
+      }
+      
       roomModal('hide');
     }
 
     // Document ready handlers for modal
     $(document).ready(function () {
+      // Connect Create button from sidebar
+      $("#create-btn").on("click", function() {
+        roomModal('show');
+      });
+
       // Close modal when clicking the X button
-      $("#modal-close-x").on("click", function () {
+      $("#modal-close-x").on("click", function (e) {
+        e.preventDefault();
         roomModal('hide');
       });
 
@@ -1758,37 +1851,8 @@ document.body.onclick = function () {
         }
       });
 
-      // Handle room status radio button changes
-      $("input[name='room-status']").on("change", function () {
-        var isInviteRoom = $("#invite-room").is(":checked");
-        var $sendBtn = $("#send-invitations-btn");
-
-        if (isInviteRoom) {
-          $sendBtn.prop('disabled', false);
-        } else {
-          $sendBtn.prop('disabled', true);
-          $("#invitations-dropdown").hide();
-        }
-      });
-
-      // Handle Send Invitations button click
-      $("#send-invitations-btn").on("click", function () {
-        if ($(this).prop('disabled')) return;
-
-        var $dropdown = $("#invitations-dropdown");
-
-        if ($dropdown.is(":visible")) {
-          $dropdown.hide();
-        } else {
-          loadInviteList();
-          $dropdown.show();
-        }
-      });
-
-      // Handle Submit button
-      $("#create-room-submit").on("click", function () {
-        submitRoomCreation();
-      });
+      // Handle Submit button or Enter form submission
+      $("#create-room-form").on("submit", submitRoomCreation);
     });
 
   })(); // End IIFE

@@ -57,8 +57,11 @@ def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
 
 def check_room_access(room_name, username):
     user_id = find_account_id_or_password_or_gender(username, 'id')
-    queryResults = db_sql("""SELECT room_type, owners, managers, curators, members FROM rooms WHERE room_name = ?;""", 'rooms', params=[room_name], chat_room=False)
+    queryResults = db_sql("""SELECT room_type, owners, managers, curators, members, deleted FROM rooms WHERE room_name = ?;""", 'rooms', params=[room_name], chat_room=False)
     
+    if not queryResults or queryResults[0][5]: # Room not found or deleted
+        return False
+        
     if queryResults[0][0] == 'private':
         owners = split(queryResults[0][1])
         managers = split(queryResults[0][2])
@@ -82,30 +85,38 @@ def check_dm_access(dm_room, username):
     return username == dm_parts[0] or username == dm_parts[1]
 
 def check_credentials(username, password):
-    password = find_account_id_or_password_or_gender(username, 'password', RGS=True)
-    return (password and password == password)
+    stored_password = find_account_id_or_password_or_gender(username, 'password', RGS=True)
+    return (stored_password and stored_password == password)
 
 
 def fetch_room_messages(room_name, limit, offset, underhead):
     messages = []
     
     if underhead:
-        raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions FROM messages WHERE id > ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)
+        raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages WHERE id > ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)
     else:
         if offset == -1:
-            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions FROM messages ORDER BY id DESC LIMIT ?""", room_name, params=[limit], chat_room=True)
+            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages ORDER BY id DESC LIMIT ?""", room_name, params=[limit], chat_room=True)
         else:
-            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions FROM messages WHERE id < ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)    
+            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages WHERE id < ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)    
 
     for t in raw_messages:
         message = {}
         message['id'] = t[0]
         message['username'] = find_username_from_id(t[1])
-        message['message'] = t[2]
+        
+        # Soft-delete masking: If deleted, hide content and upload
+        if t[7]: # t[7] is 'deleted'
+            message['message'] = "(message has been deleted)"
+            message['upload'] = ""
+        else:
+            message['message'] = t[2]
+            message['upload'] = t[5]
+            
         message['timestamp'] = t[3]
         message['reply_id'] = t[4]
-        message['upload'] = t[5]
         message['reactions'] = get_reactions_with_usernames(t[6])
+        message['deleted'] = t[7]
         messages.append(message)
 
     if offset == -1 or underhead:
@@ -125,25 +136,33 @@ def fetch_dm_messages(dm_string, username, limit, offset, underhead):
     anti_convo_hash = f"{secondary_user_id}-{primary_user_id}"
 
     if underhead:
-        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id > ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
+        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions, deleted FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id > ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
     else:
         if offset == -1:
-            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, limit], chat_room=False)
+            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions, deleted FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, limit], chat_room=False)
         else:
-            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id < ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
+            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions, deleted FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id < ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
 
     actual_user_dm_username = dm_string.split('.$@-@&.')[1] if dm_string.split('.$@-@&.')[0] == username else dm_string.split('.$@-@&.')[0]
     
     messages = []
     for message in raw_messages:
+        # Soft-delete masking: If deleted, hide content and upload
+        msg_text = message[2]
+        upload_data = message[5]
+        if message[7]: # message[7] is 'deleted'
+            msg_text = "(message has been deleted)"
+            upload_data = ""
+
         messages.append({
             'id': message[0],
             'username': find_username_from_id(message[1]),
-            'message': message[2],
+            'message': msg_text,
             'timestamp': message[3],
             'reply_id': message[4],
-            'upload': message[5],
-            'reactions': get_reactions_with_usernames(message[6])
+            'upload': upload_data,
+            'reactions': get_reactions_with_usernames(message[6]),
+            'deleted': message[7]
         })
 
     if offset == -1 or underhead:
@@ -177,8 +196,9 @@ def find_account_id_or_password_or_gender(user, id_or_password_or_gender='id', R
         
 
     except KeyError:
-        data = db_sql("""SELECT username, password, id, gender FROM accounts WHERE LOWER(username) = ?;""", 'accounts', params=[user.lower()], chat_room=False)[0]
-        if data:
+        data_list = db_sql("""SELECT username, password, id, gender FROM accounts WHERE LOWER(username) = ?;""", 'accounts', params=[user.lower()], chat_room=False)
+        if data_list:
+            data = data_list[0]
             accounts_dict[data[0]] = {'password': data[1], 'id': data[2], 'gender': data[3]}
             id_to_accounts_dict[data[2]] = data[0]
             returnable = data[1] if id_or_password_or_gender == 'password' else data[2] if id_or_password_or_gender == 'id' else data[3]
@@ -293,7 +313,8 @@ if not os.path.exists("mainroom.db"):
             timestamp TEXT NOT NULL,
             reply_id INTEGER NOT NULL,
             reactions TEXT NOT NULL,
-            upload TEXT NOT NULL
+            upload TEXT NOT NULL,
+            deleted BOOLEAN NOT NULL DEFAULT 0
         );
     ''')
     room_db.close()
@@ -333,7 +354,8 @@ if not os.path.exists("rooms.db"):
             managers TEXT NOT NULL,
             curators TEXT NOT NULL,
             members TEXT NOT NULL,
-            emoji TEXT NOT NULL
+            emoji TEXT NOT NULL,
+            deleted BOOLEAN NOT NULL DEFAULT 0
         );
     ''')
     rooms_cursor.execute("""INSERT INTO rooms (room_name, room_type, description, owners, managers, curators, members, emoji) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", ('mainroom', 'public', 'The main room for all users', '1', '', '', '', 'MR'))
@@ -352,7 +374,8 @@ if not os.path.exists("dms/boys_dm.db"):
             timestamp TEXT NOT NULL,
             reply_id INTEGER NOT NULL,
             reactions TEXT NOT NULL,
-            upload TEXT NOT NULL
+            upload TEXT NOT NULL,
+            deleted BOOLEAN NOT NULL DEFAULT 0
         );
     ''')
     boys_dm_db.close()
@@ -369,7 +392,8 @@ if not os.path.exists("dms/girls_dm.db"):
             timestamp TEXT NOT NULL,
             reply_id INTEGER NOT NULL,
             reactions TEXT NOT NULL,
-            upload TEXT NOT NULL
+            upload TEXT NOT NULL,
+            deleted BOOLEAN NOT NULL DEFAULT 0
         );
     ''')
     girls_dm_db.close()
@@ -409,18 +433,19 @@ def convert_to_gmt(timestamp):
 room_dict = {'mainroom': {'file_path': 'mainroom.db', 'lock': Lock()}}
 
 #make room databases dict
-for file in os.listdir("rooms"):
-    if file.endswith(".db"):
-        room_nameList = list(file)
-        for i in range(3): room_nameList.pop()
-        room_name = ''.join(room_nameList)
-        file_path = os.path.join("rooms", file)
-        file_lock = Lock() 
+if os.path.exists("rooms"):
+    for file in os.listdir("rooms"):
+        if file.endswith(".db"):
+            room_nameList = list(file)
+            for i in range(3): room_nameList.pop()
+            room_name = ''.join(room_nameList)
+            file_path = os.path.join("rooms", file)
+            file_lock = Lock() 
 
-        room_dict[room_name] = {
-            'file_path': file_path,
-            'lock': file_lock
-        }
+            room_dict[room_name] = {
+                'file_path': file_path,
+                'lock': file_lock
+            }
 
 
 @app.route('/<smth>/')
@@ -502,14 +527,14 @@ def home():
 
             room = db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
             
-            if '.$@-@&.' in room:                
-                actual_user_dm_username = room.split('.$@-@&.')[1] if room.split('.$@-@&.')[0] == username else room.split('.$@-@&.')[0]
-
-                room_emoji = f"/static/profile-pictures/{actual_user_dm_username}.png"
+            if '.$@-@&.' in room:
                 room_type = 'dm'
+                actual_user_dm_username = room.split('.$@-@&.')[1] if room.split('.$@-@&.')[0] == username else room.split('.$@-@&.')[0]
+                room_emoji = f"/static/profile-pictures/{actual_user_dm_username}.png"
             else:
-                room_emoji, room_type = db_sql("SELECT emoji, room_type FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)[0]
-
+                room_info = db_sql("SELECT room_type, emoji FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
+                room_type = room_info[0][0] if room_info else 'public'
+                room_emoji = room_info[0][1] if room_info else '💬'
 
             return render_template(
                 'home.html',
@@ -518,8 +543,8 @@ def home():
                 color_medium=colors['color_medium'],
                 color_light=colors['color_light'],
                 room=room,
-                room_emoji=room_emoji,
-                room_type=room_type
+                room_type=room_type,
+                room_emoji=room_emoji
             )
 
         else:
@@ -608,8 +633,8 @@ def Recv(message, sid):
                     user_id = find_account_id_or_password_or_gender(username, 'id')
                     gmt_timestamp = convert_to_gmt(timestamp)
 
-                    message_id = db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload, reactions) VALUES (?, ?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, reply_index, upload, ""], chat_room=True)
-                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': []}]), room=room)
+                    message_id = db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload, reactions, deleted) VALUES (?, ?, ?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, reply_index, upload, "", 0], chat_room=True)
+                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0}]), room=room)
             
             elif setting == 'dm':
                 # Verify user is a participant in this DM before sending
@@ -629,8 +654,8 @@ def Recv(message, sid):
                     convo_hash = f"{important_id}-{un_important_id}"
                     anti_convo_hash = f"{un_important_id}-{important_id}"
 
-                    message_id = db_sql(f"""INSERT INTO {fm_to_gb[important_gender]}s_dm (convo_hash, sender_id, message, timestamp, reply_id, upload, reactions) VALUES (?, ?, ?, ?, ?, ?, ?);""", f"{fm_to_gb[important_gender]}s_dm", params=[convo_hash, username_id, user_message, gmt_timestamp, reply_index, upload, ""], chat_room=False, provide_id=True)
-                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': []}]), room=room)
+                    message_id = db_sql(f"""INSERT INTO {fm_to_gb[important_gender]}s_dm (convo_hash, sender_id, message, timestamp, reply_id, upload, reactions, deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", f"{fm_to_gb[important_gender]}s_dm", params=[convo_hash, username_id, user_message, gmt_timestamp, reply_index, upload, "", 0], chat_room=False, provide_id=True)
+                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0}]), room=room)
                 else:
                     return # User not part of this DM or invalid DM
 
@@ -647,6 +672,9 @@ def Recv(message, sid):
         if str(offset).startswith('>'):
             offset = int(offset[1:])
             underhead = True
+        
+        elif str(offset).startswith('<'):
+            offset = int(offset[1:])
 
         
         if not check_credentials(username, password):
@@ -662,6 +690,10 @@ def Recv(message, sid):
             Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': room, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'overhead': (offset != -1), 'underhead': underhead}]), room=sid)
         else:
             if not check_room_access(room, username):
+                # Check if it was deleted
+                is_deleted = db_sql("SELECT deleted FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
+                if is_deleted and is_deleted[0][0]:
+                    Server.send(str(['Room Deleted', {'room': room}]), room=sid)
                 return
             messages = fetch_room_messages(room, limit, offset, underhead)
             Server.send(str(['Fetch Room Messages', {'messages': messages, 'room': room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[room], chat_room=False)[0][0], 'overhead': (offset != -1), 'underhead': underhead}]), room=sid)
@@ -679,7 +711,10 @@ def Recv(message, sid):
             elif check_room_access(room, username):
                 Server.server.enter_room(sid, room)
             else:
-                return # User not allowed in room
+                is_deleted = db_sql("SELECT deleted FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
+                if is_deleted and is_deleted[0][0]:
+                    Server.send(str(['Room Deleted', {'room': room}]), room=sid)
+                return # User not allowed in room or it is deleted
         else:
             return 
 
@@ -698,9 +733,30 @@ def Recv(message, sid):
 
                 db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_room, username], chat_room=False)
 
-                Server.send(str(['Fetch Room Messages', {'messages': fetch_room_messages(new_room, limit, -1, False), 'room': new_room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[new_room], chat_room=False)[0][0], 'clear': False}]), room=sid)
+                room_info = db_sql("SELECT owners, managers, curators, members, room_type, emoji FROM rooms WHERE room_name = ?;", 'rooms', params=[new_room], chat_room=False)
+                my_role = 'Member'
+                if room_info:
+                    owners_list = split(room_info[0][0])
+                    managers_list = split(room_info[0][1])
+                    curators_list = split(room_info[0][2])
+                    room_data = room_info[0]
+                    user_id_str = str(find_account_id_or_password_or_gender(username, 'id'))
+                    if user_id_str in owners_list: my_role = 'Owner'
+                    elif user_id_str in managers_list: my_role = 'Manager'
+                    elif user_id_str in curators_list: my_role = 'Curator'
+
+                Server.send(str(['Fetch Room Messages', {
+                    'messages': fetch_room_messages(new_room, limit, -1, False),
+                    'room': new_room,
+                    'emoji': room_data[5] if room_data[5] else '💬',
+                    'myRole': my_role,
+                    'clear': False
+                }]), room=sid)
             else:
-                return # User not allowed in room
+                is_deleted = db_sql("SELECT deleted FROM rooms WHERE room_name = ?;", 'rooms', params=[new_room], chat_room=False)
+                if is_deleted and is_deleted[0][0]:
+                    Server.send(str(['Room Deleted', {'room': new_room}]), room=sid)
+                return # User not allowed in room or it is deleted
         else:
             return 
 
@@ -738,7 +794,7 @@ def Recv(message, sid):
         roomtype = data['roomtype']
         
         if check_credentials(username, password):
-                all_rooms = db_sql("""SELECT room_name, room_type, description, owners, managers, curators, members, emoji FROM rooms;""", 'rooms', chat_room=False)
+                all_rooms = db_sql("""SELECT room_name, room_type, description, owners, managers, curators, members, emoji FROM rooms WHERE deleted = 0;""", 'rooms', chat_room=False)
                 user_rooms = []
 
                 user_id = find_account_id_or_password_or_gender(username, 'id')
@@ -900,9 +956,15 @@ def Recv(message, sid):
 
                     genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
 
-                    user_id, message_text, timestamp, reply_id, upload, reactions = db_sql(f"""SELECT sender_id, message, timestamp, reply_id, upload, reactions FROM {genderDict[primary_gender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id = ?;""", genderDict[primary_gender], params=[convo_hash, anti_convo_hash, index], chat_room=False)[0]
+                    user_id, message_text, timestamp, reply_id, upload, reactions, is_deleted = db_sql(f"""SELECT sender_id, message, timestamp, reply_id, upload, reactions, deleted FROM {genderDict[primary_gender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id = ?;""", genderDict[primary_gender], params=[convo_hash, anti_convo_hash, index], chat_room=False)[0]
 
                     original_username = find_username_from_id(user_id)
+                    
+                    # Soft-delete masking
+                    if is_deleted:
+                        message_text = "(message has been deleted)"
+                        upload = ""
+
                     message = {
                         'id': index,
                         'username': original_username,
@@ -910,13 +972,20 @@ def Recv(message, sid):
                         'timestamp': timestamp,
                         'reply_id': reply_id,
                         'upload': upload,
-                        'reactions': get_reactions_with_usernames(reactions)
+                        'reactions': get_reactions_with_usernames(reactions),
+                        'deleted': is_deleted
                     }
                     Server.send(str(['Fetch Special Reply Message', {'message': message, 'orgIndex': orgIndex}]), room=sid)
             else:
                 if check_room_access(room, username):
-                    user_id, message_text, timestamp, reply_id, upload, reactions = db_sql("""SELECT user_id, message, timestamp, reply_id, upload, reactions FROM messages WHERE id = ?;""", room, params=[index], chat_room=True)[0]
+                    user_id, message_text, timestamp, reply_id, upload, reactions, is_deleted = db_sql("""SELECT user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages WHERE id = ?;""", room, params=[index], chat_room=True)[0]
                     original_username = find_username_from_id(user_id)
+                    
+                    # Soft-delete masking
+                    if is_deleted:
+                        message_text = "(message has been deleted)"
+                        upload = ""
+
                     message = {
                         'id': index,
                         'username': original_username,
@@ -924,7 +993,8 @@ def Recv(message, sid):
                         'timestamp': timestamp,
                         'reply_id': reply_id,
                         'upload': upload,
-                        'reactions': get_reactions_with_usernames(reactions)
+                        'reactions': get_reactions_with_usernames(reactions),
+                        'deleted': is_deleted
                     }
                     Server.send(str(['Fetch Special Reply Message', {'message': message, 'orgIndex': orgIndex}]), room=sid)
 
@@ -949,7 +1019,7 @@ def Recv(message, sid):
                     genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
 
                     raw_messages = db_sql(f"""
-                        SELECT id, sender_id, message, timestamp, reply_id, upload, reactions 
+                        SELECT id, sender_id, message, timestamp, reply_id, upload, reactions, deleted 
                         FROM {genderDict[primary_gender]} 
                         WHERE (convo_hash = ? OR convo_hash = ?) AND id >= ? AND id <= ?
                         ORDER BY id ASC;
@@ -958,28 +1028,42 @@ def Recv(message, sid):
 
                     messages = []
                     for msg in raw_messages:
+                        # Soft-delete masking
+                        msg_text = msg[2]
+                        upload_data = msg[5]
+                        if msg[7]: # deleted
+                            msg_text = "(message has been deleted)"
+                            upload_data = ""
+
                         messages.append({
                             'id': msg[0],
                             'username': find_username_from_id(msg[1]),
-                            'message': msg[2],
+                            'message': msg_text,
                             'timestamp': msg[3],
                             'reply_id': msg[4],
-                            'upload': msg[5],
+                            'upload': upload_data,
                             'reactions': get_reactions_with_usernames(msg[6])
                         })
                     Server.send(str(['Fetch Special Reply Messages', {'messages': messages, 'index': index}]), room=sid)
             else:
                 if check_room_access(room, username):
-                    raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions FROM messages WHERE id >= ? AND id <= ?;""", room, params=[index - limit, index + limit], chat_room=True)
+                    raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages WHERE id >= ? AND id <= ?;""", room, params=[index - limit, index + limit], chat_room=True)
                     messages = []
                     for msg in raw_messages:
+                        # Soft-delete masking
+                        msg_text = msg[2]
+                        upload_data = msg[5]
+                        if msg[7]: # deleted
+                            msg_text = "(message has been deleted)"
+                            upload_data = ""
+
                         messages.append({
                             'id': msg[0],
                             'username': find_username_from_id(msg[1]),
-                            'message': msg[2],
+                            'message': msg_text,
                             'timestamp': msg[3],
                             'reply_id': msg[4],
-                            'upload': msg[5],
+                            'upload': upload_data,
                             'reactions': get_reactions_with_usernames(msg[6])
                         })
                     Server.send(str(['Fetch Special Reply Messages', {'messages': messages, 'index': index}]), room=sid)
@@ -1094,9 +1178,10 @@ def Recv(message, sid):
         roomtype = data['roomtype']
 
         if check_credentials(username, password):
-            query = db_sql("""SELECT * FROM rooms WHERE room_name = ?;""", 'rooms', params=[roomname], chat_room=False)
+            # Check for ANY existing room with this name (even deleted ones)
+            query = db_sql("""SELECT * FROM rooms WHERE LOWER(room_name) = ?;""", 'rooms', params=[roomname.lower()], chat_room=False)
             if query:
-                Server.send(str(['Create Room Results', 'Room Already Exists']), room=sid)
+                Server.send(str(['Create Room Results', 'Someone already chose this room name, please choose another.']), room=sid)
                 return
             
             else:
@@ -1111,13 +1196,14 @@ def Recv(message, sid):
                         timestamp TEXT NOT NULL,
                         reply_id INTEGER NOT NULL,
                         reactions TEXT NOT NULL,
-                        upload TEXT NOT NULL
+                        upload TEXT NOT NULL,
+                        deleted BOOLEAN NOT NULL DEFAULT 0
                     );
                 ''')
                 
                 new_room_connection.close()
 
-                room_dict[roomname] = {'filepath': f'rooms/{roomname}.db', 'lock': Lock()}
+                room_dict[roomname] = {'file_path': f'rooms/{roomname}.db', 'lock': Lock()}
 
                 db_sql("""INSERT INTO rooms (room_name, description, room_type, owners, managers, curators, members, emoji) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", 'rooms', params=[roomname, description, roomtype, str(find_account_id_or_password_or_gender(username, 'id')), '', '', '', emoji], chat_room=False)
                 
@@ -1186,6 +1272,7 @@ def Recv(message, sid):
                 target_id = str(find_account_id_or_password_or_gender(target_username, 'id'))
                 
                 if not target_id: return
+                if my_id == target_id: return # CANNOT EDIT YOURSELF
                 
                 my_role = 'Member'
                 if my_id in owners_list: my_role = 'Owner'
@@ -1197,19 +1284,39 @@ def Recv(message, sid):
                 elif target_id in managers_list: target_role = 'Manager'
                 elif target_id in curators_list: target_role = 'Curator'
                 
+                # Role Permission Check:
+                # Owners can edit their own rank (other Owners) and below.
+                # Managers can edit ranks STRICTLY below them (Curator, Member).
+                # Curators can edit ranks STRICTLY below them (Member).
+                can_this_role_edit = False
+                if my_role == 'Owner':
+                    can_this_role_edit = True # Can edit Other Owners, Managers, Curators, Members
+                elif my_role == 'Manager':
+                    if target_role in ['Curator', 'Member']: can_this_role_edit = True
+                elif my_role == 'Curator':
+                    if target_role == 'Member': can_this_role_edit = True
+
+                if not can_this_role_edit: return
+                
                 # Check permissions and linearity
                 success = False
                 
                 if action == 'promote':
-                    if target_role == 'Member' and ((room_type == 'public' and my_role in ['Owner', 'Manager']) or (room_type == 'private' and my_role in ['Owner', 'Manager', 'Curator'])):
-                        members_list.remove(target_id)
-                        if room_type == 'public': managers_list.append(target_id)
-                        else: curators_list.append(target_id)
-                        success = True
+                    if target_role == 'Member':
+                        if room_type == 'public' and (my_role in ['Owner', 'Manager']):
+                            members_list.remove(target_id)
+                            managers_list.append(target_id)
+                            success = True
+                        elif room_type == 'private' and (my_role in ['Owner', 'Manager', 'Curator']):
+                            members_list.remove(target_id)
+                            curators_list.append(target_id)
+                            success = True
+                            
                     elif target_role == 'Curator' and room_type == 'private' and my_role in ['Owner', 'Manager']:
                         curators_list.remove(target_id)
                         managers_list.append(target_id)
                         success = True
+                        
                     elif target_role == 'Manager' and my_role == 'Owner':
                         managers_list.remove(target_id)
                         owners_list.append(target_id)
@@ -1220,19 +1327,36 @@ def Recv(message, sid):
                         owners_list.remove(target_id)
                         managers_list.append(target_id)
                         success = True
-                    elif target_role == 'Manager' and my_role in ['Owner', 'Manager']:
-                        managers_list.remove(target_id)
-                        if room_type == 'public': members_list.append(target_id)
-                        else: curators_list.append(target_id)
-                        success = True
-                    elif target_role == 'Curator' and room_type == 'private' and my_role in ['Owner', 'Manager', 'Curator']:
+                    elif target_role == 'Manager':
+                        if my_role == 'Owner':
+                           managers_list.remove(target_id)
+                           if room_type == 'public': 
+                               success = True
+                           else: 
+                               curators_list.append(target_id)
+                               success = True
+                    elif target_role == 'Curator' and room_type == 'private' and (my_role in ['Owner', 'Manager']):
                         curators_list.remove(target_id)
                         members_list.append(target_id)
                         success = True
                         
                 elif action == 'remove':
-                    if target_role == 'Member' and ((room_type == 'public' and my_role in ['Owner', 'Manager']) or (room_type == 'private' and my_role in ['Owner', 'Manager', 'Curator'])):
+                    # Member can be removed by Curator+
+                    # Curator can be removed by Manager+
+                    # Manager can be removed by Owner+
+                    # Other Owner can be removed by Owner+
+                    
+                    if target_role == 'Member' and my_role in ['Owner', 'Manager', 'Curator']:
                         members_list.remove(target_id)
+                        success = True
+                    elif target_role == 'Curator' and my_role in ['Owner', 'Manager']:
+                        curators_list.remove(target_id)
+                        success = True
+                    elif target_role == 'Manager' and my_role == 'Owner':
+                        managers_list.remove(target_id)
+                        success = True
+                    elif target_role == 'Owner' and my_role == 'Owner':
+                        owners_list.remove(target_id)
                         success = True
                         
                 if success:
@@ -1255,13 +1379,113 @@ def Recv(message, sid):
                 members_list = split(room_info[0][3])
                 
                 my_id = str(find_account_id_or_password_or_gender(username, 'id'))
-                new_id = str(find_account_id_or_password_or_gender(new_username, 'id'))
                 
-                if my_id in owners_list or my_id in managers_list or my_id in curators_list:
-                    if new_id and new_id not in owners_list and new_id not in managers_list and new_id not in curators_list and new_id not in members_list:
+                # Check if I have permission to add (Owner, Manager, Curator)
+                if my_id not in owners_list and my_id not in managers_list and my_id not in curators_list:
+                    return
+                
+                target_user = find_account_id_or_password_or_gender(new_username, 'id')
+                
+                if not target_user:
+                    Server.send(str(['Room Error', f"User '{new_username}' not found."]), room=sid)
+                    return
+                
+                new_id = str(target_user)
+                
+                if new_id not in owners_list and new_id not in managers_list and new_id not in curators_list and new_id not in members_list:
+                    if room_type == 'public':
+                        managers_list.append(new_id)
+                        db_sql("UPDATE rooms SET managers=? WHERE room_name=?;", 'rooms', params=[join(managers_list), room], chat_room=False)
+                    else:
                         members_list.append(new_id)
                         db_sql("UPDATE rooms SET members=? WHERE room_name=?;", 'rooms', params=[join(members_list), room], chat_room=False)
-                        Server.send(str(['Room Member Updated', {}]), room=room)
+                    Server.send(str(['Room Member Updated', {}]), room=room)
+
+    elif msg[0] == 'Delete Room':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        room = data['room']
+        
+        if check_credentials(username, password) and room.lower() != 'mainroom':
+            room_info = db_sql("SELECT owners FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
+            if room_info:
+                owners_list = split(room_info[0][0])
+                my_id = str(find_account_id_or_password_or_gender(username, 'id'))
+                
+                if my_id in owners_list:
+                    # 1. Soft-delete in rooms.db
+                    db_sql("UPDATE rooms SET deleted = 1 WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
+                    
+                    # 2. DO NOT delete room database file (Data Retention)
+                    
+                    # 3. Update room_dict
+                    if room in room_dict:
+                        del room_dict[room]
+                    
+                    # 4. Notify everyone in the room to leave
+                    Server.send(str(['Room Deleted', {'room': room}]), room=room)
+                    print(f"Room '{room}' soft-deleted by owner '{username}'")
+                else:
+                    Server.send(str(['Room Error', "Only owners can delete this room."]), room=sid)
+        elif room.lower() == 'mainroom':
+            Server.send(str(['Room Error', "The mainroom cannot be deleted."]), room=sid)
+
+
+
+    elif msg[0] == 'Delete Message':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        index = data['index']
+        room = data['room']
+
+        if not index: return # Safety check
+
+        if check_credentials(username, password):
+            is_dm = '.$@-@&.' in room
+            my_id = find_account_id_or_password_or_gender(username, 'id')
+            
+            can_delete = False
+            
+            if is_dm:
+                # Check if it's the sender
+                if check_dm_access(room, username):
+                    primary_user_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'id')
+                    primary_gender = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'gender')
+                    fm_to_gb = {'female': 'girl', 'male': 'boy'}
+                    db_table = f"{fm_to_gb[primary_gender]}s_dm"
+                    
+                    message_info = db_sql(f"SELECT sender_id FROM {db_table} WHERE id = ?;", db_table, params=[index], chat_room=False)
+                    if message_info and message_info[0][0] == my_id:
+                        can_delete = True
+            else:
+                # Check if it's the sender or admin
+                if check_room_access(room, username):
+                    message_info = db_sql("SELECT user_id FROM messages WHERE id = ?;", room, params=[index], chat_room=True)
+                    if message_info:
+                        sender_id = message_info[0][0]
+                        if sender_id == my_id:
+                            can_delete = True
+                        else:
+                            # Check if user is owner/manager
+                            room_info = db_sql("SELECT owners, managers FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
+                            if room_info:
+                                owners = split(room_info[0][0])
+                                managers = split(room_info[0][1])
+                                if str(my_id) in owners or str(my_id) in managers:
+                                    can_delete = True
+            
+            if can_delete:
+                if is_dm:
+                    primary_gender = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'gender')
+                    fm_to_gb = {'female': 'girl', 'male': 'boy'}
+                    db_table = f"{fm_to_gb[primary_gender]}s_dm"
+                    db_sql(f"UPDATE {db_table} SET deleted = 1 WHERE id = ?;", db_table, params=[index], chat_room=False)
+                else:
+                    db_sql("UPDATE messages SET deleted = 1 WHERE id = ?;", room, params=[index], chat_room=True)
+                
+                Server.send(str(['Message Deleted', {'id': index, 'room': room}]), room=room)
 
 @Server.on('message')
 def recv(message):

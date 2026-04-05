@@ -5,8 +5,6 @@ password = localStorage['password']
 
 let currentUpload = null;
 
-cl.send(JSON.stringify(['Join Room', { 'room': ROOM, 'username': username, 'password': password }]))
-
 let network_coast_clear_for_setting_fetching_messages_to_false = false
 
 let attached_to_bottom = true
@@ -23,7 +21,7 @@ function recv(message) {
         data = msg[1]
 
         if (attached_to_bottom) {
-            appendMessage({ 'index': data['id'], 'username': data['username'], 'message': data['message'], 'timestamp': data['timestamp'], 'myself': data['username'] === username, 'replyIndex': data['reply_id'], 'realtime': true })
+            appendMessage({ 'index': data['id'], 'username': data['username'], 'message': data['message'], 'timestamp': data['timestamp'], 'myself': data['username'] === username, 'replyIndex': data['reply_id'], 'realtime': true, 'deleted': data['deleted'] })
             if (data['reactions']) {
                 let $target = $(`.message__bubble[aria-index="${data['id']}"]`);
                 for (let r of data['reactions']) {
@@ -73,7 +71,8 @@ function recv(message) {
                     'index': messages[i]['id'], 'username': messages[i]['username'],
                     'message': messages[i]['message'], 'timestamp': messages[i]['timestamp'],
                     'myself': messages[i]['username'] === username,
-                    'replyIndex': messages[i]['reply_id'], 'overhead': data['overhead'], 'underhead': data['underhead']
+                    'replyIndex': messages[i]['reply_id'], 'overhead': data['overhead'], 'underhead': data['underhead'],
+                    'deleted': messages[i]['deleted']
                 }, {
                     'scrollToBottom': !data['underhead'] && !data['overhead'],
                     'specialScrollTo': null
@@ -91,9 +90,11 @@ function recv(message) {
 
             // Handle UI Updates
             if (msg[0] === 'Fetch Room Messages') {
+                window.myRole = data['myRole'] || 'Member';
                 change_banner_picture(data['emoji'], false);
                 document.querySelector('.room-title').textContent = data['room'].toUpperCase();
             } else {
+                window.myRole = 'Member'; // Default for DMs
                 change_banner_picture(data['profile_picture'], true);
                 let dmParts = data['room'].split('.$@-@&.');
                 let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];
@@ -122,30 +123,30 @@ function recv(message) {
         clearAllChatRoomOptions()
         data = msg[1]
         let unread = false
-        for (var i in data) {
-            let roomId = data[i]['name'];
-            createChatRoomOption(roomId, data[i]['name'], data[i]['description'], function () {
-                switch_room(data[i]['name'])
-            }, false, unread, data[i]['emoji'], roomId === ROOM)
+        for (let room of data) {
+            let roomId = room['name'];
+            createChatRoomOption(roomId, room['name'], room['description'], function () {
+                switch_room(room['name'])
+            }, false, unread, room['emoji'], roomId === ROOM)
         }
     }
     else if (msg[0] === 'Get Dms') {
         clearAllChatRoomOptions()
         data = msg[1]
-        for (var i in data['unread']) {
-            let dmId = sortAndJoinStrings(username, data['unread'][i]['username'])
-            let otherUsername = data['unread'][i]['username']
-            let firstName = data['unread'][i]['first_name']
-            let lastName = data['unread'][i]['last_name']
+        for (let dm of data['unread']) {
+            let dmId = sortAndJoinStrings(username, dm['username'])
+            let otherUsername = dm['username']
+            let firstName = dm['first_name']
+            let lastName = dm['last_name']
             createChatRoomOption(dmId, otherUsername, `${firstName} ${lastName}`, function () {
                 switch_dm(otherUsername)
             }, `/static/profile-pictures/${otherUsername}.png`, true, true, (dmId === ROOM))
         }
-        for (var i in data['read']) {
-            let dmId = sortAndJoinStrings(username, data['read'][i]['username'])
-            let otherUsername = data['read'][i]['username']
-            let firstName = data['read'][i]['first_name']
-            let lastName = data['read'][i]['last_name']
+        for (let dm of data['read']) {
+            let dmId = sortAndJoinStrings(username, dm['username'])
+            let otherUsername = dm['username']
+            let firstName = dm['first_name']
+            let lastName = dm['last_name']
             createChatRoomOption(dmId, otherUsername, `${firstName} ${lastName}`, function () {
                 switch_dm(otherUsername)
             }, `/static/profile-pictures/${otherUsername}.png`, false, true, (dmId === ROOM))
@@ -166,7 +167,13 @@ function recv(message) {
             $indicator.find('.reply-username').text(message.username);
 
             // Update the message preview text
-            $indicator.find('.reply-preview-text').text(message.message);
+            const $previewText = $indicator.find('.reply-preview-text');
+            $previewText.text(message.message);
+            
+            // If deleted, apply styling
+            if (message.deleted) {
+                $previewText.css({"font-style": "italic", "color": "#777"});
+            }
 
             // Update the avatar image
             $indicator.find('.reply-avatar').attr('src', `/static/profile-pictures/${message.username}.png`);
@@ -193,7 +200,8 @@ function recv(message) {
                         'message': message['message'],
                         'timestamp': message['timestamp'],
                         'myself': message['username'] === username,
-                        'replyIndex': message['reply_id']
+                        'replyIndex': message['reply_id'],
+                        'deleted': message['deleted']
                     },
                     {
                         'scrollToBottom': false,
@@ -234,10 +242,10 @@ function recv(message) {
 
     else if (msg[0] === 'Create Room Results') {
         if (msg[1] === 'Room Already Exists') {
-            console.log('Room already exists');
+            Alert('Room already exists. Please choose a different name.');
         }
         else if (msg[1] === 'Room Created') {
-            location.reload();
+            Alert('Room created successfully!', function() { location.reload(); });
         }
     }
 
@@ -246,7 +254,7 @@ function recv(message) {
             console.log('DM already exists');
         }
         else if (msg[1] === 'DM Created') {
-            location.reload();
+            Alert('DM created successfully!', function() { location.reload(); });
         }
     }
     else if (msg[0] === 'Get Room Members Results') {
@@ -260,6 +268,48 @@ function recv(message) {
         // Broadcast received — refresh the member list if details panel is open
         if (window.isRoomDetailsOpen) {
             cl.send(JSON.stringify(['Get Room Members', { 'username': username, 'password': password, 'room': ROOM }]));
+        }
+    }
+    else if (msg[0] === 'Room Error') {
+        Alert(msg[1]);
+    }
+    else if (msg[0] === 'Room Deleted') {
+        const data = msg[1];
+        if (data.room === ROOM) {
+            Alert(`Sorry, this room has been retired or deleted by its owner. We are redirecting you back to the main lobby.`, () => {
+                switch_room('mainroom');
+            });
+        }
+    }
+    else if (msg[0] === 'Message Deleted') {
+        const data = msg[1];
+        const index = data['id'];
+        const room = data['room'];
+
+        if (room === ROOM) {
+            let $bubble = $(`.message__bubble[aria-index="${index}"]`);
+            if ($bubble.length) {
+                // Update text
+                let $text = $bubble.find('.message__text');
+                $text.text("(message has been deleted)").css({"font-style": "italic", "color": "#777"});
+                
+                // Hide sender info
+                const $msgContainer = $bubble.closest('.message');
+                $msgContainer.find('.message__avatar').remove();
+                $msgContainer.find('.message__name').remove();
+
+                // Remove actions
+                $bubble.find('.message-actions').remove();
+                
+                // Remove any uploads (future proof)
+                $bubble.find('.message__upload').remove();
+
+                // Update any reply indicators pointing to this message
+                $(`.reply-container[data-target-index="${index}"]`).each(function() {
+                    let $preview = $(this).find('.reply-preview-text');
+                    $preview.text("(message has been deleted)").css({"font-style": "italic", "color": "#777"});
+                });
+            }
         }
     }
 }
@@ -276,16 +326,37 @@ chatInput.addEventListener('keypress', function (e) {
 })
 
 function switch_room(roomname) {
+    // Always return to the chat feed first if the details panel is open
+    if (typeof window.closeRoomDetails === 'function') window.closeRoomDetails();
+    if (document.getElementById('chat-panel-header')) {
+        document.getElementById('chat-panel-header').style.cursor = 'pointer';
+    }
     FetchingMessages = true; // Lock it IMMEDIATELY on click
     cl.send(JSON.stringify(['Switch Room', { 'old-group': ROOM, 'room': roomname, 'username': username, 'password': password, 'limit': INITIAL_LIMIT }]))
     ROOM = roomname
 }
 
 function switch_dm(dm_username) {
+    // Always return to the chat feed first if the details panel is open
+    if (typeof window.closeRoomDetails === 'function') window.closeRoomDetails();
+    if (document.getElementById('chat-panel-header')) {
+        document.getElementById('chat-panel-header').style.cursor = 'default';
+    }
     FetchingMessages = true; // Lock it IMMEDIATELY on click
     cl.send(JSON.stringify(['Switch DM', { 'old-group': ROOM, 'new-dm': sortAndJoinStrings(dm_username, username), 'username': username, 'password': password, 'limit': INITIAL_LIMIT }]))
     ROOM = sortAndJoinStrings(dm_username, username)
 }
+
+window.emitCreateRoom = function(roomname, description, emoji, roomtype) {
+    cl.send(JSON.stringify(['Create Room', {
+        'username': username,
+        'password': password,
+        'roomname': roomname,
+        'description': description,
+        'emoji': emoji,
+        'roomtype': roomtype
+    }]));
+};
 
 // Global reply index tracker for the reply system
 let currentreply_id = -1;
@@ -374,7 +445,17 @@ function fetch_overhead_messages(offset_id) {
         'password': password,
         'room': ROOM, // ROOM holds the sorted dm string
         'limit': FETCH_LIMIT,
-        'offset': offset_id
+        'offset': `<${offset_id}`
+    }]));
+}
+
+window.broadcast_delete_message = function (index) {
+    if (!index) return; // Prevent empty index
+    cl.send(JSON.stringify(['Delete Message', {
+        'username': username,
+        'password': password,
+        'index': index,
+        'room': ROOM
     }]));
 }
 
@@ -559,6 +640,12 @@ const roomMemberCallbacks = {
             'username': username, 'password': password,
             'room': ROOM, 'new_username': newUsername
         }]));
+    },
+    onDeleteRoom: function() {
+        cl.send(JSON.stringify(['Delete Room', {
+            'username': username, 'password': password,
+            'room': ROOM
+        }]));
     }
 };
 
@@ -566,3 +653,15 @@ const roomMemberCallbacks = {
 window.onOpenRoomDetails = function() {
     cl.send(JSON.stringify(['Get Room Members', { 'username': username, 'password': password, 'room': ROOM }]));
 };
+
+// Initial Load trigger: Use the robust switch functions
+// This ensures that the banner, messages, and role permissions are all set correctly on page load
+$(document).ready(function() {
+    if (ROOM_TYPE === 'dm') {
+        const dmParts = ROOM.split('.$@-@&.');
+        const otherUser = dmParts[0] === username ? dmParts[1] : dmParts[0];
+        switch_dm(otherUser);
+    } else {
+        switch_room(ROOM);
+    }
+});

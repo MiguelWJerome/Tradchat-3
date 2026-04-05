@@ -3,319 +3,320 @@
 {% block title %}TradChat — Home{% endblock %}
 
 {% block styles %}
-  <!-- Google Fonts: Distinctive pairing — "Bebas Neue" display + "DM Sans" body -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<!-- Google Fonts: Distinctive pairing — "Bebas Neue" display + "DM Sans" body -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap"
+  rel="stylesheet" />
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="/static/logo.png" />
+<!-- Favicon -->
+<link rel="icon" type="image/png" href="/static/logo.png" />
 
-  <link rel="stylesheet" href="/static/css/home.css"        media="screen and (min-width: 769px)" />
-  <link rel="stylesheet" href="/static/css/home_mobile.css"  media="screen and (max-width: 768px)" />
+<link rel="stylesheet" href="/static/css/home.css" media="screen and (min-width: 769px)" />
+<link rel="stylesheet" href="/static/css/home_mobile.css" media="screen and (max-width: 768px)" />
 {% endblock %}
 
 {% block content %}
 
-    <!-- =================================================================
+<!-- =================================================================
       MAIN CONTENT AREA — sidebar + chat panel
     ================================================================= -->
-    <main class="main-content">
+<main class="main-content">
 
-      <!-- ---------------------------------------------------------------
+  <!-- ---------------------------------------------------------------
         LEFT SIDEBAR — messaging shortcuts + search
       --------------------------------------------------------------- -->
-      <aside class="sidebar">
+  <aside class="sidebar">
 
-        <!-- Sidebar icon tray: Messenger / Public Rooms / Private Rooms -->
-        <div class="sidebar__tray">
+    <!-- Sidebar icon tray: Messenger / Public Rooms / Private Rooms -->
+    <div class="sidebar__tray">
 
-          <!-- Messenger shortcut -->
-          <button class="tray-item" id="messenger-icon" aria-label="Open Messenger">
-            <i class="fa-solid fa-envelope"></i>
-            <span class="tray-item__label">Messenger</span>
-          </button>
+      <!-- Messenger shortcut -->
+      <button class="tray-item" id="messenger-icon" aria-label="Open Messenger">
+        <i class="fa-solid fa-envelope"></i>
+        <span class="tray-item__label">Messenger</span>
+      </button>
 
-          <!-- Divider line between tray icons -->
-          <div class="tray-divider" aria-hidden="true"></div>
+      <!-- Divider line between tray icons -->
+      <div class="tray-divider" aria-hidden="true"></div>
 
-          <!-- Public Rooms shortcut -->
-          <button class="tray-item" id="public-rooms-icon" aria-label="Public Rooms">
-            <i class="fa-solid fa-users"></i>
-            <span class="tray-item__label">Public<br/>Rooms</span>
-          </button>
+      <!-- Public Rooms shortcut -->
+      <button class="tray-item" id="public-rooms-icon" aria-label="Public Rooms">
+        <i class="fa-solid fa-users"></i>
+        <span class="tray-item__label">Public<br />Rooms</span>
+      </button>
 
-          <!-- Divider line -->
-          <div class="tray-divider" aria-hidden="true"></div>
+      <!-- Divider line -->
+      <div class="tray-divider" aria-hidden="true"></div>
 
-          <!-- Private Rooms shortcut -->
-          <button class="tray-item" id="private-rooms-icon" aria-label="Private Rooms">
-            <i class="fa-solid fa-user-plus"></i>
-            <span class="tray-item__label">Private<br/>Rooms</span>
-          </button>
-        </div>
+      <!-- Private Rooms shortcut -->
+      <button class="tray-item" id="private-rooms-icon" aria-label="Private Rooms">
+        <i class="fa-solid fa-user-plus"></i>
+        <span class="tray-item__label">Private<br />Rooms</span>
+      </button>
+    </div>
 
-        <!-- Sidebar action buttons -->
-        <div class="sidebar__actions">
-          <div class="sidebar-actions-row">
-            <!-- Back to Mainroom button -->
-            <button class="sidebar-action-btn back-btn" id="back-to-mainroom">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15 18 9 12 15 6"/>
-                <line x1="9" y1="12" x2="21" y2="12"/>
-              </svg>
-              <span>Mainroom</span>
-            </button>
-            
-            <!-- Create button -->
-            <button class="sidebar-action-btn create-btn" id="create-btn">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              <span>Create</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Search bar -->
-        <div class="sidebar__search">
-          <input
-            type="text"
-            class="search-input"
-            placeholder="Search"
-            aria-label="Search conversations"
-          />
-          <!-- Search icon inside field -->
-          <i class="fa-solid fa-magnifying-glass static-icon" id="search-icon" aria-label="Run search"></i>
-        </div>
-
-        <!-- Conversation list — populated dynamically by JS -->
-        <ul class="sidebar__list" id="sidebar-list" aria-label="Conversations">
-          <!-- Items injected by home.js -->
-        </ul>
-      </aside>
-
-      <!-- ---------------------------------------------------------------
-        CHAT PANEL — room header + messages + input bar
-      --------------------------------------------------------------- -->
-      <section class="chat-panel" aria-label="Chat room">
-
-        <!-- Room header — the arrow-chevron label shown in wireframe -->
-        <div class="chat-panel__header" id="chat-panel-header" style="cursor: pointer; transition: transform 0.2s ease;">
-          <div class="convo-item__avatar" id="banner-picture"></div>
-          <h2 class="room-title"></h2>
-        </div>
-
-        <!-- Room Details View (hidden by default) -->
-        <div class="room-details-view" id="room-details-view" style="display: none; background: #eeeff3; flex-grow: 1; flex-direction: column; overflow: hidden; padding: 20px;">
-          <div style="background: white; border: 1px solid var(--color-border); border-radius: 8px; flex-grow: 1; display: flex; flex-direction: column; position: relative;">
-            
-            <!-- Hidden SVGs for easy cloning -->
-            <div id="role-svgs-templates" style="display: none;">
-              <!-- Owner SVG -->
-              <div id="svg-owner"><svg viewBox="0 0 24 24" style="width: 25px; height: 25px;"><path fill="none" stroke="#c6c600" stroke-width="2" d="M11.269 4.411C11.5 3.892 11.616 3.632 11.778 3.552C11.918 3.483 12.082 3.483 12.222 3.552C12.383 3.632 12.499 3.892 12.73 4.411L14.575 8.548C14.643 8.702 14.677 8.778 14.73 8.837C14.777 8.889 14.834 8.931 14.898 8.959C14.971 8.991 15.054 9.000 15.221 9.017L19.726 9.493C20.291 9.553 20.574 9.582 20.7 9.711C20.809 9.823 20.86 9.979 20.837 10.134C20.811 10.312 20.6 10.502 20.177 10.883L16.813 13.915C16.688 14.027 16.625 14.084 16.586 14.152C16.551 14.213 16.529 14.280 16.521 14.350C16.513 14.429 16.531 14.511 16.566 14.676L17.505 19.106C17.623 19.662 17.682 19.940 17.599 20.100C17.526 20.238 17.393 20.335 17.239 20.361C17.062 20.391 16.815 20.249 16.323 19.965L12.399 17.702C12.254 17.618 12.181 17.576 12.104 17.56C12.035 17.545 11.964 17.545 11.896 17.56C11.818 17.576 11.746 17.618 11.600 17.702L7.677 19.965C7.184 20.249 6.938 20.391 6.760 20.361C6.606 20.335 6.473 20.238 6.401 20.100C6.317 19.940 6.376 19.662 6.494 19.106L7.434 14.675C7.469 14.511 7.486 14.429 7.478 14.350C7.470 14.280 7.448 14.213 7.413 14.152C7.374 14.084 7.312 14.027 7.187 13.915L3.822 10.883C3.400 10.502 3.189 10.312 3.163 10.134C3.140 9.979 3.191 9.823 3.300 9.711C3.426 9.582 3.709 9.553 4.274 9.493L8.778 9.018C8.946 9.000 9.029 8.991 9.101 8.959C9.165 8.930 9.223 8.889 9.269 8.837C9.322 8.778 9.357 8.701 9.425 8.548L11.269 4.411Z"></path></svg></div>
-              <!-- Manager SVG -->
-              <div id="svg-manager"><svg viewBox="0 0 512 512" style="width: 25px; height: 25px;"><path fill="#0000bc" stroke="#0000bc" stroke-width="1.73" d="M336 440c0 13.254 10.745 24 24 24 13.255 0 24-10.746 24-24v-24h-48v24z"></path><path fill="#0000bc" stroke="#0000bc" stroke-width="1.73" d="M441.211 372.828l-53.508-22.938c-3.359-1.438-6.273-2.75-8.898-3.953-12.999-5.867-21.741-9.759-41.67-9.909-0.39-0.029-0.722-0.231-1.119-0.231-0.135 0-0.247 0.072-0.381 0.075-2.941-0.559-6.214-7.768-7.263-17.557 19.876-17.013 37.36-44.254 48.104-87.237 22.508-4.359 39.524-23.812 39.524-47.078s-17.016-42.719-39.523-47.078c-2.027-8.111-4.335-15.561-6.827-22.552l34.061-51.089c2.836-4.25 3.469-9.594 1.703-14.391-1.758-4.797-5.703-8.469-10.617-9.875l-134.399-38.406c-2.875-0.813-5.922-0.813-8.797-1.77636e-15l-134.398 38.407c-4.914 1.406-8.859 5.078-10.617 9.875-1.766 4.797-1.133 10.141 1.703 14.391l34.062 51.089c-2.492 6.991-4.8 14.44-6.827 22.552-22.508 4.358-39.524 23.811-39.524 47.077s17.016 42.719 39.523 47.078c10.744 42.983 28.229 70.225 48.104 87.237-1.091 10.192-4.603 17.685-7.627 17.685-0.003 0-0.005 0.002-0.008 0.002s-0.005-0.002-0.008-0.002c-20.773 0-29.531 3.953-42.781 9.938-2.633 1.188-5.547 2.516-8.906 3.953l-53.508 22.938c-23.562 10.093-38.789 33.187-38.789 58.827v64.344c0 8.844 7.164 16 16 16h416c8.836 0 16-7.156 16-16v-64.344c0-25.64-15.227-48.734-38.789-58.828zm-185.211-340.187l108.93 31.125-21.492 32.234h-174.876l-21.492-32.234 108.93-31.125zm66.422 95.359c-8.805 10.656-22.25 16-66.422 16-44.039 0-57.297-5.078-66.313-16h132.735zm-158.328 84.437c-1.555-7.5-8.148-12.766-15.656-12.766-0.523 0-1.055 0.031-1.586 0.078-0.18 0.016-1.57 0.219-1.75 0.25-9.43 0-17.102-7.172-17.102-16 0-8.781 7.617-15.953 17.102-15.953 0.211 0.016 1.531 0.188 1.75 0.203 8.211 0.813 15.586-4.672 17.242-12.688 0.468-2.266 1.104-4.176 1.61-6.362 7.305 8.809 16.357 15.735 31.269 20.321-3.076 4.036-4.973 9.015-4.973 14.48 0 13.255 10.745 24 24 24s24-10.745 24-24c0-2.977-0.611-5.796-1.602-8.426 5.488 0.252 11.241 0.426 17.602 0.426 6.36 0 12.113-0.171 17.6-0.42-0.989 2.629-1.6 5.445-1.6 8.42 0 13.255 10.745 24 24 24 13.255 0 24-10.745 24-24 0-5.435-1.875-10.391-4.92-14.414 14.977-4.559 24.012-11.455 31.255-20.23 0.492 2.135 1.115 3.996 1.571 6.207 1.664 8.016 9.117 13.484 17.242 12.688l1.75-.25c9.43 0 17.102 7.172 17.102 16 0 8.781-7.617 15.953-17.102 15.953-0.211-0.016-1.531-0.188-1.75-0.203-8.109-0.734-15.578 4.672-17.242 12.688-13.843 66.998-43.906 99.561-91.906 99.561s-78.063-32.563-91.906-99.563zm91.906 178.438c-23.785-9.357-46.784-22.057-57.629-31.194 6.443-5.515 11.352-13.588 14.327-23.65 14.713 5.863 29.622 7.969 43.302 7.969s28.589-2.106 43.303-7.97c2.959 10.008 7.824 18.057 14.217 23.57-10.904 9.287-33.817 21.939-57.52 31.275zm-192 40.781c0-12.828 7.609-24.375 19.398-29.422l53.508-22.938c3.57-1.531 6.672-2.922 9.469-4.188 7.97-3.599 12.408-5.558 18.725-6.464 13.364 22.482 50.479 40.459 74.9 50.311v61.045h-176v-48.344zm384 48.344h-176v-61.044c24.421-9.852 61.536-27.828 74.9-50.311 6.316 0.906 10.755 2.865 18.725 6.464 2.797 1.266 5.898 2.656 9.469 4.188l53.508 22.938c11.789 5.046 19.398 16.593 19.398 29.421v48.344z"></path><path fill="#0000bc" stroke="#0000bc" stroke-width="1.73" d="M240 288h32c8.836 0 16-7.156 16-16 0-8.844-7.164-16-16-16h-32c-8.836 0-16 7.156-16 16 0 8.844 7.164 16 16 16z"></path><circle fill="#0000bc" stroke="#0000bc" stroke-width="1.73" cx="256" cy="64" r="16"></circle></svg></div>
-              <!-- Curator SVG -->
-              <div id="svg-curator"><svg viewBox="-2.4 -2.4 28.80 28.80" style="width: 25px; height: 25px;"><path stroke-linecap="round" stroke-linejoin="round" fill="none" stroke="#009900" stroke-width="2" d="M4 18L9 12M20 18L15 12M3 8L10.225 12.8166C10.8665 13.2443 11.1872 13.4582 11.5339 13.5412C11.8403 13.6147 12.1597 13.6147 12.4661 13.5412C12.8128 13.4582 13.1335 13.2443 13.775 12.8166L21 8M6.2 19H17.8C18.9201 19 19.4802 19 19.908 18.782C20.2843 18.5903 20.5903 18.2843 20.782 17.908C21 17.4802 21 16.9201 21 15.8V8.2C21 7.0799 21 6.51984 20.782 6.09202C20.5903 5.71569 20.2843 5.40973 19.908 5.21799C19.4802 5 18.9201 5 17.8 5H6.2C5.0799 5 4.51984 5 4.09202 5.21799C3.71569 5.40973 3.40973 5.71569 3.21799 6.09202C3 6.51984 3 7.07989 3 8.2V15.8C3 16.9201 3 17.4802 3.21799 17.908C3.40973 18.2843 3.71569 18.5903 4.09202 18.782C4.51984 19 5.07989 19 6.2 19Z"></path></svg></div>
-            </div>
-
-            <!-- Wireframe Header Box -->
-            <div style="background: rgba(0,0,0,0.05); text-align: center; border-bottom: 1px solid var(--color-border); padding: 10px; border-radius: 8px 8px 0 0;">
-              <h3 style="margin: 0; font-weight: normal; font-size: 1.2rem; color: #333;" id="details-room-title">Room</h3>
-            </div>
-
-            <!-- Decorative gears based on wireframe -->
-            <i class="fa-solid fa-gear" style="position: absolute; top: 60px; left: 20px; font-size: 30px; color: #999;"></i>
-            <i class="fa-solid fa-gear" style="position: absolute; top: 60px; right: 20px; font-size: 30px; color: #999;"></i>
-
-            <!-- Tabs -->
-            <div style="display: flex; justify-content: center; gap: 15px; margin: 20px 0;">
-              <button class="btn-soft active" style="background: var(--color-dark); color: white;">Members</button>
-              <button class="btn-soft" style="opacity: 0.5; cursor: not-allowed;" title="We'll work on this later!" disabled>Space Details</button>
-              <button class="btn-soft" style="opacity: 0.5; cursor: not-allowed;" title="We'll work on this later!" disabled>Integrations</button>
-            </div>
-
-            <!-- Content Area inside Details -->
-            <div style="flex-grow: 1; padding: 0 50px 20px 50px; display: flex; flex-direction: column;">
-              
-              <!-- Search & Add -->
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <div style="flex-grow: 1; display: flex; justify-content: center;">
-                  <div style="position: relative; width: 400px;">
-                    <input type="text" id="member-search-input" placeholder="Search" style="width: 100%; padding: 6px 12px; border: 1px solid var(--color-dark); border-radius: 15px;" />
-                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; right: 10px; top: 8px; color: #666;"></i>
-                  </div>
-                </div>
-                <!-- ADD button will be hidden/shown via JS based on role -->
-                <button class="btn-soft" id="add-member-btn" style="background: #e2e8f0; border-color: #ccc; display: none;">ADD+</button>
-              </div>
-
-              <!-- Members Table Header -->
-              <div style="display: grid; grid-template-columns: 2fr 3fr 2fr 40px; padding: 10px 0; border-bottom: 1px solid var(--color-border); font-weight: bold; color: #555;">
-                <div>User</div>
-                <div>Full Name</div>
-                <div>Type</div>
-                <div></div>
-              </div>
-
-              <!-- Members List Container -->
-              <div id="members-list-container" style="flex-grow: 1; overflow-y: auto;">
-                <!-- Populated by JS -->
-              </div>
-            </div>
-          </div>
-        </div>
-
-
-        <!-- Scrollable message feed -->
-        <div class="chat-panel__feed" id="chat-feed" role="log" aria-live="polite">
-          <!-- Overhead loading spinner -->
-          <div id="message-container"></div>
-          <div id="overhead-spinner"></div>
-        </div>
-        
-        <!-- New messages floating button (hidden by default) -->
-        <button id="new-messages-btn" class="new-messages-btn" style="display: none;">
-          <i class="fa-solid fa-arrow-down"></i>
-          <span>New Messages</span>
+    <!-- Sidebar action buttons -->
+    <div class="sidebar__actions">
+      <div class="sidebar-actions-row">
+        <!-- Back to Mainroom button -->
+        <button class="sidebar-action-btn back-btn" id="back-to-mainroom">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6" />
+            <line x1="9" y1="12" x2="21" y2="12" />
+          </svg>
+          <span>Mainroom</span>
         </button>
 
-        <!-- Bottom input bar -->
-        <div class="chat-panel__inputbar">
+        <!-- Create button -->
+        <button class="sidebar-action-btn create-btn" id="create-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          <span>Create</span>
+        </button>
+      </div>
+    </div>
 
-          <!-- Text input with nested icons -->
-          <div class="input-wrapper">
-            <input
-              type="text"
-              class="inputbar__text"
-              id="chat-input"
-              placeholder="Say something..."
-              aria-label="Message input"
-            />
+    <!-- Search bar -->
+    <div class="sidebar__search">
+      <input type="text" class="search-input" placeholder="Search" aria-label="Search conversations" />
+      <!-- Search icon inside field -->
+      <i class="fa-solid fa-magnifying-glass static-icon" id="search-icon" aria-label="Run search"></i>
+    </div>
 
-            <!-- Accessory icon buttons positioned inside input -->
-            <div class="inputbar__icons">
+    <!-- Conversation list — populated dynamically by JS -->
+    <ul class="sidebar__list" id="sidebar-list" aria-label="Conversations">
+      <!-- Items injected by home.js -->
+    </ul>
+  </aside>
 
-              <!-- Emoji picker trigger -->
-              <i class="fa-solid fa-face-grin clickable-icon" id="emoji-btn" aria-label="Insert emoji"></i>
+  <!-- ---------------------------------------------------------------
+        CHAT PANEL — room header + messages + input bar
+      --------------------------------------------------------------- -->
+  <section class="chat-panel" aria-label="Chat room">
 
-              <!-- GIF button -->
-              <i class="fa-solid fa-gift clickable-icon" id="gif-btn" aria-label="Insert GIF"></i>
+    <!-- Room header — the arrow-chevron label shown in wireframe -->
+    <div class="chat-panel__header" id="chat-panel-header" style="cursor: pointer; transition: transform 0.2s ease;">
+      <div class="convo-item__avatar" id="banner-picture"></div>
+      <h2 class="room-title"></h2>
+    </div>
 
-              <!-- Attachment / upload button -->
-              <i class="fa-solid fa-file-arrow-up clickable-icon" id="upload-btn" aria-label="Upload file"></i>
-            </div>
+    <!-- Room Details View (hidden by default, takes full remaining panel height) -->
+    <div class="room-details-view" id="room-details-view" style="display: none;">
+
+      <!-- Hidden SVGs for easy cloning — never displayed, just cloned by JS -->
+      <div id="role-svgs-templates" style="display: none;">
+        <div id="svg-owner"><svg viewBox="0 0 24 24" style="width: 22px; height: 22px;">
+            <path fill="none" stroke="#c6c600" stroke-width="2"
+              d="M11.269 4.411C11.5 3.892 11.616 3.632 11.778 3.552C11.918 3.483 12.082 3.483 12.222 3.552C12.383 3.632 12.499 3.892 12.73 4.411L14.575 8.548C14.643 8.702 14.677 8.778 14.73 8.837C14.777 8.889 14.834 8.931 14.898 8.959C14.971 8.991 15.054 9.000 15.221 9.017L19.726 9.493C20.291 9.553 20.574 9.582 20.7 9.711C20.809 9.823 20.86 9.979 20.837 10.134C20.811 10.312 20.6 10.502 20.177 10.883L16.813 13.915C16.688 14.027 16.625 14.084 16.586 14.152C16.551 14.213 16.529 14.280 16.521 14.350C16.513 14.429 16.531 14.511 16.566 14.676L17.505 19.106C17.623 19.662 17.682 19.940 17.599 20.100C17.526 20.238 17.393 20.335 17.239 20.361C17.062 20.391 16.815 20.249 16.323 19.965L12.399 17.702C12.254 17.618 12.181 17.576 12.104 17.56C12.035 17.545 11.964 17.545 11.896 17.56C11.818 17.576 11.746 17.618 11.600 17.702L7.677 19.965C7.184 20.249 6.938 20.391 6.760 20.361C6.606 20.335 6.473 20.238 6.401 20.100C6.317 19.940 6.376 19.662 6.494 19.106L7.434 14.675C7.469 14.511 7.486 14.429 7.478 14.350C7.470 14.280 7.448 14.213 7.413 14.152C7.374 14.084 7.312 14.027 7.187 13.915L3.822 10.883C3.400 10.502 3.189 10.312 3.163 10.134C3.140 9.979 3.191 9.823 3.300 9.711C3.426 9.582 3.709 9.553 4.274 9.493L8.778 9.018C8.946 9.000 9.029 8.991 9.101 8.959C9.165 8.930 9.223 8.889 9.269 8.837C9.322 8.778 9.357 8.701 9.425 8.548L11.269 4.411Z">
+            </path>
+          </svg></div>
+        <div id="svg-manager"><svg viewBox="0 0 512 512" style="width: 22px; height: 22px;">
+            <path fill="#0000bc" stroke="#0000bc" stroke-width="1.73"
+              d="M336 440c0 13.254 10.745 24 24 24 13.255 0 24-10.746 24-24v-24h-48v24z"></path>
+            <path fill="#0000bc" stroke="#0000bc" stroke-width="1.73"
+              d="M441.211 372.828l-53.508-22.938c-3.359-1.438-6.273-2.75-8.898-3.953-12.999-5.867-21.741-9.759-41.67-9.909-0.39-0.029-0.722-0.231-1.119-0.231-0.135 0-0.247 0.072-0.381 0.075-2.941-0.559-6.214-7.768-7.263-17.557 19.876-17.013 37.36-44.254 48.104-87.237 22.508-4.359 39.524-23.812 39.524-47.078s-17.016-42.719-39.523-47.078c-2.027-8.111-4.335-15.561-6.827-22.552l34.061-51.089c2.836-4.25 3.469-9.594 1.703-14.391-1.758-4.797-5.703-8.469-10.617-9.875l-134.399-38.406c-2.875-0.813-5.922-0.813-8.797-1.77636e-15l-134.398 38.407c-4.914 1.406-8.859 5.078-10.617 9.875-1.766 4.797-1.133 10.141 1.703 14.391l34.062 51.089c-2.492 6.991-4.8 14.44-6.827 22.552-22.508 4.358-39.524 23.811-39.524 47.077s17.016 42.719 39.523 47.078c10.744 42.983 28.229 70.225 48.104 87.237-1.091 10.192-4.603 17.685-7.627 17.685-0.003 0-0.005 0.002-0.008 0.002s-0.005-0.002-0.008-0.002c-20.773 0-29.531 3.953-42.781 9.938-2.633 1.188-5.547 2.516-8.906 3.953l-53.508 22.938c-23.562 10.093-38.789 33.187-38.789 58.827v64.344c0 8.844 7.164 16 16 16h416c8.836 0 16-7.156 16-16v-64.344c0-25.64-15.227-48.734-38.789-58.828zm-185.211-340.187l108.93 31.125-21.492 32.234h-174.876l-21.492-32.234 108.93-31.125zm66.422 95.359c-8.805 10.656-22.25 16-66.422 16-44.039 0-57.297-5.078-66.313-16h132.735zm-158.328 84.437c-1.555-7.5-8.148-12.766-15.656-12.766-0.523 0-1.055 0.031-1.586 0.078-0.18 0.016-1.57 0.219-1.75 0.25-9.43 0-17.102-7.172-17.102-16 0-8.781 7.617-15.953 17.102-15.953 0.211 0.016 1.531 0.188 1.75 0.203 8.211 0.813 15.586-4.672 17.242-12.688 0.468-2.266 1.104-4.176 1.61-6.362 7.305 8.809 16.357 15.735 31.269 20.321-3.076 4.036-4.973 9.015-4.973 14.48 0 13.255 10.745 24 24 24s24-10.745 24-24c0-2.977-0.611-5.796-1.602-8.426 5.488 0.252 11.241 0.426 17.602 0.426 6.36 0 12.113-0.171 17.6-0.42-0.989 2.629-1.6 5.445-1.6 8.42 0 13.255 10.745 24 24 24 13.255 0 24-10.745 24-24 0-5.435-1.875-10.391-4.92-14.414 14.977-4.559 24.012-11.455 31.255-20.23 0.492 2.135 1.115 3.996 1.571 6.207 1.664 8.016 9.117 13.484 17.242 12.688l1.75-.25c9.43 0 17.102 7.172 17.102 16 0 8.781-7.617 15.953-17.102 15.953-0.211-0.016-1.531-0.188-1.75-0.203-8.109-0.734-15.578 4.672-17.242 12.688-13.843 66.998-43.906 99.561-91.906 99.561s-78.063-32.563-91.906-99.563zm91.906 178.438c-23.785-9.357-46.784-22.057-57.629-31.194 6.443-5.515 11.352-13.588 14.327-23.65 14.713 5.863 29.622 7.969 43.302 7.969s28.589-2.106 43.303-7.97c2.959 10.008 7.824 18.057 14.217 23.57-10.904 9.287-33.817 21.939-57.52 31.275zm-192 40.781c0-12.828 7.609-24.375 19.398-29.422l53.508-22.938c3.57-1.531 6.672-2.922 9.469-4.188 7.97-3.599 12.408-5.558 18.725-6.464 13.364 22.482 50.479 40.459 74.9 50.311v61.045h-176v-48.344zm384 48.344h-176v-61.044c24.421-9.852 61.536-27.828 74.9-50.311 6.316 0.906 10.755 2.865 18.725 6.464 2.797 1.266 5.898 2.656 9.469 4.188l53.508 22.938c11.789 5.046 19.398 16.593 19.398 29.421v48.344z">
+            </path>
+            <path fill="#0000bc" stroke="#0000bc" stroke-width="1.73"
+              d="M240 288h32c8.836 0 16-7.156 16-16 0-8.844-7.164-16-16-16h-32c-8.836 0-16 7.156-16 16 0 8.844 7.164 16 16 16z">
+            </path>
+            <circle fill="#0000bc" stroke="#0000bc" stroke-width="1.73" cx="256" cy="64" r="16"></circle>
+          </svg></div>
+        <div id="svg-curator"><svg viewBox="-2.4 -2.4 28.80 28.80" style="width: 22px; height: 22px;">
+            <path stroke-linecap="round" stroke-linejoin="round" fill="none" stroke="#009900" stroke-width="2"
+              d="M4 18L9 12M20 18L15 12M3 8L10.225 12.8166C10.8665 13.2443 11.1872 13.4582 11.5339 13.5412C11.8403 13.6147 12.1597 13.6147 12.4661 13.5412C12.8128 13.4582 13.1335 13.2443 13.775 12.8166L21 8M6.2 19H17.8C18.9201 19 19.4802 19 19.908 18.782C20.2843 18.5903 20.5903 18.2843 20.782 17.908C21 17.4802 21 16.9201 21 15.8V8.2C21 7.0799 21 6.51984 20.782 6.09202C20.5903 5.71569 20.2843 5.40973 19.908 5.21799C19.4802 5 18.9201 5 17.8 5H6.2C5.0799 5 4.51984 5 4.09202 5.21799C3.71569 5.40973 3.40973 5.71569 3.21799 6.09202C3 6.51984 3 7.07989 3 8.2V15.8C3 16.9201 3 17.4802 3.21799 17.908C3.40973 18.2843 3.71569 18.5903 4.09202 18.782C4.51984 19 5.07989 19 6.2 19Z">
+            </path>
+          </svg></div>
+        <div id="svg-member"><svg viewBox="0 0 24 24" style="width: 22px; height: 22px;">
+            <path fill="none" stroke="#000000" stroke-width="2.5" stroke-linecap="round"
+              d="M5 21C5 17.134 8.13401 14 12 14C15.866 14 19 17.134 19 21M16 7C16 9.20914 14.2091 11 12 11C9.79086 11 8 9.20914 8 7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7Z">
+            </path>
+          </svg></div>
+      </div>
+
+      <!-- Inner card -->
+      <div class="room-details-card">
+
+        <!-- Inner room name banner: color-medium background -->
+        <div class="room-details-inner-banner">
+          <h3 id="details-room-title" class="room-details-title">Room</h3>
+        </div>
+
+        <!-- Tabs row with gears flanking on each side (like wireframe) -->
+        <div class="room-details-tabs-row">
+          <i class="fa-solid fa-gear room-details-gear"></i>
+          <div class="room-details-tabs">
+            <button class="room-details-tab room-details-tab--active">Members</button>
+            <button class="room-details-tab room-details-tab--disabled" title="Coming soon!" disabled>Space
+              Details</button>
+            <button class="room-details-tab room-details-tab--disabled" title="Coming soon!"
+              disabled>Integrations</button>
           </div>
-
-          <!-- Reply preview bar (hidden by default) -->
-          <div id="reply-preview-bar"></div>
-
-          <!-- Send button — separated visually as in wireframe -->
-          <i class="fa-solid fa-paper-plane clickable-icon send-icon" id="send-btn" aria-label="Send message"></i>
+          <i class="fa-solid fa-gear room-details-gear"></i>
         </div>
 
-        <!-- Simple emoji picker popover (hidden by default, toggled by JS) -->
-        <div class="emoji-picker" id="emoji-picker" aria-hidden="true">
-          <!-- Emojis injected by looks/home.js -->
+        <!-- Search + Add row -->
+        <div class="room-details-toolbar">
+          <div class="room-details-search-wrap">
+            <input type="text" id="member-search-input" placeholder="Search" class="room-details-search" />
+            <i class="fa-solid fa-magnifying-glass room-details-search-icon"></i>
+          </div>
+          <!-- ADD+ matches tab button style, shown only to Owners/Managers/Curators -->
+          <button class="room-details-tab" id="add-member-btn" style="display: none;">ADD+</button>
+          <!-- DELETE ROOM button, shown only to Owners and NOT for mainroom -->
+          <button class="room-details-tab" id="delete-room-btn"
+            style="display: none; color: #cc0000; border-color: #cc0000;">DELETE ROOM</button>
         </div>
-      </section>
-    </main><!-- /main-content -->
 
-  <!--
+        <!-- Members table -->
+        <div class="room-details-table-header">
+          <div>User</div>
+          <div>Full Name</div>
+          <div>Type</div>
+          <div></div>
+        </div>
+
+        <!-- Members list (filled by JS) -->
+        <div id="members-list-container" class="room-details-members-list"></div>
+
+      </div>
+    </div>
+
+
+    <!-- Scrollable message feed -->
+    <div class="chat-panel__feed" id="chat-feed" role="log" aria-live="polite">
+      <!-- Overhead loading spinner -->
+      <div id="message-container"></div>
+      <div id="overhead-spinner"></div>
+    </div>
+
+    <!-- New messages floating button (hidden by default) -->
+    <button id="new-messages-btn" class="new-messages-btn" style="display: none;">
+      <i class="fa-solid fa-arrow-down"></i>
+      <span>New Messages</span>
+    </button>
+
+    <!-- Bottom input bar -->
+    <div class="chat-panel__inputbar" id="chat-panel-inputbar">
+
+      <!-- Text input with nested icons -->
+      <div class="input-wrapper">
+        <input type="text" class="inputbar__text" id="chat-input" placeholder="Say something..."
+          aria-label="Message input" />
+
+        <!-- Accessory icon buttons positioned inside input -->
+        <div class="inputbar__icons">
+
+          <!-- Emoji picker trigger -->
+          <i class="fa-solid fa-face-grin clickable-icon" id="emoji-btn" aria-label="Insert emoji"></i>
+
+          <!-- GIF button -->
+          <i class="fa-solid fa-gift clickable-icon" id="gif-btn" aria-label="Insert GIF"></i>
+
+          <!-- Attachment / upload button -->
+          <i class="fa-solid fa-file-arrow-up clickable-icon" id="upload-btn" aria-label="Upload file"></i>
+        </div>
+      </div>
+
+      <!-- Reply preview bar (hidden by default) -->
+      <div id="reply-preview-bar"></div>
+
+      <!-- Send button — separated visually as in wireframe -->
+      <i class="fa-solid fa-paper-plane clickable-icon send-icon" id="send-btn" aria-label="Send message"></i>
+    </div>
+
+    <!-- Simple emoji picker popover (hidden by default, toggled by JS) -->
+    <div class="emoji-picker" id="emoji-picker" aria-hidden="true">
+      <!-- Emojis injected by looks/home.js -->
+    </div>
+  </section>
+</main><!-- /main-content -->
+
+<!--
     CREATE ROOM MODAL
     Hidden by default, shown via roomModal() function in looks/home.js
     Includes room name, description, emoji selector, and room status options
   -->
-  <div id="create-room-modal" class="modal-overlay" style="display: none;" aria-hidden="true">
-    <div class="modal-container" style="background: white; border-radius: 12px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto;">
-      <!-- Modal Header -->
-      <div class="modal-header">
-        <h2 class="modal-title">Create Room</h2>
-        <button class="modal-close-btn" id="modal-close-x" aria-label="Close modal">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
+<div id="create-room-modal" class="modal-overlay" style="display: none;" aria-hidden="true">
+  <div class="modal-container"
+    style="background: white; border-radius: 12px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto;">
+    <!-- Modal Header -->
+    <div class="modal-header">
+      <h2 class="modal-title">Create Room</h2>
+      <button class="modal-close-btn" id="modal-close-x" aria-label="Close modal">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <form id="create-room-form" class="modal-body">
+      <!-- Left Column: Form Fields -->
+      <div class="modal-left">
+        <div class="form-group">
+          <label for="room-emoji">Room Emoji: <span style="color: red">*</span></label>
+          <div class="emoji-selector" id="room-emoji-selector">
+            <input type="hidden" id="room-emoji" name="emoji" required>
+            <div class="emoji-display" id="selected-emoji" data-required="true">
+              <i class="fa-solid fa-xmark"></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="room-name">Room Name: <span style="color: red">*</span></label>
+          <input type="text" id="room-name" name="roomname" class="modal-input" placeholder="" required minlength="1" />
+        </div>
+
+        <div class="form-group">
+          <label for="room-description">Room Description: <span style="color: red">*</span></label>
+          <input type="text" id="room-description" name="description" class="modal-input" placeholder="" required
+            minlength="1" />
+        </div>
+
+        <div class="modal-bottom-row">
+          <p class="modal-note">
+            *You can go back and edit your room settings in the MANAGE ROOMS section of SETTINGS, which can be acccessed
+            by clicking your profile in the top right corner*
+          </p>
+          <button type="submit" class="submit-btn" id="create-room-submit">Submit</button>
+        </div>
       </div>
 
-      <!-- Modal Body -->
-      <form id="create-room-form" class="modal-body">
-        <!-- Left Column: Form Fields -->
-        <div class="modal-left">
-          <div class="form-group">
-            <label for="room-emoji">Room Emoji: <span style="color: red">*</span></label>
-            <div class="emoji-selector" id="room-emoji-selector">
-              <input type="hidden" id="room-emoji" name="emoji" required>
-              <div class="emoji-display" id="selected-emoji" data-required="true">
-                <i class="fa-solid fa-xmark"></i>
+      <!-- Right Column: Room Status -->
+      <div class="modal-right">
+        <div class="room-status-box">
+          <h3 class="status-title">Room Status</h3>
+
+          <div class="room-status-content">
+            <div class="radio-option">
+              <input type="radio" id="open-room" name="roomtype" value="public" checked required />
+              <div class="radio-content">
+                <label for="open-room" class="radio-label">Open Room</label>
+                <span class="radio-description">Anyone has access</span>
               </div>
             </div>
-          </div>
 
-          <div class="form-group">
-            <label for="room-name">Room Name: <span style="color: red">*</span></label>
-            <input type="text" id="room-name" name="roomname" class="modal-input" placeholder="" required minlength="1" />
-          </div>
-
-          <div class="form-group">
-            <label for="room-description">Room Description: <span style="color: red">*</span></label>
-            <input type="text" id="room-description" name="description" class="modal-input" placeholder="" required minlength="1" />
-          </div>
-
-          <div class="modal-bottom-row">
-            <p class="modal-note">
-              *You can go back and edit your room settings in the MANAGE ROOMS section of SETTINGS, which can be acccessed by clicking your profile in the top right corner*
-            </p>
-            <button type="submit" class="submit-btn" id="create-room-submit">Submit</button>
-          </div>
-        </div>
-
-        <!-- Right Column: Room Status -->
-        <div class="modal-right">
-          <div class="room-status-box">
-            <h3 class="status-title">Room Status</h3>
-
-            <div class="room-status-content">
-              <div class="radio-option">
-                <input type="radio" id="open-room" name="roomtype" value="public" checked required />
-                <div class="radio-content">
-                  <label for="open-room" class="radio-label">Open Room</label>
-                  <span class="radio-description">Anyone has access</span>
-                </div>
-              </div>
-
-              <div class="radio-option">
-                <input type="radio" id="invite-room" name="roomtype" value="private" required />
-                <div class="radio-content">
-                  <label for="invite-room" class="radio-label">Invite Room</label>
-                  <span class="radio-description">You choose who has access</span>
-                </div>
-              </div>
-
-              <button type="button" class="send-invitations-btn" id="send-invitations-btn" disabled>
-                <span>Send Invitations</span>
-                <i class="fa-solid fa-user-plus"></i>
-              </button>
-
-              <!-- Invitations Dropdown (hidden by default) -->
-              <div class="invitations-dropdown" id="invitations-dropdown" style="display: none;">
-                <h4>Select people to invite:</h4>
-                <ul class="invite-list" id="invite-list">
-                  <!-- Populated dynamically by JS -->
-                </ul>
+            <div class="radio-option">
+              <input type="radio" id="invite-room" name="roomtype" value="private" required />
+              <div class="radio-content">
+                <label for="invite-room" class="radio-label">Invite Room</label>
+                <span class="radio-description">You choose who has access</span>
               </div>
             </div>
           </div>
         </div>
-      </form>
-    </div>
+      </div>
+    </form>
   </div>
+</div>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
-  let ROOM = '{{ room }}'.replaceAll('amp;', '');
+  let ROOM = '{{ room }}'.replaceAll('&#39;', "'").replaceAll('&amp;', '&');
   let ROOM_TYPE = '{{ room_type }}';
   let ROOM_EMOJI = '{{ room_emoji }}';
   let INITIAL_LIMIT = 20;
@@ -323,10 +324,10 @@
   let SPECIAL_REPLY_LIMIT = Math.ceil(FETCH_LIMIT / 2);
   let OVERHEAD_LOADER_DELAY = 400;
 </script>
-<script src="/static/javascript/tradchat.js"           defer></script>
-<script src="/static/javascript/socketio.js"           defer></script>
-<script src="/static/javascript/jQuery.js"             defer></script>
-<script src="/static/javascript/emoji.js"           defer></script>
-<script src="/static/javascript/looks/home.js"         defer></script>
-<script src="/static/javascript/network/home.js"       defer></script>
+<script src="/static/javascript/tradchat.js" defer></script>
+<script src="/static/javascript/socketio.js" defer></script>
+<script src="/static/javascript/jQuery.js" defer></script>
+<script src="/static/javascript/emoji.js" defer></script>
+<script src="/static/javascript/looks/home.js" defer></script>
+<script src="/static/javascript/network/home.js" defer></script>
 {% endblock %}
