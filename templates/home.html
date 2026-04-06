@@ -201,24 +201,37 @@
     <!-- Bottom input bar -->
     <div class="chat-panel__inputbar" id="chat-panel-inputbar">
 
-      <!-- Text input with nested icons -->
-      <div class="input-wrapper">
-        <input type="text" class="inputbar__text" id="chat-input" placeholder="Say something..."
-          aria-label="Message input" />
+      <!-- Restructured chat box that contains preview + input -->
+      <div class="chat-input-box" id="chat-input-box">
+        <!-- New image preview area (Google Chat style) -->
+        <div id="upload-preview-container">
+          <div class="upload-preview-strip" id="upload-preview-strip">
+            <!-- Thumbnails injected by JS -->
+          </div>
+        </div>
 
-        <!-- Accessory icon buttons positioned inside input -->
-        <div class="inputbar__icons">
+        <!-- Text input with nested icons -->
+        <div class="input-wrapper">
+          <input type="text" class="inputbar__text" id="chat-input" placeholder="Say something..."
+            aria-label="Message input" />
 
-          <!-- Emoji picker trigger -->
-          <i class="fa-solid fa-face-grin clickable-icon" id="emoji-btn" aria-label="Insert emoji"></i>
+          <!-- Accessory icon buttons positioned inside input -->
+          <div class="inputbar__icons">
 
-          <!-- GIF button -->
-          <i class="fa-solid fa-gift clickable-icon" id="gif-btn" aria-label="Insert GIF"></i>
+            <!-- Emoji picker trigger -->
+            <i class="fa-solid fa-face-grin clickable-icon" id="emoji-btn" aria-label="Insert emoji"></i>
 
-          <!-- Attachment / upload button -->
-          <i class="fa-solid fa-file-arrow-up clickable-icon" id="upload-btn" aria-label="Upload file"></i>
+            <!-- GIF button -->
+            <i class="fa-solid fa-gift clickable-icon" id="gif-btn" aria-label="Insert GIF"></i>
+
+            <!-- Attachment / upload button -->
+            <i class="fa-solid fa-file-arrow-up clickable-icon" id="upload-btn" aria-label="Upload file"></i>
+          </div>
         </div>
       </div>
+
+      <!-- Hidden file input — multiple images allowed -->
+      <input type="file" id="file-upload-input" hidden accept="image/*" multiple />
 
       <!-- Reply preview bar (hidden by default) -->
       <div id="reply-preview-bar"></div>

@@ -732,38 +732,108 @@
   color: var(--color-dark);
 }
 
+/* 2. Position the chat-input-box wrapper to host both preview and input */
+.chat-input-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  border: 2px solid var(--color-dark);
+  border-radius: 20px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.chat-input-box:focus-within {
+  border-color: var(--color-medium);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* --- High-Fidelity Image Upload Preview --- */
+#upload-preview-container {
+  padding: 12px 12px 0 12px;
+  width: 100%;
+  box-sizing: border-box;
+  display: none;
+}
+
+.upload-preview-strip {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.upload-preview-item {
+  position: relative;
+  display: inline-block;
+  width: 120px;
+  height: 120px;
+  border-radius: 12px;
+  overflow: visible;
+  background: rgba(255,255,255,0.6);
+  border: 1.5px solid var(--color-border);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+
+.upload-preview-item img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+}
+
+.preview-close-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-dark);
+  color: var(--color-light);
+  border: 2px solid white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  z-index: 10;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.preview-close-btn:hover {
+  background: #cc0000;
+  transform: scale(1.1);
+}
+
 /* Input wrapper for positioning icons inside */
 .input-wrapper {
   position: relative;
-  flex: 1;
+  width: 100%;
   display: flex;
   align-items: center;
 }
 
-/* Main text input field */
+/* Main text input field - stripped of border/background to blend into .chat-input-box */
 .inputbar__text {
   width: 100%;
-  padding: 7px 70px 7px 9px;
-  /* Half the original padding */
-  border: 2px solid var(--color-dark);
-  border-radius: 16px;
-  /* more rounded input field */
+  padding: 12px 110px 12px 14px;
+  border: none;
   background: transparent;
-  /* Removed color-light background */
   font-family: var(--font-body);
-  font-size: calc(1rem * 1.1);
-  /* 1.1x larger text */
+  font-size: 1rem;
   color: black;
   outline: none;
-  transition: border-color var(--transition), box-shadow var(--transition);
-  height: calc(50px * 1.1);
-  /* 1.1x taller input */
+  height: 54px;
 }
 
-.inputbar__text:focus {
-  border-color: var(--color-medium);
-  box-shadow: 0 0 0 3px var(--color-medium);
-}
+
+
 
 .inputbar__text::placeholder {
   color: #000;

@@ -1377,6 +1377,7 @@ def Recv(message, sid):
                 managers_list = split(room_info[0][1])
                 curators_list = split(room_info[0][2])
                 members_list = split(room_info[0][3])
+                room_type = room_info[0][4]
                 
                 my_id = str(find_account_id_or_password_or_gender(username, 'id'))
                 
