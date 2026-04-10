@@ -9,6 +9,10 @@ import shutil
 import secrets
 from threading import Thread, Lock
 import ast
+import base64
+import io
+from PIL import Image, ImageOps 
+import os
 
 def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
     # The 'with' statement handles the "waiting" and "releasing" for you!
@@ -294,7 +298,7 @@ def get_reactions_with_usernames(reaction_str):
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(64)
-Server = SocketIO(app)
+Server = SocketIO(app, max_http_payload_size=50 * 1024 * 1024)
 
 
 accounts_lock = Lock()
@@ -608,7 +612,10 @@ def upload_file():
 
 def Recv(message, sid):
     msg = ast.literal_eval(message)
-    print(msg)
+    if msg[0] == 'Image Upload':
+        print(['Image Upload', {k: (v if k != 'image' else f'<{len(v)} bytes of image data>') for k, v in msg[1].items()}])
+    else:
+        print(msg)
 
     if msg[0] == 'Message':
         data = msg[1]
@@ -629,12 +636,14 @@ def Recv(message, sid):
             if setting == 'room':
                 
                 if check_room_access(room, username):
-                
                     user_id = find_account_id_or_password_or_gender(username, 'id')
                     gmt_timestamp = convert_to_gmt(timestamp)
 
                     message_id = db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload, reactions, deleted) VALUES (?, ?, ?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, reply_index, upload, "", 0], chat_room=True)
-                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0}]), room=room)
+                    if not upload:
+                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0, 'upload': ''}]), room=room)
+                else:
+                    print(f"[ERROR] User {username} does not have access to room {room}")
             
             elif setting == 'dm':
                 # Verify user is a participant in this DM before sending
@@ -655,9 +664,124 @@ def Recv(message, sid):
                     anti_convo_hash = f"{un_important_id}-{important_id}"
 
                     message_id = db_sql(f"""INSERT INTO {fm_to_gb[important_gender]}s_dm (convo_hash, sender_id, message, timestamp, reply_id, upload, reactions, deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", f"{fm_to_gb[important_gender]}s_dm", params=[convo_hash, username_id, user_message, gmt_timestamp, reply_index, upload, "", 0], chat_room=False, provide_id=True)
-                    Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0}]), room=room)
+                    if not upload:
+                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0, 'upload': ''}]), room=room)
                 else:
-                    return # User not part of this DM or invalid DM
+                    print(f"[ERROR] User {username} does not have access to DM room {room}")
+            else:
+                print(f"[ERROR] Unknown setting '{setting}' for message from {username}")
+        else:
+            print(f"[ERROR] Invalid credentials for user {username}")
+
+    elif msg[0] == 'Image Upload':
+        data = msg[1]
+        upload_id = data['upload_id']
+        image_data = data['image'] # base64 string
+        username = data['username']
+        password = data['password']
+
+        if check_credentials(username, password):
+            # 1. Process Image
+            try:
+                # Remove header if present
+                if ',' in image_data:
+                    image_data = image_data.split(',')[1]
+                
+                image_bytes = base64.b64decode(image_data)
+                img = Image.open(io.BytesIO(image_bytes))
+                img = ImageOps.exif_transpose(img) # Fix rotation from phone cameras 
+                
+                w, h = img.size
+                narrowest = min(w, h)
+                if narrowest > 800:
+                    scale = 800 / narrowest
+                    img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+                
+                # Save processed image
+                while True:
+                    save_filename = f"{secrets.token_hex(8)}.jpg"
+                    save_path = os.path.join('static', 'uploads', save_filename)
+                    if not os.path.exists(save_path):
+                        break
+                
+                img.convert('RGB').save(save_path, 'JPEG', quality=85)
+                final_url = f"/static/uploads/{save_filename}"
+                
+                # 2. Update Database & Check for completion
+                # Search across all room databases and DM databases
+                all_room_names = list(room_dict.keys())
+                target_msg = None
+                target_db = None
+                is_chat_room = False
+
+                for r in all_room_names:
+                    res = db_sql("SELECT id, upload FROM messages WHERE upload LIKE ?;", r, params=[f'%{upload_id}%'], chat_room=True)
+                    if res:
+                        target_msg = res[0]
+                        target_db = r
+                        is_chat_room = True
+                        break
+                
+                if not target_msg:
+                    # Check DMs
+                    for dm_db in ['boys_dm', 'girls_dm']:
+                        res = db_sql(f"SELECT id, upload, convo_hash FROM {dm_db} WHERE upload LIKE ?;", dm_db, params=[f'%{upload_id}%'], chat_room=False)
+                        if res:
+                            target_msg = res[0]
+                            target_db = dm_db
+                            is_chat_room = False
+                            break
+                
+                if target_msg:
+                    msg_id, current_upload = target_msg[0], target_msg[1]
+                    # Replace ID with actual URL
+                    ids = current_upload.split('|')
+                    new_ids = [final_url if x == upload_id else x for x in ids]
+                    new_upload = '|'.join(new_ids)
+                    
+                    if is_chat_room:
+                        db_sql("UPDATE messages SET upload = ? WHERE id = ?;", target_db, params=[new_upload, msg_id], chat_room=True)
+                    else:
+                        db_sql(f"UPDATE {target_db} SET upload = ? WHERE id = ?;", target_db, params=[new_upload, msg_id], chat_room=False)
+                    
+                    # 3. Broadcast if finished
+                    is_finished = True
+                    for part in new_upload.split('|'):
+                        if not part.startswith('/static/uploads/'):
+                            is_finished = False
+                            break
+                    
+                    if is_finished:
+                        if is_chat_room:
+                            msg_data = db_sql("SELECT user_id, message, timestamp, reply_id, reactions, deleted FROM messages WHERE id = ?;", target_db, params=[msg_id], chat_room=True)[0]
+                            room_name = target_db
+                        else:
+                            msg_data = db_sql(f"SELECT sender_id, message, timestamp, reply_id, reactions, deleted, convo_hash FROM {target_db} WHERE id = ?;", target_db, params=[msg_id], chat_room=False)[0]
+                            user1 = find_username_from_id(int(msg_data[6].split('-')[0]))
+                            user2 = find_username_from_id(int(msg_data[6].split('-')[1]))
+                            room_name = f"{user1}.$@-@&.{user2}" if user1 and user2 else None
+
+                        if room_name:
+                            broadcast_data = {
+                                'id': msg_id,
+                                'username': find_username_from_id(msg_data[0]),
+                                'message': msg_data[1],
+                                'timestamp': msg_data[2],
+                                'reply_id': int(msg_data[3]),
+                                'reactions': [],
+                                'deleted': msg_data[5],
+                                'upload': new_upload
+                            }
+                            Server.send(str(['Message', broadcast_data]), room=room_name)
+                    else:
+                        pass # still pending
+                else:
+                    print(f"[ERROR] Could not find message associated with upload_id: {upload_id}")
+
+            except Exception as e:
+                print(f"[ERROR] Image Processing Failure: {e}")
+                import traceback
+                traceback.print_exc()
 
     elif msg[0] == 'Fetch Room Messages' or msg[0] == 'Fetch DM Messages':
         data = msg[1]

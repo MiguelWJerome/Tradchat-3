@@ -18,7 +18,7 @@ function recv(message) {
     if (msg[0] === 'Message') {
         data = msg[1];
         if (attached_to_bottom) {
-            appendMessage({ 'index': data['id'], 'username': data['username'], 'message': data['message'], 'timestamp': data['timestamp'], 'myself': data['username'] === username, 'replyIndex': data['reply_id'], 'realtime': true, 'deleted': data['deleted'] });
+            appendMessage({ 'index': data['id'], 'username': data['username'], 'message': data['message'], 'timestamp': data['timestamp'], 'myself': data['username'] === username, 'replyIndex': data['reply_id'], 'realtime': true, 'deleted': data['deleted'], 'upload': data['upload'] });
             if (data['reactions']) {
                 let $target = $(`.message__bubble[aria-index="${data['id']}"]`);
                 for (let r of data['reactions']) {
@@ -54,7 +54,7 @@ function recv(message) {
                     'message': messages[i]['message'], 'timestamp': messages[i]['timestamp'],
                     'myself': messages[i]['username'] === username,
                     'replyIndex': messages[i]['reply_id'], 'overhead': data['overhead'], 'underhead': data['underhead'],
-                    'deleted': messages[i]['deleted']
+                    'deleted': messages[i]['deleted'], 'upload': messages[i]['upload']
                 }, {
                     'scrollToBottom': !data['underhead'] && !data['overhead'],
                     'specialScrollTo': null
@@ -142,7 +142,7 @@ function recv(message) {
                     'index': message['id'], 'username': message['username'],
                     'message': message['message'], 'timestamp': message['timestamp'],
                     'myself': message['username'] === username,
-                    'replyIndex': message['reply_id'], 'deleted': message['deleted']
+                    'replyIndex': message['reply_id'], 'deleted': message['deleted'], 'upload': message['upload']
                 }, { 'scrollToBottom': false, 'specialScrollTo': data['index'] });
                 if (message['reactions']) {
                     let $target = $(`.message__bubble[aria-index="${message['id']}"]`);
@@ -288,12 +288,41 @@ let currentreply_id = -1;
 sendButton.addEventListener('click', function () {
     if (chatInput.value.trim() === "" && currentUpload.length === 0) return;
     let setting = ROOM.split('.$@-@&.').length > 1 ? 'dm' : 'room';
+
+    let uploadData = '';
+    let imagesToUpload = [];
+
+    let IDs = [];
+    if (currentUpload.length > 0) {
+        currentUpload.forEach((dataUrl, index) => {
+            const randomID = Math.floor(Math.random() * 9000000000 + 1000000000);
+            const uploadID = username + password + randomID + "_" + index;
+            IDs.push(uploadID);
+            imagesToUpload.push({ 'id': uploadID, 'image': dataUrl });
+        });
+        uploadData = IDs.join('|');
+    }
+
     cl.send(JSON.stringify(['Message', {
         'setting': setting, 'room': ROOM, 'username': username,
         'password': password, 'time-stamp': Date(),
         'message': chatInput.value, 'reply-index': currentreply_id, 
-        'upload': currentUpload.length > 0 ? currentUpload : ''
+        'upload': uploadData
     }]));
+
+    if (imagesToUpload.length > 0) {
+        setTimeout(() => {
+            imagesToUpload.forEach(item => {
+                cl.send(JSON.stringify(['Image Upload', {
+                    'upload_id': item.id,
+                    'image': item.image,
+                    'username': username,
+                    'password': password
+                }]));
+            });
+        }, 200);
+    }
+
     chatInput.value = '';
     clearUpload();
     if (typeof cancelReply === 'function') cancelReply();
@@ -492,48 +521,74 @@ $(document).ready(function() {
         if (!files.length) return;
 
         files.forEach(file => {
-            if (file.size > 5 * 1024 * 1024) {
-                if (typeof Alert === 'function') Alert(`"${file.name}" is too large. Please select images under 5MB.`);
+            if (file.size > 20 * 1024 * 1024) {
+                if (typeof Alert === 'function') Alert(`"${file.name}" is too large. Please select images under 20MB.`);
                 return;
             }
 
             const reader = new FileReader();
             reader.onload = function(event) {
-                const dataUrl = event.target.result;
-                currentUpload.push(dataUrl);
-
-                // Build a thumbnail card with its own X
-                const idx = currentUpload.length - 1;
-                const $card = $(`
-                    <div class="upload-preview-item" data-idx="${idx}">
-                        <img src="${dataUrl}" alt="Upload Preview" />
-                        <button class="preview-close-btn" aria-label="Remove image">
-                            <i class="fa-solid fa-xmark"></i>
-                        </button>
-                    </div>
-                `);
-
-                $card.find('.preview-close-btn').on('click', function(e) {
-                    e.preventDefault();
-                    const cardIdx = parseInt($card.attr('data-idx'));
-                    currentUpload.splice(cardIdx, 1);
-                    $card.remove();
-                    // Re-index remaining cards
-                    $('#upload-preview-strip .upload-preview-item').each(function(i) {
-                        $(this).attr('data-idx', i);
-                    });
-                    if (currentUpload.length === 0) {
-                        $('#upload-preview-container').hide();
+                const img = new Image();
+                img.onload = function() {
+                    console.log(`[DEBUG] Image loaded in browser: ${img.width}x${img.height}`);
+                    
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    let w = img.width;
+                    let h = img.height;
+                    const narrowest = Math.min(w, h);
+                    
+                    if (narrowest > 800) {
+                        const scale = 800 / narrowest;
+                        w = Math.floor(w * scale);
+                        h = Math.floor(h * scale);
+                        console.log(`[DEBUG] Resizing client-side to: ${w}x${h}`);
                     }
-                });
+                    
+                    canvas.width = w;
+                    canvas.height = h;
+                    ctx.drawImage(img, 0, 0, w, h);
+                    
+                    const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    console.log(`[DEBUG] Client-side processing complete. Final payload size: ${Math.round(resizedDataUrl.length / 1024)} KB`);
+                    
+                    currentUpload.push(resizedDataUrl);
 
-                $('#upload-preview-strip').append($card);
-                $('#upload-preview-container').show();
+                    // Build a thumbnail card with its own X
+                    const idx = currentUpload.length - 1;
+                    const $card = $(`
+                        <div class="upload-preview-item" data-idx="${idx}">
+                            <img src="${resizedDataUrl}" alt="Upload Preview" />
+                            <button class="preview-close-btn" aria-label="Remove image">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    `);
 
-                if (attached_to_bottom) {
-                    let $feed = $('#chat-feed');
-                    $feed.scrollTop($feed[0].scrollHeight);
-                }
+                    $card.find('.preview-close-btn').on('click', function(e) {
+                        e.preventDefault();
+                        const cardIdx = parseInt($card.attr('data-idx'));
+                        currentUpload.splice(cardIdx, 1);
+                        $card.remove();
+                        // Re-index remaining cards
+                        $('#upload-preview-strip .upload-preview-item').each(function(i) {
+                            $(this).attr('data-idx', i);
+                        });
+                        if (currentUpload.length === 0) {
+                            $('#upload-preview-container').hide();
+                        }
+                    });
+
+                    $('#upload-preview-strip').append($card);
+                    $('#upload-preview-container').show();
+
+                    if (attached_to_bottom) {
+                        let $feed = $('#chat-feed');
+                        $feed.scrollTop($feed[0].scrollHeight);
+                    }
+                };
+                img.src = event.target.result;
             };
             reader.readAsDataURL(file);
         });

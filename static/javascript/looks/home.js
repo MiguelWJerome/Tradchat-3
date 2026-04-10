@@ -807,6 +807,32 @@ document.body.onclick = function () {
           $targetMsgGroup.find(".message__content").append($newBubble);
         }
 
+        // --- Handle Images for Grouped Messages ---
+        if (data['upload'] && data['upload'].trim() !== '') {
+            let imageGroup = $("<div>").css({"display": "flex", "flex-wrap": "wrap", "gap": "8px", "margin-top": "8px"});
+            let uploadItems = data['upload'].split('|');
+            uploadItems.forEach(item => {
+                if (item.startsWith('/static/uploads/')) {
+                    let $img = $("<img>").attr("src", item).css({
+                        "max-width": "200px",
+                        "max-height": "200px",
+                        "border-radius": "8px",
+                        "border": "1px solid rgba(0,0,0,0.1)",
+                        "object-fit": "cover",
+                        "cursor": "pointer"
+                    }).on('click', function() { window.open(item, '_blank'); });
+                    imageGroup.append($img);
+                }
+            });
+            if (imageGroup.children().length > 0) {
+                if (overhead) {
+                    $newBubble.after(imageGroup);
+                } else {
+                    $targetMsgGroup.find(".message__content").append(imageGroup);
+                }
+            }
+        }
+
         // Add reply button click handler
         $newBubble.find('.reply-btn').on('click', function (e) {
           e.stopPropagation();
@@ -956,6 +982,30 @@ document.body.onclick = function () {
           $messageContainer.prepend($msg);
         } else {
           $messageContainer.append($msg);
+        }
+
+        // --- Handle Images for New Message Groups ---
+        if (data['upload'] && data['upload'].trim() !== '') {
+            let imageGroup = $("<div>").css({"display": "flex", "flex-wrap": "wrap", "gap": "8px", "margin-top": "8px"});
+            if (myself) imageGroup.css("justify-content", "flex-end");
+            
+            let uploadItems = data['upload'].split('|');
+            uploadItems.forEach(item => {
+                if (item.startsWith('/static/uploads/')) {
+                    let $img = $("<img>").attr("src", item).css({
+                        "max-width": "200px",
+                        "max-height": "200px",
+                        "border-radius": "8px",
+                        "border": "1px solid rgba(0,0,0,0.1)",
+                        "object-fit": "cover",
+                        "cursor": "pointer"
+                    }).on('click', function() { window.open(item, '_blank'); });
+                    imageGroup.append($img);
+                }
+            });
+            if (imageGroup.children().length > 0) {
+                $content.append(imageGroup);
+            }
         }
 
         // Add reply button click handler
