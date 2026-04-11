@@ -48,6 +48,8 @@ function recv(message) {
                 // Initial room load - clear the screen for a fresh start
                 document.querySelector('#message-container').innerHTML = '';
                 window.attached_to_bottom = true;
+                window.__placed_unread_marker = false;
+                window.__unread_marker_element = null;
             }
             messages = data['messages'];
             if (data['underhead'] && messages.length < 1) {
@@ -67,7 +69,6 @@ function recv(message) {
                     window.attached_to_bottom = false;
                 }
             }
-            window.__placed_unread_marker = false;
             
             for (var i in messages) {
                 appendMessage({
@@ -77,7 +78,7 @@ function recv(message) {
                     'replyIndex': messages[i]['reply_id'], 'overhead': data['overhead'], 'underhead': data['underhead'],
                     'deleted': messages[i]['deleted'], 'upload': messages[i]['upload']
                 }, {
-                    'scrollToBottom': !data['underhead'] && !data['overhead'],
+                    'scrollToBottom': !data['underhead'] && !data['overhead'] && data['at_bottom'] !== false,
                     'specialScrollTo': null,
                     'lastTimeStamp': data['lastTimeStamp'] !== undefined ? data['lastTimeStamp'] : false
                 });
@@ -104,6 +105,13 @@ function recv(message) {
             toggle_overhead_animation(false);
             // Update cache based on server response (at_bottom: true means no more older/newer messages exist)
             window.reached_real_bottom = (data['at_bottom'] === true);
+
+            // Scroll to unread marker if it exists and we're not at the bottom
+            if (data['at_bottom'] === false && !data['underhead'] && !data['overhead']) {
+                if (window.__unread_marker_element) {
+                    window.__unread_marker_element.scrollIntoView({ behavior: 'auto', block: 'center' });
+                }
+            }
 
             setTimeout(() => {
                 FetchingMessages = false;

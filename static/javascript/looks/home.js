@@ -1229,25 +1229,8 @@ document.body.onclick = function () {
       }
 
       if (!data['overhead'] && !data['underhead']) {
-        // For realtime messages when attached to bottom, just scroll (counter handled elsewhere)
-        if (data['realtime'] && window.attached_to_bottom) {
-          if (scrollData['scrollToBottom']) {
-            scrollToBottom();
-          }
-          return;
-        }
-
-        // Check if user is at the bottom (within 100px tolerance)
-        var feed = document.getElementById('chat-feed');
-        var isAtBottom = false;
-        if (feed) {
-          var scrollPosition = feed.scrollTop + feed.clientHeight;
-          var scrollHeight = feed.scrollHeight;
-          isAtBottom = scrollHeight - scrollPosition <= 100;
-        }
-
         // Always scroll to bottom for user's own messages, or if already at bottom
-        if (isAtBottom || data['myself']) {
+        if (data['myself'] || window.attached_to_bottom) {
           if (scrollData['scrollToBottom']) {
             scrollToBottom();
           }
