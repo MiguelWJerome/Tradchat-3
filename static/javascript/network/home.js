@@ -7,7 +7,10 @@ let currentUpload = [];
 
 let network_coast_clear_for_setting_fetching_messages_to_false = false
 
+// Track if chat is locked to the bottom for real-time messages
 let attached_to_bottom = true
+// Cache if we've officially reached the absolute end of the message history
+window.reached_real_bottom = false
 
 let fetch_messages_data_queue = []
 let fetch_special_reply_messages_data_queue = []
@@ -30,6 +33,8 @@ function recv(message) {
         } else {
             toggle_new_messages_btn(true);
         }
+        // New message arrived, so there might be more history to load below us
+        window.reached_real_bottom = false;
     }
     else if (msg[0] === 'Fetch Room Messages' || msg[0] === 'Fetch DM Messages') {
         FetchingMessages = true;
@@ -40,14 +45,29 @@ function recv(message) {
             let data = fetch_messages_data_queue.splice(0, 1)[0];
             if (data['underhead'] && data['overhead']) data['overhead'] = false;
             if (!data['overhead'] && !data['underhead']) {
+                // Initial room load - clear the screen for a fresh start
                 document.querySelector('#message-container').innerHTML = '';
             }
             messages = data['messages'];
             if (data['underhead'] && messages.length < 1) {
                 attached_to_bottom = true;
                 toggle_overhead_animation(false);
+                FetchingMessages = false;
                 return;
             }
+            if (!data['overhead']) {
+                // If we are loading the initial batch or scrolling down (underhead)
+                // We become attached if the batch reaches the actual bottom AND we aren't in "unread lookup" mode
+                let inUnreadMode = (data['lastTimeStamp'] !== undefined && data['lastTimeStamp'] !== false && !data['overhead'] && !data['underhead']);
+                
+                if (data['at_bottom'] !== false && !inUnreadMode) {
+                    attached_to_bottom = true;
+                } else {
+                    attached_to_bottom = false;
+                }
+            }
+            window.__placed_unread_marker = false;
+            
             for (var i in messages) {
                 appendMessage({
                     'index': messages[i]['id'], 'username': messages[i]['username'],
@@ -57,7 +77,8 @@ function recv(message) {
                     'deleted': messages[i]['deleted'], 'upload': messages[i]['upload']
                 }, {
                     'scrollToBottom': !data['underhead'] && !data['overhead'],
-                    'specialScrollTo': null
+                    'specialScrollTo': null,
+                    'lastTimeStamp': data['lastTimeStamp'] !== undefined ? data['lastTimeStamp'] : false
                 });
                 if (messages[i]['reactions']) {
                     let $target = $(`.message__bubble[aria-index="${messages[i]['id']}"]`);
@@ -80,6 +101,9 @@ function recv(message) {
                 document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase();
             }
             toggle_overhead_animation(false);
+            // Update cache based on server response (at_bottom: true means no more older/newer messages exist)
+            window.reached_real_bottom = (data['at_bottom'] === true);
+
             setTimeout(() => {
                 FetchingMessages = false;
                 we_are_currently_appending_messages_rn = false;
@@ -90,30 +114,25 @@ function recv(message) {
     else if (msg[0] === 'Get Rooms') {
         clearAllChatRoomOptions();
         data = msg[1];
-        let unread = false;
         for (let room of data) {
             let roomId = room['name'];
+            let isUnread = room['lastTimeStamp'] !== false;
             createChatRoomOption(roomId, room['name'], room['description'], function () {
                 switch_room(room['name']);
-            }, false, unread, room['emoji'], roomId === ROOM);
+            }, false, isUnread, room['emoji'], roomId === ROOM);
         }
     }
     else if (msg[0] === 'Get Dms') {
         clearAllChatRoomOptions();
         data = msg[1];
-        for (let dm of data['unread']) {
+        for (let dm of data) {
             let dmId = sortAndJoinStrings(username, dm['username']);
             let otherUsername = dm['username'];
+            let isUnread = dm['lastTimeStamp'] !== false;
+            
             createChatRoomOption(dmId, otherUsername, `${dm['first_name']} ${dm['last_name']}`, function () {
                 switch_dm(otherUsername);
-            }, `/static/profile-pictures/${otherUsername}.png`, true, true, (dmId === ROOM));
-        }
-        for (let dm of data['read']) {
-            let dmId = sortAndJoinStrings(username, dm['username']);
-            let otherUsername = dm['username'];
-            createChatRoomOption(dmId, otherUsername, `${dm['first_name']} ${dm['last_name']}`, function () {
-                switch_dm(otherUsername);
-            }, `/static/profile-pictures/${otherUsername}.png`, false, true, (dmId === ROOM));
+            }, `/static/profile-pictures/${otherUsername}.png`, isUnread, true, (dmId === ROOM));
         }
     }
     else if (msg[0] === 'Fetch Special Reply Message') {
@@ -260,6 +279,7 @@ function switch_room(roomname) {
     FetchingMessages = true;
     cl.send(JSON.stringify(['Switch Room', { 'old-group': ROOM, 'room': roomname, 'username': username, 'password': password, 'limit': INITIAL_LIMIT }]))
     ROOM = roomname
+    window.reached_real_bottom = false;
 }
 
 function switch_dm(dm_username) {
@@ -270,6 +290,7 @@ function switch_dm(dm_username) {
     FetchingMessages = true;
     cl.send(JSON.stringify(['Switch DM', { 'old-group': ROOM, 'new-dm': sortAndJoinStrings(dm_username, username), 'username': username, 'password': password, 'limit': INITIAL_LIMIT }]))
     ROOM = sortAndJoinStrings(dm_username, username)
+    window.reached_real_bottom = false;
 }
 
 window.emitCreateRoom = function(roomname, description, emoji, roomtype) {
@@ -406,29 +427,19 @@ document.getElementById('private-rooms-icon').addEventListener('click', function
     cl.send(JSON.stringify(['Get Rooms', { 'username': username, 'password': password, 'roomtype': 'private' }]))
 });
 
-const emojiPicker = new lc_emoji_picker('#emoji-btn', {
+window.emojiPicker = new lc_emoji_picker('#emoji-btn', {
     emoji_json_url: '/static/emoji.json',
     selection_callback: function (emoji) { document.querySelector('#chat-input').value += emoji }
 });
 
-document.querySelector('#selected-emoji').onclick = function () {
-    emojiPicker.re_attach('#emoji-btn', function (emoji) { document.querySelector('#chat-input').value += emoji })
-};
+
 
 const createRoomForm = document.getElementById('create-room-form');
 const roomNameInput = document.getElementById('room-name');
 const roomDescInput = document.getElementById('room-description');
 const roomEmojiInput = document.getElementById('room-emoji');
 
-function handleEnterKey(e) {
-    if (e.key === 'Enter') {
-        const form = e.target.closest('form');
-        if (form && form.checkValidity()) e.preventDefault();
-    }
-}
 
-roomNameInput.addEventListener('keypress', handleEnterKey);
-roomDescInput.addEventListener('keypress', handleEnterKey);
 
 function validateInput(input) {
     input.style.borderColor = input.value.trim().length > 0 ? 'var(--color-medium)' : 'var(--color-dark)';
@@ -438,18 +449,44 @@ roomNameInput.addEventListener('input', function () { validateInput(this); });
 roomDescInput.addEventListener('input', function () { validateInput(this); });
 
 if (createRoomForm) {
-    createRoomForm.addEventListener('submit', function (e) {
-        if (this.checkValidity()) {
+    const createRoomSubmitBtn = document.getElementById('create-room-submit');
+    
+    createRoomSubmitBtn.addEventListener('click', function () {
+        const selector = document.querySelector('.emoji-selector');
+        const display = document.querySelector('.emoji-display');
+        
+        // Reset validation visuals
+        selector.classList.remove('invalid');
+        display.classList.remove('invalid');
+
+        // 1. Check Custom Emoji Toggle first (as requested)
+        if (!window.isRoomEmojiSelected) {
+            selector.classList.add('invalid');
+            display.classList.add('invalid');
+            return; 
+        }
+
+        // 2. Check Native Form Validity (Name, Description, etc.)
+        if (!createRoomForm.checkValidity()) {
+            // This triggers the browser's built-in "Please fill out this field" tooltips
+            createRoomForm.reportValidity();
+            return;
+        }
+
+        // 3. All valid - Proceed with submission
+        const roomname = roomNameInput.value.trim();
+        const description = roomDescInput.value.trim();
+        const emoji = roomEmojiInput.value;
+        const roomtype = document.querySelector('input[name="roomtype"]:checked').value;
+        
+        create_chat_room(roomname, description, emoji, roomtype);
+    });
+
+    // Also handle Enter key to trigger the same logic
+    createRoomForm.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
             e.preventDefault();
-            const roomname = roomNameInput.value.trim();
-            const description = roomDescInput.value.trim();
-            const emoji = roomEmojiInput.value;
-            const roomtype = document.querySelector('input[name="roomtype"]:checked').value;
-            if (!emoji) {
-                document.querySelector('.emoji-display').style.borderColor = 'red';
-                return;
-            }
-            create_chat_room(roomname, description, emoji, roomtype);
+            createRoomSubmitBtn.click();
         }
     });
 }

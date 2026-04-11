@@ -271,9 +271,10 @@
           <label for="room-emoji">Room Emoji: <span style="color: red">*</span></label>
           <div class="emoji-selector" id="room-emoji-selector">
             <input type="hidden" id="room-emoji" name="emoji" required>
-            <div class="emoji-display" id="selected-emoji" data-required="true">
+            <div class="emoji-display" id="selected-emoji">
               <i class="fa-solid fa-xmark"></i>
             </div>
+            <span class="emoji-required-msg">Emoji Required!</span>
           </div>
         </div>
 
@@ -288,13 +289,15 @@
             minlength="1" />
         </div>
 
-        <div class="modal-bottom-row">
-          <p class="modal-note">
-            *You can go back and edit your room settings in the MANAGE ROOMS section of SETTINGS, which can be acccessed
-            by clicking your profile in the top right corner*
-          </p>
-          <button type="submit" class="submit-btn" id="create-room-submit">Submit</button>
-        </div>
+          <div class="modal-bottom-row">
+            <p class="modal-note">
+              *You can go back and edit your room settings in the MANAGE ROOMS section of SETTINGS, which can be acccessed
+              by clicking your profile in the top right corner*
+            </p>
+            <button type="button" class="submit-btn" id="create-room-submit">Submit</button>
+            <!-- Hidden real submit for native validation -->
+            <button type="submit" id="real-create-submit" style="display: none;"></button>
+          </div>
       </div>
 
       <!-- Right Column: Room Status -->

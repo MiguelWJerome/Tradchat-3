@@ -497,7 +497,8 @@ document.body.onclick = function () {
         .append($avatar, $info);
 
       // Add unread styling if needed
-      if (unread) {
+      // UI MAGIC: Never show unread indicator for the room we are currently in
+      if (unread && roomId !== ROOM) {
         $item.css({
           "background": "rgba(59, 130, 246, 0.1)" // Light blue background
         });
@@ -558,7 +559,16 @@ document.body.onclick = function () {
 
       // Select the new room if roomId is provided
       if (roomId) {
-        $(".convo-item").filter(function() { return $(this).attr("data-room") === roomId; }).addClass("active");
+        var $item = $(".convo-item").filter(function() { return $(this).attr("data-room") === roomId; });
+        $item.addClass("active");
+        
+        // UI MAGIC: Clear unread status visually when switching to this room
+        $item.css("background", ""); // Remove inline light blue background
+        $item.find("div").filter(function() { 
+          // Match the dark blue background color of the unread indicator
+          var bg = $(this).css("background-color");
+          return bg === "rgb(30, 64, 175)" || bg === "#1e40af"; 
+        }).remove();
       }
     };
 
@@ -757,6 +767,35 @@ document.body.onclick = function () {
 
         isSameUser = !isDeleted && !lastBubbleIsDeleted && (lastUser === (myself ? "You" : username)) && (lastDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs);
         $targetMsgGroup = $lastMsg;
+      }
+
+      var hitUnread = false;
+      if (typeof scrollData === "object" && scrollData.lastTimeStamp && !window.__placed_unread_marker) {
+         if (timestamp > scrollData.lastTimeStamp) {
+             isSameUser = false;
+             window.__placed_unread_marker = true;
+             
+             var $unreadDivider = $("<div>")
+                .addClass("chat-unread-divider")
+                .css({
+                  "display": "flex",
+                  "align-items": "center",
+                  "justify-content": "center",
+                  "margin": "20px 0",
+                  "position": "relative"
+                })
+                .html(`
+                        <div style="position: absolute; width: 100%; height: 1px; background: red; z-index: 1;"></div>
+                        <span style="background: var(--color-light); padding: 4px 15px; z-index: 2; color: red; font-size: 0.85rem; font-weight: bold; border-radius: 4px; border: 1px solid red; white-space: nowrap;">
+                            NEW MESSAGES
+                        </span>
+                    `);
+             if (overhead) {
+                $messageContainer.prepend($unreadDivider);
+             } else {
+                $messageContainer.append($unreadDivider);
+             }
+         }
       }
 
       if (isSameUser && $targetMsgGroup.length) {
@@ -1594,7 +1633,7 @@ document.body.onclick = function () {
           isAtBottom = scrollHeight - scrollPosition <= 100;
         }
 
-        if (attached_to_bottom || isAtBottom) {
+        if (attached_to_bottom) {
           // Already attached/near bottom - just scroll to bottom
           scrollToBottom();
         } else {
@@ -1666,17 +1705,9 @@ document.body.onclick = function () {
           var clientHeight = $chatFeed[0].clientHeight;
           var isAtBottom = scrollHeight - scrollTop - clientHeight <= 10;
 
-          // Update attached_to_bottom based on actual scroll position
-          if (isAtBottom) {
-            attached_to_bottom = true;
-          } else if (scrollTop < scrollHeight - clientHeight - 100) {
-            // User has scrolled up more than 100px from bottom - detach
-            attached_to_bottom = false;
-          }
-
           if (isAtBottom) {
             // Check if we're not attached to bottom (need to fetch newer messages)
-            if (!attached_to_bottom) {
+            if (!attached_to_bottom && !window.reached_real_bottom) {
               // --- CRITICAL GUARD: Prevent multiple underhead fetches ---
               if (FetchingMessages) {
                 console.log("Underhead scroll sensor triggered, but blocked by FetchingMessages lock.");
@@ -1698,6 +1729,12 @@ document.body.onclick = function () {
                 console.log('Called fetch_underhead_messages with ID:', bottommost_id);
               }
             }
+            
+            attached_to_bottom = true;
+            toggle_new_messages_btn(false);
+          } else if (scrollTop < scrollHeight - clientHeight - 100) {
+            // User has scrolled up more than 100px from bottom - detach
+            attached_to_bottom = false;
           }
         });
       }
@@ -1798,6 +1835,11 @@ document.body.onclick = function () {
      */
 
     /**
+     * State toggle to track if an emoji has been explicitly selected for the new room
+     */
+    window.isRoomEmojiSelected = false;
+
+    /**
      * roomModal(action)
      * ---------------
      * Controls the visibility of the Create Room modal.
@@ -1809,20 +1851,30 @@ document.body.onclick = function () {
 
       if (action === 'show') {
         $modal.css('display', 'flex').attr('aria-hidden', 'false');
-        // Reset form when showing
+        // Reset state and toggle
+        window.isRoomEmojiSelected = false;
         resetRoomModal();
         // Attach emoji picker to the modal selector
-        if (typeof emojiPicker !== 'undefined' && emojiPicker.re_attach) {
-          emojiPicker.re_attach('#selected-emoji', function (emoji) { 
-            $("#selected-emoji").html(emoji);
+        if (typeof window.emojiPicker !== 'undefined' && window.emojiPicker.re_attach) {
+          // Clear invalid styles as soon as they click to pick an emoji
+          $("#selected-emoji").off('click.validation').on('click.validation', function() {
+            $(this).removeClass('invalid');
+            $("#room-emoji-selector").removeClass('invalid');
+          });
+
+          window.emojiPicker.re_attach('#selected-emoji', function (emoji) { 
+            $("#selected-emoji").html(emoji).removeClass('invalid');
+            $("#room-emoji-selector").removeClass('invalid');
             $("#room-emoji").val(emoji);
+            window.isRoomEmojiSelected = true;
           });
         }
       } else if (action === 'hide') {
         $modal.css('display', 'none').attr('aria-hidden', 'true');
+        window.isRoomEmojiSelected = false;
         // Reattach emoji picker back to chat input
-        if (typeof emojiPicker !== 'undefined' && emojiPicker.re_attach) {
-          emojiPicker.re_attach('#emoji-btn', function (emoji) { document.querySelector('#chat-input').value += emoji });
+        if (typeof window.emojiPicker !== 'undefined' && window.emojiPicker.re_attach) {
+          window.emojiPicker.re_attach('#emoji-btn', function (emoji) { document.querySelector('#chat-input').value += emoji });
         }
       }
     };
@@ -1835,12 +1887,15 @@ document.body.onclick = function () {
     function resetRoomModal() {
       $("#room-name").val('');
       $("#room-description").val('');
-      $("#selected-emoji").html('<i class="fa-solid fa-xmark"></i>');
+      $("#selected-emoji").html('<i class="fa-solid fa-xmark"></i>').removeClass('invalid');
+      $("#room-emoji-selector").removeClass('invalid');
+      $("#room-emoji").val('');
+      window.isRoomEmojiSelected = false;
       $("#open-room").prop('checked', true);
       $("#invite-room").prop('checked', false);
       $("#send-invitations-btn").prop('disabled', true);
       $("#invitations-dropdown").hide();
-      selectedInvitees = [];
+      window.selectedInvitees = [];
     }
 
     /**

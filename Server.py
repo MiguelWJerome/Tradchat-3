@@ -34,6 +34,9 @@ def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
         elif db_string == "girls_dm":
             lock = girls_dm_lock
             db_path = 'dms/girls_dm.db'
+        elif db_string == "last_read":
+            lock = last_read_lock
+            db_path = 'last_read.db'
     
     with lock:
         try:
@@ -93,16 +96,36 @@ def check_credentials(username, password):
     return (stored_password and stored_password == password)
 
 
-def fetch_room_messages(room_name, limit, offset, underhead):
+def fetch_room_messages(room_name, limit, offset, underhead, username=None):
     messages = []
+    lastTimeStamp = False
     
-    if underhead:
-        raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages WHERE id > ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)
-    else:
-        if offset == -1:
-            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages ORDER BY id DESC LIMIT ?""", room_name, params=[limit], chat_room=True)
+    if offset == -1 and username:
+        user_id = find_account_id_or_password_or_gender(username, 'id')
+        last_read_entry = db_sql("""SELECT last_viewed FROM last_read WHERE user_id = ? AND target_id = ? AND is_dm = 0;""", 'last_read', params=[user_id, room_name], chat_room=False)
+        lv = last_read_entry[0][0] if last_read_entry else '1970-01-01 00:00:00'
+        
+        fum = db_sql("SELECT id FROM messages WHERE timestamp > ? ORDER BY id ASC LIMIT 1;", room_name, params=[lv], chat_room=True)
+        if fum:
+            lastTimeStamp = lv
+            fum_id = fum[0][0]
+            half = limit // 2
+            
+            before_msgs = db_sql("SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages WHERE id < ? ORDER BY id DESC LIMIT ?", room_name, params=[fum_id, half], chat_room=True)
+            before_msgs.reverse()
+            after_msgs = db_sql("SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages WHERE id >= ? ORDER BY id ASC LIMIT ?", room_name, params=[fum_id, limit - half], chat_room=True)
+            
+            raw_messages = before_msgs + after_msgs
         else:
-            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages WHERE id < ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)    
+            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages ORDER BY id DESC LIMIT ?""", room_name, params=[limit], chat_room=True)
+    else:
+        if underhead:
+            raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages WHERE id > ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)
+        else:
+            if offset == -1:
+                raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages ORDER BY id DESC LIMIT ?""", room_name, params=[limit], chat_room=True)
+            else:
+                raw_messages = db_sql("""SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages WHERE id < ? ORDER BY id DESC LIMIT ?""", room_name, params=[offset, limit], chat_room=True)    
 
     for t in raw_messages:
         message = {}
@@ -123,10 +146,19 @@ def fetch_room_messages(room_name, limit, offset, underhead):
         message['deleted'] = t[7]
         messages.append(message)
 
-    if offset == -1 or underhead:
-        messages.reverse()
+    if not (offset == -1 and username and lastTimeStamp is not False):
+        if offset == -1 or underhead:
+            messages.reverse()
     
-    return messages
+    at_bottom = True
+    if messages:
+        max_id_row = db_sql("SELECT MAX(id) FROM messages;", room_name, chat_room=True)
+        if max_id_row and max_id_row[0][0] is not None:
+            max_id = max_id_row[0][0]
+            current_max_id = max(m['id'] for m in messages)
+            at_bottom = (current_max_id >= max_id)
+    
+    return messages, lastTimeStamp, at_bottom
 
 
 def fetch_dm_messages(dm_string, username, limit, offset, underhead):
@@ -139,11 +171,33 @@ def fetch_dm_messages(dm_string, username, limit, offset, underhead):
     convo_hash = f"{primary_user_id}-{secondary_user_id}"
     anti_convo_hash = f"{secondary_user_id}-{primary_user_id}"
 
-    if underhead:
-        raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions, deleted FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id > ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
-    else:
-        if offset == -1:
+    lastTimeStamp = False
+
+    if offset == -1:
+        user_id = find_account_id_or_password_or_gender(username, 'id')
+        primary_id = int(convo_hash.split('-')[0])
+        secondary_id = int(convo_hash.split('-')[1])
+        target_id = f"{min(primary_id, secondary_id)}-{max(primary_id, secondary_id)}"
+        
+        last_read_entry = db_sql("""SELECT last_viewed FROM last_read WHERE user_id = ? AND target_id = ? AND is_dm = 1;""", 'last_read', params=[user_id, target_id], chat_room=False)
+        lv = last_read_entry[0][0] if last_read_entry else '1970-01-01 00:00:00'
+        
+        fum = db_sql(f"SELECT id FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND timestamp > ? ORDER BY id ASC LIMIT 1;", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, lv], chat_room=False)
+        if fum:
+            lastTimeStamp = lv
+            fum_id = fum[0][0]
+            half = limit // 2
+            
+            before_msgs = db_sql(f"SELECT id, sender_id, message, timestamp, reply_id, upload, reactions, deleted FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id < ? ORDER BY id DESC LIMIT ?", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, fum_id, half], chat_room=False)
+            before_msgs.reverse()
+            after_msgs = db_sql(f"SELECT id, sender_id, message, timestamp, reply_id, upload, reactions, deleted FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id >= ? ORDER BY id ASC LIMIT ?", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, fum_id, limit - half], chat_room=False)
+            
+            raw_messages = before_msgs + after_msgs
+        else:
             raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions, deleted FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, limit], chat_room=False)
+    else:
+        if underhead:
+            raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions, deleted FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id > ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
         else:
             raw_messages = db_sql(f"""SELECT id, sender_id, message, timestamp, reply_id, upload, reactions, deleted FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?) AND id < ? ORDER BY id DESC LIMIT ?""", genderDict[primaryGender], params=[convo_hash, anti_convo_hash, offset, limit], chat_room=False)
 
@@ -169,14 +223,47 @@ def fetch_dm_messages(dm_string, username, limit, offset, underhead):
             'deleted': message[7]
         })
 
-    if offset == -1 or underhead:
-        messages.reverse()
+    if not (offset == -1 and lastTimeStamp is not False):
+        if offset == -1 or underhead:
+            messages.reverse()
     
-    return messages, actual_user_dm_username
+    at_bottom = True
+    if messages:
+        max_id_row = db_sql(f"SELECT MAX(id) FROM {genderDict[primaryGender]} WHERE convo_hash = ? OR convo_hash = ?;", genderDict[primaryGender], params=[convo_hash, anti_convo_hash], chat_room=False)
+        if max_id_row and max_id_row[0][0] is not None:
+            max_id = max_id_row[0][0]
+            current_max_id = max(m['id'] for m in messages)
+            at_bottom = (current_max_id >= max_id)
+            
+    return messages, actual_user_dm_username, lastTimeStamp, at_bottom
 
 
 accounts_dict = {}
 id_to_accounts_dict = {}
+sid_to_room_state = {}
+
+def process_room_leave(sid):
+    if sid in sid_to_room_state:
+        state = sid_to_room_state[sid]
+        user_id = state['user_id']
+        room = state['room']
+        is_dm = state['is_dm']
+        now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        
+        target_id = room
+        if is_dm:
+            user1 = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'id')
+            user2 = find_account_id_or_password_or_gender(room.split('.$@-@&.')[1], 'id')
+            ids = sorted([int(user1), int(user2)])
+            target_id = f"{ids[0]}-{ids[1]}"
+            
+        db_sql("""INSERT OR REPLACE INTO last_read (user_id, target_id, is_dm, last_viewed) VALUES (?, ?, ?, ?);""", 'last_read', params=[user_id, target_id, is_dm, now_str], chat_room=False)
+        del sid_to_room_state[sid]
+
+def process_room_join(sid, username, room):
+    user_id = find_account_id_or_password_or_gender(username, 'id')
+    is_dm = '.$@-@&.' in room
+    sid_to_room_state[sid] = {'user_id': user_id, 'room': room, 'is_dm': is_dm}
 
 def find_account_id_or_password_or_gender(user, id_or_password_or_gender='id', RGS=False, RU=False):
     if RGS:
@@ -305,6 +392,7 @@ accounts_lock = Lock()
 rooms_lock = Lock()
 boys_dm_lock = Lock()
 girls_dm_lock = Lock()
+last_read_lock = Lock()
 
 if not os.path.exists("mainroom.db"):
     room_db = sqlite3.connect("mainroom.db")
@@ -344,6 +432,33 @@ if not os.path.exists("accounts.db"):
         );
     ''')
     accounts_db.close()
+
+# Ensure last_read table exists in dedicated database
+if not os.path.exists("last_read.db"):
+    lr_db = sqlite3.connect("last_read.db")
+    lr_cursor = lr_db.cursor()
+    lr_cursor.execute('''
+        CREATE TABLE last_read (
+            user_id INTEGER,
+            target_id TEXT,
+            is_dm BOOLEAN,
+            last_viewed TEXT,
+            PRIMARY KEY (user_id, target_id)
+        );
+    ''')
+    lr_db.commit()
+    lr_db.close()
+
+# Cleanup: remove last_read from accounts.db if it exists
+try:
+    with accounts_lock:
+        temp_conn = sqlite3.connect("accounts.db")
+        temp_cursor = temp_conn.cursor()
+        temp_cursor.execute("DROP TABLE IF EXISTS last_read;")
+        temp_conn.commit()
+        temp_conn.close()
+except Exception as e:
+    print(f"Cleanup Error: {e}")
 
 if not os.path.exists("rooms.db"):
     rooms_db = sqlite3.connect("rooms.db")
@@ -809,9 +924,9 @@ def Recv(message, sid):
         if is_dm:
             if not check_dm_access(room, username):
                 return
-            messages, actual_user_dm_username = fetch_dm_messages(room, username, limit, offset, underhead)
+            messages, actual_user_dm_username, lastTimeStamp, at_bottom = fetch_dm_messages(room, username, limit, offset, underhead)
             db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[room, username], chat_room=False)
-            Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': room, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'overhead': (offset != -1), 'underhead': underhead}]), room=sid)
+            Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': room, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'overhead': (offset != -1 and not underhead), 'underhead': underhead, 'lastTimeStamp': lastTimeStamp, 'at_bottom': at_bottom}]), room=sid)
         else:
             if not check_room_access(room, username):
                 # Check if it was deleted
@@ -819,8 +934,8 @@ def Recv(message, sid):
                 if is_deleted and is_deleted[0][0]:
                     Server.send(str(['Room Deleted', {'room': room}]), room=sid)
                 return
-            messages = fetch_room_messages(room, limit, offset, underhead)
-            Server.send(str(['Fetch Room Messages', {'messages': messages, 'room': room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[room], chat_room=False)[0][0], 'overhead': (offset != -1), 'underhead': underhead}]), room=sid)
+            messages, lastTimeStamp, at_bottom = fetch_room_messages(room, limit, offset, underhead, username)
+            Server.send(str(['Fetch Room Messages', {'messages': messages, 'room': room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[room], chat_room=False)[0][0], 'overhead': (offset != -1 and not underhead), 'underhead': underhead, 'lastTimeStamp': lastTimeStamp, 'at_bottom': at_bottom}]), room=sid)
 
     elif msg[0] == 'Join Room':
         data = msg[1]
@@ -831,8 +946,12 @@ def Recv(message, sid):
         if check_credentials(username, password):
             # DMs don't need room access check - but we must verify user is a participant
             if check_dm_access(room, username):
+                process_room_leave(sid)
+                process_room_join(sid, username, room)
                 Server.server.enter_room(sid, room)
             elif check_room_access(room, username):
+                process_room_leave(sid)
+                process_room_join(sid, username, room)
                 Server.server.enter_room(sid, room)
             else:
                 is_deleted = db_sql("SELECT deleted FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
@@ -852,8 +971,10 @@ def Recv(message, sid):
         
         if check_credentials(username, password):
             if check_room_access(new_room, username):
+                process_room_leave(sid)
                 Server.server.leave_room(sid, old_group)
                 Server.server.enter_room(sid, new_room)
+                process_room_join(sid, username, new_room)
 
                 db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_room, username], chat_room=False)
 
@@ -869,12 +990,16 @@ def Recv(message, sid):
                     elif user_id_str in managers_list: my_role = 'Manager'
                     elif user_id_str in curators_list: my_role = 'Curator'
 
+                messages, lastTimeStamp, at_bottom = fetch_room_messages(new_room, limit, -1, False, username)
+
                 Server.send(str(['Fetch Room Messages', {
-                    'messages': fetch_room_messages(new_room, limit, -1, False),
+                    'messages': messages,
                     'room': new_room,
                     'emoji': room_data[5] if room_data[5] else '💬',
                     'myRole': my_role,
-                    'clear': False
+                    'clear': False,
+                    'lastTimeStamp': lastTimeStamp,
+                    'at_bottom': at_bottom
                 }]), room=sid)
             else:
                 is_deleted = db_sql("SELECT deleted FROM rooms WHERE room_name = ?;", 'rooms', params=[new_room], chat_room=False)
@@ -893,14 +1018,16 @@ def Recv(message, sid):
         limit = data['limit']
         
         if check_credentials(username, password) and check_dm_access(new_dm, username):
+            process_room_leave(sid)
             Server.server.leave_room(sid, old_group)
             Server.server.enter_room(sid, new_dm)
+            process_room_join(sid, username, new_dm)
             
-            messages, actual_user_dm_username = fetch_dm_messages(new_dm, username, limit, -1, False)
+            messages, actual_user_dm_username, lastTimeStamp, at_bottom = fetch_dm_messages(new_dm, username, limit, -1, False)
 
             db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_dm, username], chat_room=False)
             
-            Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': new_dm, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'clear': False}]), room=sid)
+            Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': new_dm, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'clear': False, 'lastTimeStamp': lastTimeStamp, 'at_bottom': at_bottom}]), room=sid)
 
     elif msg[0] == 'Leave Room':
         data = msg[1]
@@ -909,6 +1036,7 @@ def Recv(message, sid):
         password = data['password']
         
         if check_credentials(username, password):
+            process_room_leave(sid)
             Server.server.leave_room(sid, room)
 
     elif msg[0] == 'Get Rooms':
@@ -924,11 +1052,11 @@ def Recv(message, sid):
                 user_id = find_account_id_or_password_or_gender(username, 'id')
                 
                 for room in all_rooms:
-
+                    room_name = room[0]
+                    has_access = False
+                    
                     if room[1] == 'public' and roomtype == 'public':
-                        user_rooms.append({'name': room[0], 'description': room[2], 'emoji': room[7]})
-                    
-                    
+                        has_access = True
                     elif room[1] == 'private' and roomtype == 'private':
                         owners = split(room[3])
                         managers = split(room[4])
@@ -938,7 +1066,21 @@ def Recv(message, sid):
                         all_members = owners+managers+curators+members
                         
                         if str(user_id) in all_members:
-                            user_rooms.append({'name': room[0], 'description': room[2], 'emoji': room[7]})
+                            has_access = True
+
+                    if has_access:
+                        last_read_entry = db_sql("""SELECT last_viewed FROM last_read WHERE user_id = ? AND target_id = ? AND is_dm = 0;""", 'last_read', params=[user_id, room_name], chat_room=False)
+                        lastTimeStamp = False
+                        
+                        if last_read_entry:
+                            lv = last_read_entry[0][0]
+                            res = db_sql("SELECT id FROM messages WHERE timestamp > ? LIMIT 1;", room_name, params=[lv], chat_room=True)
+                            if res:
+                                lastTimeStamp = lv
+                        else:
+                            lastTimeStamp = '1970-01-01 00:00:00'
+                            
+                        user_rooms.append({'name': room_name, 'description': room[2], 'emoji': room[7], 'lastTimeStamp': lastTimeStamp})
 
                 Server.send(str(['Get Rooms', user_rooms]), room=sid)
 
@@ -949,22 +1091,39 @@ def Recv(message, sid):
         password = data['password']
         
         if check_credentials(username, password):
-            dms = {'unread': [], 'read': []}
+            dms = []
             dms_ids = split(db_sql("""SELECT dms FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0])
+            user_id = find_account_id_or_password_or_gender(username, 'id')
             
             if dms_ids:
                 for dm in dms_ids:
-                    if dm[0] == 'u':
-                        dmli = list(dm)
-                        dmli.pop(0)
-                        dm = ''.join(dmli)
-                        dm_info = db_sql("""SELECT username, first_name, last_name FROM accounts WHERE id = ?;""", 'accounts', params=[str(dm)], chat_room=False)[0]
-                        dms['unread'].append({'username': dm_info[0], 'first_name': dm_info[1], 'last_name': dm_info[2]})
-                    else:
-                        dm_info = db_sql("""SELECT username, first_name, last_name FROM accounts WHERE id = ?;""", 'accounts', params=[str(dm)], chat_room=False)[0]
-                        dms['read'].append({'username': dm_info[0], 'first_name': dm_info[1], 'last_name': dm_info[2]})
-                
-            
+                    actual_dm_id = str(dm)
+                    if actual_dm_id[0] == 'u':
+                        actual_dm_id = actual_dm_id[1:]
+                        
+                    dm_info_row = db_sql("""SELECT username, first_name, last_name, id FROM accounts WHERE id = ?;""", 'accounts', params=[actual_dm_id], chat_room=False)
+                    if dm_info_row:
+                        dm_info = dm_info_row[0]
+                        target_id = f"{min(int(user_id), int(dm_info[3]))}-{max(int(user_id), int(dm_info[3]))}"
+                        last_read_entry = db_sql("""SELECT last_viewed FROM last_read WHERE user_id = ? AND target_id = ? AND is_dm = 1;""", 'last_read', params=[user_id, target_id], chat_room=False)
+                        
+                        lastTimeStamp = False
+                        
+                        convo_hash = f"{user_id}-{dm_info[3]}"
+                        anti_convo_hash = f"{dm_info[3]}-{user_id}"
+                        
+                        if last_read_entry:
+                            lv = last_read_entry[0][0]
+                            # check if there are new messages
+                            res_b = db_sql("SELECT id FROM boys_dm WHERE (convo_hash = ? OR convo_hash = ?) AND timestamp > ? LIMIT 1;", 'boys_dm', params=[convo_hash, anti_convo_hash, lv], chat_room=False)
+                            res_g = db_sql("SELECT id FROM girls_dm WHERE (convo_hash = ? OR convo_hash = ?) AND timestamp > ? LIMIT 1;", 'girls_dm', params=[convo_hash, anti_convo_hash, lv], chat_room=False)
+                            if res_b or res_g:
+                                lastTimeStamp = lv
+                        else:
+                            lastTimeStamp = '1970-01-01 00:00:00'
+                            
+                        dms.append({'username': dm_info[0], 'first_name': dm_info[1], 'last_name': dm_info[2], 'lastTimeStamp': lastTimeStamp})
+                        
             Server.send(str(['Get Dms', dms]), room=sid)
 
     elif msg[0] == 'Added Reaction':
@@ -1611,6 +1770,10 @@ def Recv(message, sid):
                     db_sql("UPDATE messages SET deleted = 1 WHERE id = ?;", room, params=[index], chat_room=True)
                 
                 Server.send(str(['Message Deleted', {'id': index, 'room': room}]), room=room)
+
+@Server.on('disconnect')
+def on_disconnect():
+    process_room_leave(request.sid)
 
 @Server.on('message')
 def recv(message):
