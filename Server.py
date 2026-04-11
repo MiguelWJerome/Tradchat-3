@@ -248,6 +248,12 @@ def process_room_leave(sid):
         user_id = state['user_id']
         room = state['room']
         is_dm = state['is_dm']
+        
+        # If the user recently manually marked a message as unread, don't overwrite it on disconnect/leave
+        if state.get('ignore_next_leave'):
+            del sid_to_room_state[sid]
+            return
+
         now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         
         target_id = room
@@ -257,7 +263,7 @@ def process_room_leave(sid):
             ids = sorted([int(user1), int(user2)])
             target_id = f"{ids[0]}-{ids[1]}"
             
-        db_sql("""INSERT OR REPLACE INTO last_read (user_id, target_id, is_dm, last_viewed) VALUES (?, ?, ?, ?);""", 'last_read', params=[user_id, target_id, is_dm, now_str], chat_room=False)
+        db_sql("INSERT OR REPLACE INTO last_read (user_id, target_id, is_dm, last_viewed) VALUES (?, ?, ?, ?);", 'last_read', params=[user_id, target_id, is_dm, now_str], chat_room=False)
         del sid_to_room_state[sid]
 
 def process_room_join(sid, username, room):
@@ -449,16 +455,6 @@ if not os.path.exists("last_read.db"):
     lr_db.commit()
     lr_db.close()
 
-# Cleanup: remove last_read from accounts.db if it exists
-try:
-    with accounts_lock:
-        temp_conn = sqlite3.connect("accounts.db")
-        temp_cursor = temp_conn.cursor()
-        temp_cursor.execute("DROP TABLE IF EXISTS last_read;")
-        temp_conn.commit()
-        temp_conn.close()
-except Exception as e:
-    print(f"Cleanup Error: {e}")
 
 if not os.path.exists("rooms.db"):
     rooms_db = sqlite3.connect("rooms.db")
@@ -1715,7 +1711,68 @@ def Recv(message, sid):
         elif room.lower() == 'mainroom':
             Server.send(str(['Room Error', "The mainroom cannot be deleted."]), room=sid)
 
-
+    elif msg[0] == 'Mark Unread':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        room = data['room']
+        index = data['index']
+        
+        if check_credentials(username, password):
+            try:
+                index = int(index)
+            except (ValueError, TypeError):
+                return
+                
+            user_id = find_account_id_or_password_or_gender(username, 'id')
+            is_dm = '.$@-@&.' in room
+            has_access = False
+            
+            if is_dm:
+                has_access = check_dm_access(room, username)
+            else:
+                has_access = check_room_access(room, username)
+                
+            if has_access:
+                prev_timestamp = None
+                target_id = room
+                
+                if is_dm:
+                    primary_user_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'id')
+                    primary_gender = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'gender')
+                    secondary_user_id = find_account_id_or_password_or_gender(room.split('.$@-@&.')[1], 'id')
+                    
+                    ids = sorted([int(primary_user_id), int(secondary_user_id)])
+                    target_id = f"{ids[0]}-{ids[1]}"
+                    
+                    convo_hash = f"{primary_user_id}-{secondary_user_id}"
+                    anti_convo_hash = f"{secondary_user_id}-{primary_user_id}"
+                    
+                    fm_to_gb = {'female': 'girls_dm', 'male': 'boys_dm'}
+                    db_table = fm_to_gb[primary_gender]
+                    
+                    curr_msg = db_sql(f"SELECT timestamp FROM {db_table} WHERE (convo_hash = ? OR convo_hash = ?) AND id = ?;", db_table, params=[convo_hash, anti_convo_hash, index], chat_room=False)
+                    if curr_msg:
+                        try:
+                            dt = datetime.datetime.strptime(curr_msg[0][0], "%Y-%m-%d %H:%M:%S") - datetime.timedelta(seconds=1)
+                            prev_timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
+                        except Exception:
+                            prev_timestamp = "1970-01-01 00:00:00"
+                else:
+                    target_id = room
+                    curr_msg = db_sql("SELECT timestamp FROM messages WHERE id = ?;", room, params=[index], chat_room=True)
+                    if curr_msg:
+                        try:
+                            dt = datetime.datetime.strptime(curr_msg[0][0], "%Y-%m-%d %H:%M:%S") - datetime.timedelta(seconds=1)
+                            prev_timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
+                        except Exception:
+                            prev_timestamp = "1970-01-01 00:00:00"
+                
+                if prev_timestamp:
+                    db_sql("INSERT OR REPLACE INTO last_read (user_id, target_id, is_dm, last_viewed) VALUES (?, ?, ?, ?);", 'last_read', params=[user_id, target_id, is_dm, prev_timestamp], chat_room=False)
+                    
+                    if sid in sid_to_room_state:
+                        sid_to_room_state[sid]['ignore_next_leave'] = True
 
     elif msg[0] == 'Delete Message':
         data = msg[1]

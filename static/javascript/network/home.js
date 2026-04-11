@@ -8,7 +8,7 @@ let currentUpload = [];
 let network_coast_clear_for_setting_fetching_messages_to_false = false
 
 // Track if chat is locked to the bottom for real-time messages
-let attached_to_bottom = true
+window.attached_to_bottom = true;
 // Cache if we've officially reached the absolute end of the message history
 window.reached_real_bottom = false
 
@@ -20,7 +20,7 @@ function recv(message) {
     console.log(msg);
     if (msg[0] === 'Message') {
         data = msg[1];
-        if (attached_to_bottom) {
+        if (window.attached_to_bottom) {
             appendMessage({ 'index': data['id'], 'username': data['username'], 'message': data['message'], 'timestamp': data['timestamp'], 'myself': data['username'] === username, 'replyIndex': data['reply_id'], 'realtime': true, 'deleted': data['deleted'], 'upload': data['upload'] });
             if (data['reactions']) {
                 let $target = $(`.message__bubble[aria-index="${data['id']}"]`);
@@ -47,6 +47,7 @@ function recv(message) {
             if (!data['overhead'] && !data['underhead']) {
                 // Initial room load - clear the screen for a fresh start
                 document.querySelector('#message-container').innerHTML = '';
+                window.attached_to_bottom = true;
             }
             messages = data['messages'];
             if (data['underhead'] && messages.length < 1) {
@@ -61,9 +62,9 @@ function recv(message) {
                 let inUnreadMode = (data['lastTimeStamp'] !== undefined && data['lastTimeStamp'] !== false && !data['overhead'] && !data['underhead']);
                 
                 if (data['at_bottom'] !== false && !inUnreadMode) {
-                    attached_to_bottom = true;
+                    window.attached_to_bottom = true;
                 } else {
-                    attached_to_bottom = false;
+                    window.attached_to_bottom = false;
                 }
             }
             window.__placed_unread_marker = false;
@@ -171,7 +172,7 @@ function recv(message) {
                 }
             }
             toggle_overhead_animation(false);
-            attached_to_bottom = false;
+            window.attached_to_bottom = false;
         }, OVERHEAD_LOADER_DELAY);
     }
     else if (msg[0] === 'Added Reaction') {
@@ -346,6 +347,7 @@ sendButton.addEventListener('click', function () {
 
     chatInput.value = '';
     clearUpload();
+    window.attached_to_bottom = true;
     if (typeof cancelReply === 'function') cancelReply();
 })
 
@@ -396,6 +398,11 @@ function fetch_overhead_messages(offset_id) {
 window.broadcast_delete_message = function (index) {
     if (!index) return;
     cl.send(JSON.stringify(['Delete Message', { 'username': username, 'password': password, 'index': index, 'room': ROOM }]));
+}
+
+window.broadcast_mark_unread = function (index) {
+    if (!index) return;
+    cl.send(JSON.stringify(['Mark Unread', { 'username': username, 'password': password, 'index': index, 'room': ROOM }]));
 }
 
 function fetch_special_reply_message(index, orgIndex) {

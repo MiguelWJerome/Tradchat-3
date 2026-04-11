@@ -823,6 +823,9 @@ document.body.onclick = function () {
                                '<div class="action-divider"></div>';
             }
             
+            actionsHtml += '<div class="action-item unread-btn" title="Mark Unread">💬</div>' +
+                           '<div class="action-divider"></div>';
+            
             actionsHtml += '<div class="action-item reply-btn" title="Reply">↩️</div>';
             $actions.html(actionsHtml);
             $newBubble.append($actions);
@@ -929,6 +932,64 @@ document.body.onclick = function () {
             document.addEventListener('click', restorePicker, true);
           }
         });
+
+        // Add unread button click handler
+        $newBubble.find('.unread-btn').on('click', function(e) {
+            e.stopPropagation();
+            const $bubble = $(this).closest('.message__bubble');
+            const index = $bubble.attr('aria-index');
+            
+            $('.chat-unread-divider').remove(); // remove any existing ones
+
+            var $unreadDivider = $("<div>")
+               .addClass("chat-unread-divider")
+               .css({
+                 "display": "flex",
+                 "align-items": "center",
+                 "justify-content": "center",
+                 "margin": "20px 0",
+                 "position": "relative"
+               })
+               .html(`
+                       <div style="position: absolute; width: 100%; height: 1px; background: red; z-index: 1;"></div>
+                       <span style="background: var(--color-light); padding: 4px 15px; z-index: 2; color: red; font-size: 0.85rem; font-weight: bold; border-radius: 4px; border: 1px solid red; white-space: nowrap;">
+                           NEW MESSAGES
+                       </span>
+                   `);
+
+            const $msgGroup = $bubble.closest('.message');
+            const $prevBubbles = $bubble.prevAll('.message__bubble');
+
+            if ($prevBubbles.length > 0) {
+                // Split the group
+                const isOwn = $msgGroup.hasClass('own');
+                const $newGroup = $('<div>').addClass('message').addClass(isOwn ? 'own' : '');
+                const $content = $('<div>').addClass('message__content');
+                
+                // Get original avatar and name wrapper
+                const $originalAvatar = $msgGroup.find('.message__avatar').first().clone();
+                const $originalNameWrapper = $msgGroup.find('.message__content > div').first().clone();
+                
+                $content.append($originalNameWrapper);
+                
+                // Move current bubble and all following siblings (bubbles + images)
+                const $toMove = $bubble.add($bubble.nextAll());
+                $content.append($toMove);
+                
+                if ($originalAvatar.length) $newGroup.append($originalAvatar);
+                $newGroup.append($content);
+                
+                $msgGroup.after($newGroup);
+                $newGroup.before($unreadDivider);
+            } else {
+                // Already the first bubble in the group, just place divider before the group
+                $msgGroup.before($unreadDivider);
+            }
+            
+            if (typeof broadcast_mark_unread === 'function') {
+                broadcast_mark_unread(index);
+            }
+        });
       } else {
         // New Message Group - create a new message container
 
@@ -988,6 +1049,9 @@ document.body.onclick = function () {
                 actionsHtml += '<div class="action-item delete-btn" title="Delete">🗑️</div>' +
                                '<div class="action-divider"></div>';
             }
+            
+            actionsHtml += '<div class="action-item unread-btn" title="Mark Unread">💬</div>' +
+                           '<div class="action-divider"></div>';
             
             actionsHtml += '<div class="action-item reply-btn" title="Reply">↩️</div>';
             
@@ -1104,11 +1168,69 @@ document.body.onclick = function () {
             document.addEventListener('click', restorePicker, true);
           }
         });
+
+        // Add unread button click handler
+        $bubble.find('.unread-btn').on('click', function(e) {
+            e.stopPropagation();
+            const $clickedBubble = $(this).closest('.message__bubble');
+            const index = $clickedBubble.attr('aria-index');
+            
+            $('.chat-unread-divider').remove(); // remove any existing ones
+
+            var $unreadDivider = $("<div>")
+               .addClass("chat-unread-divider")
+               .css({
+                 "display": "flex",
+                 "align-items": "center",
+                 "justify-content": "center",
+                 "margin": "20px 0",
+                 "position": "relative"
+               })
+               .html(`
+                       <div style="position: absolute; width: 100%; height: 1px; background: red; z-index: 1;"></div>
+                       <span style="background: var(--color-light); padding: 4px 15px; z-index: 2; color: red; font-size: 0.85rem; font-weight: bold; border-radius: 4px; border: 1px solid red; white-space: nowrap;">
+                           NEW MESSAGES
+                       </span>
+                   `);
+
+            const $msgGroup = $clickedBubble.closest('.message');
+            const $prevBubbles = $clickedBubble.prevAll('.message__bubble');
+
+            if ($prevBubbles.length > 0) {
+                // Split the group
+                const isOwn = $msgGroup.hasClass('own');
+                const $newGroup = $('<div>').addClass('message').addClass(isOwn ? 'own' : '');
+                const $content = $('<div>').addClass('message__content');
+                
+                // Get original avatar and name wrapper
+                const $originalAvatar = $msgGroup.find('.message__avatar').first().clone();
+                const $originalNameWrapper = $msgGroup.find('.message__content > div').first().clone();
+                
+                $content.append($originalNameWrapper);
+                
+                // Move current bubble and all following siblings (bubbles + images)
+                const $toMove = $clickedBubble.add($clickedBubble.nextAll());
+                $content.append($toMove);
+                
+                if ($originalAvatar.length) $newGroup.append($originalAvatar);
+                $newGroup.append($content);
+                
+                $msgGroup.after($newGroup);
+                $newGroup.before($unreadDivider);
+            } else {
+                // Already the first bubble in the group, just place divider before the group
+                $msgGroup.before($unreadDivider);
+            }
+            
+            if (typeof broadcast_mark_unread === 'function') {
+                broadcast_mark_unread(index);
+            }
+        });
       }
 
       if (!data['overhead'] && !data['underhead']) {
         // For realtime messages when attached to bottom, just scroll (counter handled elsewhere)
-        if (data['realtime'] && attached_to_bottom) {
+        if (data['realtime'] && window.attached_to_bottom) {
           if (scrollData['scrollToBottom']) {
             scrollToBottom();
           }
@@ -1633,7 +1755,7 @@ document.body.onclick = function () {
           isAtBottom = scrollHeight - scrollPosition <= 100;
         }
 
-        if (attached_to_bottom) {
+        if (window.attached_to_bottom) {
           // Already attached/near bottom - just scroll to bottom
           scrollToBottom();
         } else {
@@ -1648,7 +1770,7 @@ document.body.onclick = function () {
             'limit': INITIAL_LIMIT,
             'offset': -1
           }]));
-          attached_to_bottom = true;
+          window.attached_to_bottom = true;
         }
 
         toggle_new_messages_btn(false);
@@ -1707,7 +1829,7 @@ document.body.onclick = function () {
 
           if (isAtBottom) {
             // Check if we're not attached to bottom (need to fetch newer messages)
-            if (!attached_to_bottom && !window.reached_real_bottom) {
+            if (!window.attached_to_bottom && !window.reached_real_bottom) {
               // --- CRITICAL GUARD: Prevent multiple underhead fetches ---
               if (FetchingMessages) {
                 console.log("Underhead scroll sensor triggered, but blocked by FetchingMessages lock.");
@@ -1730,11 +1852,11 @@ document.body.onclick = function () {
               }
             }
             
-            attached_to_bottom = true;
+            window.attached_to_bottom = true;
             toggle_new_messages_btn(false);
           } else if (scrollTop < scrollHeight - clientHeight - 100) {
             // User has scrolled up more than 100px from bottom - detach
-            attached_to_bottom = false;
+            window.attached_to_bottom = false;
           }
         });
       }
