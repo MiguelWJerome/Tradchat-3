@@ -1987,4 +1987,22 @@
   min-height: 0;
   overflow-y: auto;
   padding: 0 40px 16px;
-}
+}
+/* Chat Uploaded Content */
+.chat-upload-img {
+  max-width: 300px;
+  max-height: 300px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.1);
+  object-fit: cover;
+  cursor: pointer;
+}
+
+.chat-upload-gif {
+  max-width: 300px;
+  max-height: 300px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.1);
+  object-fit: cover;
+  box-shadow: 2px 2px 0 var(--color-dark);
+}

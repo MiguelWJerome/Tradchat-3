@@ -12,7 +12,7 @@ import ast
 import base64
 import io
 from PIL import Image, ImageOps 
-import os
+import requests
 
 def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
     # The 'with' statement handles the "waiting" and "releasing" for you!
@@ -37,6 +37,9 @@ def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
         elif db_string == "last_read":
             lock = last_read_lock
             db_path = 'last_read.db'
+        elif db_string == "gif_whitelist":
+            lock = gif_whitelist_lock
+            db_path = 'gif_whitelist.db'
     
     with lock:
         try:
@@ -399,6 +402,7 @@ rooms_lock = Lock()
 boys_dm_lock = Lock()
 girls_dm_lock = Lock()
 last_read_lock = Lock()
+gif_whitelist_lock = Lock()
 
 if not os.path.exists("mainroom.db"):
     room_db = sqlite3.connect("mainroom.db")
@@ -512,6 +516,28 @@ if not os.path.exists("dms/girls_dm.db"):
         );
     ''')
     girls_dm_db.close()
+
+
+if not os.path.exists("gif_whitelist.db"):
+    gw_db = sqlite3.connect("gif_whitelist.db")
+    gw_cursor = gw_db.cursor()
+    gw_cursor.execute('''
+        CREATE TABLE gif_whitelist (
+            giphy_id TEXT PRIMARY KEY
+        );
+    ''')
+    gw_db.commit()
+    gw_db.close()
+else:
+    # Migration check: check if giphy_id exists, if not, rename tenor_id or recreate
+    gw_db = sqlite3.connect("gif_whitelist.db")
+    gw_cursor = gw_db.cursor()
+    gw_cursor.execute("PRAGMA table_info(gif_whitelist);")
+    columns = [row[1] for row in gw_cursor.fetchall()]
+    if 'tenor_id' in columns and 'giphy_id' not in columns:
+        gw_cursor.execute("ALTER TABLE gif_whitelist RENAME COLUMN tenor_id TO giphy_id;")
+        gw_db.commit()
+    gw_db.close()
 
 def convert_to_gmt(timestamp):
     # Input example: "Sat Mar 07 2026 15:15:11 GMT-0500 (Eastern Standard Time)"
@@ -718,6 +744,21 @@ def upload_file():
             flash('File type not allowed')
     
     return render_template('upload.html')
+    
+@app.route('/gif-approve/')
+def gif_approve():
+    try:
+        username = session['username']
+        password = session['password']
+        if check_credentials(username, password):
+            user_id = find_account_id_or_password_or_gender(username, 'id')
+            if int(user_id) in [1, 2]:
+                return render_template('gif_approve.html')
+            else:
+                return "Unauthorized: Admin Only", 403
+        return redirect('/')
+    except:
+        return redirect('/')
 
 
 
@@ -751,8 +792,8 @@ def Recv(message, sid):
                     gmt_timestamp = convert_to_gmt(timestamp)
 
                     message_id = db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload, reactions, deleted) VALUES (?, ?, ?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, reply_index, upload, "", 0], chat_room=True)
-                    if not upload:
-                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0, 'upload': ''}]), room=room)
+                    if not upload or upload.startswith('http'):
+                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0, 'upload': upload}]), room=room)
                 else:
                     print(f"[ERROR] User {username} does not have access to room {room}")
             
@@ -775,8 +816,8 @@ def Recv(message, sid):
                     anti_convo_hash = f"{un_important_id}-{important_id}"
 
                     message_id = db_sql(f"""INSERT INTO {fm_to_gb[important_gender]}s_dm (convo_hash, sender_id, message, timestamp, reply_id, upload, reactions, deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", f"{fm_to_gb[important_gender]}s_dm", params=[convo_hash, username_id, user_message, gmt_timestamp, reply_index, upload, "", 0], chat_room=False, provide_id=True)
-                    if not upload:
-                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0, 'upload': ''}]), room=room)
+                    if not upload or upload.startswith('http'):
+                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0, 'upload': upload}]), room=room)
                 else:
                     print(f"[ERROR] User {username} does not have access to DM room {room}")
             else:
@@ -1827,6 +1868,85 @@ def Recv(message, sid):
                     db_sql("UPDATE messages SET deleted = 1 WHERE id = ?;", room, params=[index], chat_room=True)
                 
                 Server.send(str(['Message Deleted', {'id': index, 'room': room}]), room=room)
+
+    elif msg[0] == 'Approve GIF':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        giphy_id = data['giphy_id']
+
+        if check_credentials(username, password):
+            user_id = find_account_id_or_password_or_gender(username, 'id')
+            if int(user_id) in [1, 2]: # Admin or Server
+                db_sql("INSERT OR REPLACE INTO gif_whitelist (giphy_id) VALUES (?);", 'gif_whitelist', params=[giphy_id], chat_room=False)
+                Server.send(str(['Approve GIF Result', {'status': 'success', 'giphy_id': giphy_id}]), room=sid)
+            else:
+                Server.send(str(['Approve GIF Result', {'status': 'error', 'message': 'Unauthorized'}]), room=sid)
+
+    elif msg[0] == 'GIF Search':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        query = data['query']
+
+        if check_credentials(username, password):
+            GIPHY_API_KEY = "aiWSDACCInT5DQcuk4hnjC7xMCeEspAv"
+
+            try:
+                # GIPHY Search API (rating=g for safety)
+                url = f"https://api.giphy.com/v1/gifs/search?q={query}&api_key={GIPHY_API_KEY}&limit=50&rating=g"
+                response = requests.get(url)
+                if response.status_code == 200:
+                    giphy_results = response.json().get('data', [])
+                    
+                    # Interception: Filter against whitelist
+                    whitelisted_ids = [row[0] for row in db_sql("SELECT giphy_id FROM gif_whitelist;", 'gif_whitelist', chat_room=False)]
+                    
+                    approved_matches = []
+                    for result in giphy_results:
+                        g_id = result.get('id')
+                        if g_id in whitelisted_ids:
+                            # Extract fixed_height GIF URL and truncate query params
+                            media_url = result.get('images', {}).get('fixed_height', {}).get('url', '').split('?')[0]
+                            approved_matches.append({'giphy_id': g_id, 'url': media_url})
+                    
+                    if approved_matches:
+                        Server.send(str(['GIF Search Results', {'status': 'success', 'results': approved_matches}]), room=sid)
+                    else:
+                        Server.send(str(['GIF Search Results', {'status': 'success', 'results': [], 'message': 'No safe matches found'}]), room=sid)
+                else:
+                    Server.send(str(['GIF Search Results', {'status': 'error', 'message': 'GIPHY API error'}]), room=sid)
+            except Exception as e:
+                print(f"GIF Search Error: {e}")
+                Server.send(str(['GIF Search Results', {'status': 'error', 'message': 'Internal search error'}]), room=sid)
+
+    elif msg[0] == 'Unfiltered GIF Search':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        query = data['query']
+
+        if check_credentials(username, password):
+            user_id = find_account_id_or_password_or_gender(username, 'id')
+            if int(user_id) in [1, 2]:
+                GIPHY_API_KEY = "aiWSDACCInT5DQcuk4hnjC7xMCeEspAv"
+
+                try:
+                    url = f"https://api.giphy.com/v1/gifs/search?q={query}&api_key={GIPHY_API_KEY}&limit=50&rating=g"
+                    response = requests.get(url)
+                    if response.status_code == 200:
+                        giphy_results = response.json().get('data', [])
+                        results = []
+                        for result in giphy_results:
+                            g_id = result.get('id')
+                            media_url = result.get('images', {}).get('fixed_height', {}).get('url', '').split('?')[0]
+                            results.append({'giphy_id': g_id, 'url': media_url})
+                        
+                        Server.send(str(['GIF Search Results', {'status': 'success', 'results': results}]), room=sid)
+                    else:
+                        Server.send(str(['GIF Search Results', {'status': 'error', 'message': 'GIPHY API error'}]), room=sid)
+                except Exception as e:
+                    Server.send(str(['GIF Search Results', {'status': 'error', 'message': str(e)}]), room=sid)
 
 @Server.on('disconnect')
 def on_disconnect():

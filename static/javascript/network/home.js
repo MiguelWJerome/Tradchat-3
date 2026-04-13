@@ -53,7 +53,7 @@ function recv(message) {
             }
             messages = data['messages'];
             if (data['underhead'] && messages.length < 1) {
-                attached_to_bottom = true;
+                window.attached_to_bottom = true;
                 toggle_overhead_animation(false);
                 FetchingMessages = false;
                 return;
@@ -209,6 +209,23 @@ function recv(message) {
         if (window.isRoomDetailsOpen) cl.send(JSON.stringify(['Get Room Members', { 'username': username, 'password': password, 'room': ROOM }]));
     }
     else if (msg[0] === 'Room Error') Alert(msg[1]);
+    else if (msg[0] === 'GIF Search Results') {
+        const data = msg[1];
+        if (data.status === 'success') {
+            if (typeof renderGifResults === 'function') renderGifResults(data.results);
+        } else {
+            Alert(data.message || 'Error searching GIFs');
+            if (typeof renderGifResults === 'function') renderGifResults([]);
+        }
+    }
+    else if (msg[0] === 'Approve GIF Result') {
+        const data = msg[1];
+        if (data.status === 'success') {
+            Alert(`GIF ${data.giphy_id} approved!`);
+        } else {
+            Alert(`Error: ${data.message}`);
+        }
+    }
     else if (msg[0] === 'Room Deleted') {
         const data = msg[1];
         if (data.room === ROOM) {
@@ -324,11 +341,15 @@ sendButton.addEventListener('click', function () {
 
     let IDs = [];
     if (currentUpload.length > 0) {
-        currentUpload.forEach((dataUrl, index) => {
-            const randomID = Math.floor(Math.random() * 9000000000 + 1000000000);
-            const uploadID = username + password + randomID + "_" + index;
-            IDs.push(uploadID);
-            imagesToUpload.push({ 'id': uploadID, 'image': dataUrl });
+        currentUpload.forEach((item, index) => {
+            if (item.startsWith('http')) {
+                IDs.push(item); // Direct URL (GIPHY)
+            } else {
+                const randomID = Math.floor(Math.random() * 9000000000 + 1000000000);
+                const uploadID = username + password + randomID + "_" + index;
+                IDs.push(uploadID);
+                imagesToUpload.push({ 'id': uploadID, 'image': item });
+            }
         });
         uploadData = IDs.join('|');
     }
@@ -429,6 +450,53 @@ function broadcast_added_reaction(index, emoji) {
 function broadcast_removed_reaction(index, emoji) {
     cl.send(JSON.stringify(['Removed Reaction', { 'username': username, 'password': password, 'index': index, 'room': ROOM, 'emoji': emoji }]))
 }
+
+window.emitGifSearch = function(query) {
+    cl.send(JSON.stringify(['GIF Search', { 'username': username, 'password': password, 'query': query }]));
+};
+
+window.attachGif = function(url) {
+    currentUpload.push(url);
+    const idx = currentUpload.length - 1;
+    const $card = $(`
+        <div class="upload-preview-item" data-idx="${idx}">
+            <img src="${url}" alt="GIF Preview" />
+            <button class="preview-close-btn" aria-label="Remove GIF">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    `);
+
+    $card.find('.preview-close-btn').on('click', function(e) {
+        e.preventDefault();
+        const cardIdx = parseInt($card.attr('data-idx'));
+        currentUpload.splice(cardIdx, 1);
+        $card.remove();
+        $('#upload-preview-strip .upload-preview-item').each(function(i) {
+            $(this).attr('data-idx', i);
+        });
+        if (currentUpload.length === 0) {
+            $('#upload-preview-container').hide();
+        }
+    });
+
+    $('#upload-preview-strip').append($card);
+    $('#upload-preview-container').show();
+
+    if (attached_to_bottom) {
+        let $feed = $('#chat-feed');
+        $feed.scrollTop($feed[0].scrollHeight);
+    }
+};
+
+window.sendGif = function(url) {
+    // Deprecated in favor of attachGif, but kept for compatibility
+    window.attachGif(url);
+};
+
+window.approveGif = function(giphy_id) {
+    cl.send(JSON.stringify(['Approve GIF', { 'username': username, 'password': password, giphy_id: giphy_id }]));
+};
 
 document.getElementById('messenger-icon').addEventListener('click', function () {
     cl.send(JSON.stringify(['Get Dms', { 'username': username, 'password': password }]))

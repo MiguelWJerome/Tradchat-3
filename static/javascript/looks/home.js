@@ -132,7 +132,7 @@ document.body.onclick = function () {
 
     $(document).ready(function () {
       // Logic moved to switch functions in network layer
-      
+
       $('#chat-panel-header').on('click', function () {
         // Do not allow opening room details for direct messages
         if (typeof ROOM !== 'undefined' && ROOM.includes('.$@-@&.')) {
@@ -242,7 +242,7 @@ document.body.onclick = function () {
         // Curators can edit below
         let canEdit = false;
         const isMyself = member.username === username;
-        
+
         if (!isMyself) {
           if (myRole === 'Owner') canEdit = true;
           else if (myRole === 'Manager' && (member.role === 'Curator' || member.role === 'Member')) canEdit = true;
@@ -320,7 +320,7 @@ document.body.onclick = function () {
             // 2. Managers can edit Curators and Members.
             // 3. Curators can edit Members.
             // 4. Managers/Curators cannot promote anyone to their own rank.
-            
+
             if (myRole === 'Manager') {
               if (possiblePromote === 'Manager') possiblePromote = null;
             }
@@ -346,7 +346,7 @@ document.body.onclick = function () {
               }
               return $svg[0].outerHTML;
             }
-            
+
             function getRoleColor(roleObj) {
               if (roleObj === 'Owner') return '#c6c600';
               if (roleObj === 'Manager') return '#0000bc';
@@ -551,7 +551,7 @@ document.body.onclick = function () {
     window.changeSelectedRoomOption = function (roomId) {
       // Deselect the current room if one exists
       if (selectedRoomId) {
-        $(".convo-item").filter(function() { return $(this).attr("data-room") === selectedRoomId; }).removeClass("active");
+        $(".convo-item").filter(function () { return $(this).attr("data-room") === selectedRoomId; }).removeClass("active");
       }
 
       // Update the selected room ID
@@ -559,15 +559,15 @@ document.body.onclick = function () {
 
       // Select the new room if roomId is provided
       if (roomId) {
-        var $item = $(".convo-item").filter(function() { return $(this).attr("data-room") === roomId; });
+        var $item = $(".convo-item").filter(function () { return $(this).attr("data-room") === roomId; });
         $item.addClass("active");
-        
+
         // UI MAGIC: Clear unread status visually when switching to this room
         $item.css("background", ""); // Remove inline light blue background
-        $item.find("div").filter(function() { 
+        $item.find("div").filter(function () {
           // Match the dark blue background color of the unread indicator
           var bg = $(this).css("background-color");
-          return bg === "rgb(30, 64, 175)" || bg === "#1e40af"; 
+          return bg === "rgb(30, 64, 175)" || bg === "#1e40af";
         }).remove();
       }
     };
@@ -721,12 +721,12 @@ document.body.onclick = function () {
           var firstTimestamp = parseInt($firstMsg.attr("data-timestamp") || "0");
           var firstUser = $firstMsg.attr("data-user");
           var timeDiffMs = firstTimestamp - currentTimestamp;
-          
+
           // Check if the first message bubble is deleted
           var firstBubbleIsDeleted = $firstMsg.find(".message__bubble").first().find(".message__text").text() === "(message has been deleted)";
 
           // Grouping logic: Not deleted, same user, same date, and the existing message is NEWER (timeDiff >= 0)
-          isSameUser = !isDeleted && !firstBubbleIsDeleted && 
+          isSameUser = !isDeleted && !firstBubbleIsDeleted &&
             (firstUser === (myself ? "You" : username)) &&
             (firstDateAttr === fullDateStr) &&
             (timeDiffMs < fiveMinutesMs) &&
@@ -761,7 +761,7 @@ document.body.onclick = function () {
         var lastTimestamp = parseInt($lastMsg.attr("data-timestamp") || "0");
         var lastUser = $lastMsg.attr("data-user");
         var timeDiffMs = currentTimestamp - lastTimestamp;
-        
+
         // Check if the last message bubble is deleted
         var lastBubbleIsDeleted = $lastMsg.find(".message__bubble").last().find(".message__text").text() === "(message has been deleted)";
 
@@ -771,31 +771,31 @@ document.body.onclick = function () {
 
       var hitUnread = false;
       if (typeof scrollData === "object" && scrollData.lastTimeStamp && !window.__placed_unread_marker) {
-         if (timestamp > scrollData.lastTimeStamp) {
-             isSameUser = false;
-             window.__placed_unread_marker = true;
-             
-             var $unreadDivider = $("<div>")
-                .addClass("chat-unread-divider")
-                .css({
-                  "display": "flex",
-                  "align-items": "center",
-                  "justify-content": "center",
-                  "margin": "20px 0",
-                  "position": "relative"
-                })
-                .html(`
+        if (timestamp > scrollData.lastTimeStamp) {
+          isSameUser = false;
+          window.__placed_unread_marker = true;
+
+          var $unreadDivider = $("<div>")
+            .addClass("chat-unread-divider")
+            .css({
+              "display": "flex",
+              "align-items": "center",
+              "justify-content": "center",
+              "margin": "20px 0",
+              "position": "relative"
+            })
+            .html(`
                         <div style="position: absolute; width: 100%; height: 1px; background: red; z-index: 1;"></div>
                         <span style="background: var(--color-light); padding: 4px 15px; z-index: 2; color: red; font-size: 0.85rem; font-weight: bold; border-radius: 4px; border: 1px solid red; white-space: nowrap;">
                             NEW MESSAGES
                         </span>
                     `);
-             if (overhead) {
-                $messageContainer.prepend($unreadDivider);
-             } else {
-                $messageContainer.append($unreadDivider);
-             }
-         }
+          if (overhead) {
+            $messageContainer.prepend($unreadDivider);
+          } else {
+            $messageContainer.append($unreadDivider);
+          }
+        }
       }
 
       if (isSameUser && $targetMsgGroup.length) {
@@ -813,22 +813,22 @@ document.body.onclick = function () {
 
         // Add message actions hover menu
         var $actions = $("<div>").addClass("message-actions");
-        
+
         if (!isDeleted) {
-            let actionsHtml = '<div class="action-item reaction-btn" title="React">😊</div>' +
-                              '<div class="action-divider"></div>';
-            
-            if (canDelete) {
-                actionsHtml += '<div class="action-item delete-btn" title="Delete">🗑️</div>' +
-                               '<div class="action-divider"></div>';
-            }
-            
-            actionsHtml += '<div class="action-item unread-btn" title="Mark Unread">💬</div>' +
-                           '<div class="action-divider"></div>';
-            
-            actionsHtml += '<div class="action-item reply-btn" title="Reply">↩️</div>';
-            $actions.html(actionsHtml);
-            $newBubble.append($actions);
+          let actionsHtml = '<div class="action-item reaction-btn" title="React">😊</div>' +
+            '<div class="action-divider"></div>';
+
+          if (canDelete) {
+            actionsHtml += '<div class="action-item delete-btn" title="Delete">🗑️</div>' +
+              '<div class="action-divider"></div>';
+          }
+
+          actionsHtml += '<div class="action-item unread-btn" title="Mark Unread">💬</div>' +
+            '<div class="action-divider"></div>';
+
+          actionsHtml += '<div class="action-item reply-btn" title="Reply">↩️</div>';
+          $actions.html(actionsHtml);
+          $newBubble.append($actions);
         }
 
         var $newText = $("<div>").addClass("message__text").text(isDeleted ? "(message has been deleted)" : message);
@@ -851,28 +851,25 @@ document.body.onclick = function () {
 
         // --- Handle Images for Grouped Messages ---
         if (data['upload'] && data['upload'].trim() !== '') {
-            let imageGroup = $("<div>").css({"display": "flex", "flex-wrap": "wrap", "gap": "8px", "margin-top": "8px"});
-            let uploadItems = data['upload'].split('|');
-            uploadItems.forEach(item => {
-                if (item.startsWith('/static/uploads/')) {
-                    let $img = $("<img>").attr("src", item).css({
-                        "max-width": "200px",
-                        "max-height": "200px",
-                        "border-radius": "8px",
-                        "border": "1px solid rgba(0,0,0,0.1)",
-                        "object-fit": "cover",
-                        "cursor": "pointer"
-                    }).on('click', function() { window.open(item, '_blank'); });
-                    imageGroup.append($img);
-                }
-            });
-            if (imageGroup.children().length > 0) {
-                if (overhead) {
-                    $newBubble.after(imageGroup);
-                } else {
-                    $targetMsgGroup.find(".message__content").append(imageGroup);
-                }
+          let imageGroup = $("<div>").css({ "display": "flex", "flex-wrap": "wrap", "gap": "8px", "margin-top": "8px" });
+          let uploadItems = data['upload'].split('|');
+          uploadItems.forEach(item => {
+            if (item.startsWith('/static/uploads/')) {
+              let $img = $("<img>").attr("src", item).addClass("chat-upload-img").on('click', function () { window.open(item, '_blank'); });
+              imageGroup.append($img);
+            } else if (item.includes('giphy.com')) {
+              // GIPHY GIF Rendering
+              let $gif = $("<img>").attr("src", item).addClass("chat-upload-gif");
+              imageGroup.append($gif);
             }
+          });
+          if (imageGroup.children().length > 0) {
+            if (overhead) {
+              $newBubble.after(imageGroup);
+            } else {
+              $targetMsgGroup.find(".message__content").append(imageGroup);
+            }
+          }
         }
 
         // Add reply button click handler
@@ -934,61 +931,61 @@ document.body.onclick = function () {
         });
 
         // Add unread button click handler
-        $newBubble.find('.unread-btn').on('click', function(e) {
-            e.stopPropagation();
-            const $bubble = $(this).closest('.message__bubble');
-            const index = $bubble.attr('aria-index');
-            
-            $('.chat-unread-divider').remove(); // remove any existing ones
+        $newBubble.find('.unread-btn').on('click', function (e) {
+          e.stopPropagation();
+          const $bubble = $(this).closest('.message__bubble');
+          const index = $bubble.attr('aria-index');
 
-            var $unreadDivider = $("<div>")
-               .addClass("chat-unread-divider")
-               .css({
-                 "display": "flex",
-                 "align-items": "center",
-                 "justify-content": "center",
-                 "margin": "20px 0",
-                 "position": "relative"
-               })
-               .html(`
+          $('.chat-unread-divider').remove(); // remove any existing ones
+
+          var $unreadDivider = $("<div>")
+            .addClass("chat-unread-divider")
+            .css({
+              "display": "flex",
+              "align-items": "center",
+              "justify-content": "center",
+              "margin": "20px 0",
+              "position": "relative"
+            })
+            .html(`
                        <div style="position: absolute; width: 100%; height: 1px; background: red; z-index: 1;"></div>
                        <span style="background: var(--color-light); padding: 4px 15px; z-index: 2; color: red; font-size: 0.85rem; font-weight: bold; border-radius: 4px; border: 1px solid red; white-space: nowrap;">
                            NEW MESSAGES
                        </span>
                    `);
 
-            const $msgGroup = $bubble.closest('.message');
-            const $prevBubbles = $bubble.prevAll('.message__bubble');
+          const $msgGroup = $bubble.closest('.message');
+          const $prevBubbles = $bubble.prevAll('.message__bubble');
 
-            if ($prevBubbles.length > 0) {
-                // Split the group
-                const isOwn = $msgGroup.hasClass('own');
-                const $newGroup = $('<div>').addClass('message').addClass(isOwn ? 'own' : '');
-                const $content = $('<div>').addClass('message__content');
-                
-                // Get original avatar and name wrapper
-                const $originalAvatar = $msgGroup.find('.message__avatar').first().clone();
-                const $originalNameWrapper = $msgGroup.find('.message__content > div').first().clone();
-                
-                $content.append($originalNameWrapper);
-                
-                // Move current bubble and all following siblings (bubbles + images)
-                const $toMove = $bubble.add($bubble.nextAll());
-                $content.append($toMove);
-                
-                if ($originalAvatar.length) $newGroup.append($originalAvatar);
-                $newGroup.append($content);
-                
-                $msgGroup.after($newGroup);
-                $newGroup.before($unreadDivider);
-            } else {
-                // Already the first bubble in the group, just place divider before the group
-                $msgGroup.before($unreadDivider);
-            }
-            
-            if (typeof broadcast_mark_unread === 'function') {
-                broadcast_mark_unread(index);
-            }
+          if ($prevBubbles.length > 0) {
+            // Split the group
+            const isOwn = $msgGroup.hasClass('own');
+            const $newGroup = $('<div>').addClass('message').addClass(isOwn ? 'own' : '');
+            const $content = $('<div>').addClass('message__content');
+
+            // Get original avatar and name wrapper
+            const $originalAvatar = $msgGroup.find('.message__avatar').first().clone();
+            const $originalNameWrapper = $msgGroup.find('.message__content > div').first().clone();
+
+            $content.append($originalNameWrapper);
+
+            // Move current bubble and all following siblings (bubbles + images)
+            const $toMove = $bubble.add($bubble.nextAll());
+            $content.append($toMove);
+
+            if ($originalAvatar.length) $newGroup.append($originalAvatar);
+            $newGroup.append($content);
+
+            $msgGroup.after($newGroup);
+            $newGroup.before($unreadDivider);
+          } else {
+            // Already the first bubble in the group, just place divider before the group
+            $msgGroup.before($unreadDivider);
+          }
+
+          if (typeof broadcast_mark_unread === 'function') {
+            broadcast_mark_unread(index);
+          }
         });
       } else {
         // New Message Group - create a new message container
@@ -1034,7 +1031,7 @@ document.body.onclick = function () {
 
         // Add message actions hover menu
         var $actions = $("<div>").addClass("message-actions");
-        
+
         // Role-based delete button visibility
         // Can delete if: 1. It's your message 2. It's a room and you are Owner/Manager
         const isDM = typeof ROOM !== 'undefined' && ROOM.includes('.$@-@&.');
@@ -1042,21 +1039,21 @@ document.body.onclick = function () {
         const canDelete = myself || (!isDM && isMod);
 
         if (!isDeleted) {
-            let actionsHtml = '<div class="action-item reaction-btn" title="React">😊</div>' +
-                              '<div class="action-divider"></div>';
-            
-            if (canDelete) {
-                actionsHtml += '<div class="action-item delete-btn" title="Delete">🗑️</div>' +
-                               '<div class="action-divider"></div>';
-            }
-            
-            actionsHtml += '<div class="action-item unread-btn" title="Mark Unread">💬</div>' +
-                           '<div class="action-divider"></div>';
-            
-            actionsHtml += '<div class="action-item reply-btn" title="Reply">↩️</div>';
-            
-            $actions.html(actionsHtml);
-            $bubble.append($actions);
+          let actionsHtml = '<div class="action-item reaction-btn" title="React">😊</div>' +
+            '<div class="action-divider"></div>';
+
+          if (canDelete) {
+            actionsHtml += '<div class="action-item delete-btn" title="Delete">🗑️</div>' +
+              '<div class="action-divider"></div>';
+          }
+
+          actionsHtml += '<div class="action-item unread-btn" title="Mark Unread">💬</div>' +
+            '<div class="action-divider"></div>';
+
+          actionsHtml += '<div class="action-item reply-btn" title="Reply">↩️</div>';
+
+          $actions.html(actionsHtml);
+          $bubble.append($actions);
         }
 
         // If this is a reply, add reply indicator
@@ -1089,26 +1086,23 @@ document.body.onclick = function () {
 
         // --- Handle Images for New Message Groups ---
         if (data['upload'] && data['upload'].trim() !== '') {
-            let imageGroup = $("<div>").css({"display": "flex", "flex-wrap": "wrap", "gap": "8px", "margin-top": "8px"});
-            if (myself) imageGroup.css("justify-content", "flex-end");
-            
-            let uploadItems = data['upload'].split('|');
-            uploadItems.forEach(item => {
-                if (item.startsWith('/static/uploads/')) {
-                    let $img = $("<img>").attr("src", item).css({
-                        "max-width": "200px",
-                        "max-height": "200px",
-                        "border-radius": "8px",
-                        "border": "1px solid rgba(0,0,0,0.1)",
-                        "object-fit": "cover",
-                        "cursor": "pointer"
-                    }).on('click', function() { window.open(item, '_blank'); });
-                    imageGroup.append($img);
-                }
-            });
-            if (imageGroup.children().length > 0) {
-                $content.append(imageGroup);
+          let imageGroup = $("<div>").css({ "display": "flex", "flex-wrap": "wrap", "gap": "8px", "margin-top": "8px" });
+          if (myself) imageGroup.css("justify-content", "flex-end");
+
+          let uploadItems = data['upload'].split('|');
+          uploadItems.forEach(item => {
+            if (item.startsWith('/static/uploads/')) {
+              let $img = $("<img>").attr("src", item).addClass("chat-upload-img").on('click', function () { window.open(item, '_blank'); });
+              imageGroup.append($img);
+            } else if (item.includes('giphy.com')) {
+              // GIPHY GIF Rendering
+              let $gif = $("<img>").attr("src", item).addClass("chat-upload-gif");
+              imageGroup.append($gif);
             }
+          });
+          if (imageGroup.children().length > 0) {
+            $content.append(imageGroup);
+          }
         }
 
         // Add reply button click handler
@@ -1170,61 +1164,61 @@ document.body.onclick = function () {
         });
 
         // Add unread button click handler
-        $bubble.find('.unread-btn').on('click', function(e) {
-            e.stopPropagation();
-            const $clickedBubble = $(this).closest('.message__bubble');
-            const index = $clickedBubble.attr('aria-index');
-            
-            $('.chat-unread-divider').remove(); // remove any existing ones
+        $bubble.find('.unread-btn').on('click', function (e) {
+          e.stopPropagation();
+          const $clickedBubble = $(this).closest('.message__bubble');
+          const index = $clickedBubble.attr('aria-index');
 
-            var $unreadDivider = $("<div>")
-               .addClass("chat-unread-divider")
-               .css({
-                 "display": "flex",
-                 "align-items": "center",
-                 "justify-content": "center",
-                 "margin": "20px 0",
-                 "position": "relative"
-               })
-               .html(`
+          $('.chat-unread-divider').remove(); // remove any existing ones
+
+          var $unreadDivider = $("<div>")
+            .addClass("chat-unread-divider")
+            .css({
+              "display": "flex",
+              "align-items": "center",
+              "justify-content": "center",
+              "margin": "20px 0",
+              "position": "relative"
+            })
+            .html(`
                        <div style="position: absolute; width: 100%; height: 1px; background: red; z-index: 1;"></div>
                        <span style="background: var(--color-light); padding: 4px 15px; z-index: 2; color: red; font-size: 0.85rem; font-weight: bold; border-radius: 4px; border: 1px solid red; white-space: nowrap;">
                            NEW MESSAGES
                        </span>
                    `);
 
-            const $msgGroup = $clickedBubble.closest('.message');
-            const $prevBubbles = $clickedBubble.prevAll('.message__bubble');
+          const $msgGroup = $clickedBubble.closest('.message');
+          const $prevBubbles = $clickedBubble.prevAll('.message__bubble');
 
-            if ($prevBubbles.length > 0) {
-                // Split the group
-                const isOwn = $msgGroup.hasClass('own');
-                const $newGroup = $('<div>').addClass('message').addClass(isOwn ? 'own' : '');
-                const $content = $('<div>').addClass('message__content');
-                
-                // Get original avatar and name wrapper
-                const $originalAvatar = $msgGroup.find('.message__avatar').first().clone();
-                const $originalNameWrapper = $msgGroup.find('.message__content > div').first().clone();
-                
-                $content.append($originalNameWrapper);
-                
-                // Move current bubble and all following siblings (bubbles + images)
-                const $toMove = $clickedBubble.add($clickedBubble.nextAll());
-                $content.append($toMove);
-                
-                if ($originalAvatar.length) $newGroup.append($originalAvatar);
-                $newGroup.append($content);
-                
-                $msgGroup.after($newGroup);
-                $newGroup.before($unreadDivider);
-            } else {
-                // Already the first bubble in the group, just place divider before the group
-                $msgGroup.before($unreadDivider);
-            }
-            
-            if (typeof broadcast_mark_unread === 'function') {
-                broadcast_mark_unread(index);
-            }
+          if ($prevBubbles.length > 0) {
+            // Split the group
+            const isOwn = $msgGroup.hasClass('own');
+            const $newGroup = $('<div>').addClass('message').addClass(isOwn ? 'own' : '');
+            const $content = $('<div>').addClass('message__content');
+
+            // Get original avatar and name wrapper
+            const $originalAvatar = $msgGroup.find('.message__avatar').first().clone();
+            const $originalNameWrapper = $msgGroup.find('.message__content > div').first().clone();
+
+            $content.append($originalNameWrapper);
+
+            // Move current bubble and all following siblings (bubbles + images)
+            const $toMove = $clickedBubble.add($clickedBubble.nextAll());
+            $content.append($toMove);
+
+            if ($originalAvatar.length) $newGroup.append($originalAvatar);
+            $newGroup.append($content);
+
+            $msgGroup.after($newGroup);
+            $newGroup.before($unreadDivider);
+          } else {
+            // Already the first bubble in the group, just place divider before the group
+            $msgGroup.before($unreadDivider);
+          }
+
+          if (typeof broadcast_mark_unread === 'function') {
+            broadcast_mark_unread(index);
+          }
         });
       }
 
@@ -1595,10 +1589,62 @@ document.body.onclick = function () {
 
     /**
      * =========================================================================
-     * MOBILE ENHANCEMENTS
-     * Mobile-specific functionality for better mobile experience
      * =========================================================================
      */
+
+    $(document).ready(function () {
+      // GIF Modal Logic
+      $('#gif-btn').on('click', function () {
+        $('#gif-modal').css('display', 'flex').attr('aria-hidden', 'false');
+      });
+
+      $('#gif-modal-close').on('click', function () {
+        $('#gif-modal').hide().attr('aria-hidden', 'true');
+        $('#gif-btn').focus(); // Transfer focus back to the button that opened it
+      });
+
+      $('#gif-search-btn-icon').on('click', function () {
+        let query = $('#gif-search-input').val().trim();
+        if (query) {
+          if (typeof window.emitGifSearch === 'function') {
+            $('#gif-results-container').html('<p style="grid-column: span 2; text-align: center; color: #777; margin-top: 20px;">Searching...</p>');
+            window.emitGifSearch(query);
+          }
+        }
+      });
+
+      $('#gif-search-input').on('keypress', function (e) {
+        if (e.key === 'Enter') {
+          $('#gif-search-btn-icon').click();
+        }
+      });
+
+      window.renderGifResults = function (results) {
+        const $container = $('#gif-results-container');
+        $container.empty();
+        if (results.length === 0) {
+          $container.html('<p style="grid-column: span 2; text-align: center; color: #777; margin-top: 20px;">No safe matches found.</p>');
+          return;
+        }
+
+        results.forEach(gif => {
+          let $img = $('<img>').attr('src', gif.url).css({
+            'width': '100%',
+            'height': 'auto',
+            'border-radius': '8px',
+            'cursor': 'pointer',
+          }).on('click', function () {
+            if (typeof window.attachGif === 'function') {
+              window.attachGif(gif.url);
+              $('#gif-modal').hide().attr('aria-hidden', 'true');
+              $('#gif-btn').focus();
+            }
+          });
+          $container.append($img);
+        });
+      };
+    });
+
 
     // Check if we're on mobile (max-width: 768px)
     function isMobile() {
@@ -1834,7 +1880,7 @@ document.body.onclick = function () {
                 console.log('Called fetch_underhead_messages with ID:', bottommost_id);
               }
             }
-            
+
             window.attached_to_bottom = true;
             toggle_new_messages_btn(false);
           } else if (scrollTop < scrollHeight - clientHeight - 100) {
@@ -1962,12 +2008,12 @@ document.body.onclick = function () {
         // Attach emoji picker to the modal selector
         if (typeof window.emojiPicker !== 'undefined' && window.emojiPicker.re_attach) {
           // Clear invalid styles as soon as they click to pick an emoji
-          $("#selected-emoji").off('click.validation').on('click.validation', function() {
+          $("#selected-emoji").off('click.validation').on('click.validation', function () {
             $(this).removeClass('invalid');
             $("#room-emoji-selector").removeClass('invalid');
           });
 
-          window.emojiPicker.re_attach('#selected-emoji', function (emoji) { 
+          window.emojiPicker.re_attach('#selected-emoji', function (emoji) {
             $("#selected-emoji").html(emoji).removeClass('invalid');
             $("#room-emoji-selector").removeClass('invalid');
             $("#room-emoji").val(emoji);
@@ -2010,7 +2056,7 @@ document.body.onclick = function () {
      */
     function submitRoomCreation(e) {
       if (e) e.preventDefault();
-      
+
       var roomName = $("#room-name").val().trim();
       var roomDescription = $("#room-description").val().trim();
       var roomEmojiText = $("#selected-emoji").text().trim();
@@ -2037,14 +2083,14 @@ document.body.onclick = function () {
       } else {
         console.error("emitCreateRoom not found in network layer.");
       }
-      
+
       roomModal('hide');
     }
 
     // Document ready handlers for modal
     $(document).ready(function () {
       // Connect Create button from sidebar
-      $("#create-btn").on("click", function() {
+      $("#create-btn").on("click", function () {
         roomModal('show');
       });
 

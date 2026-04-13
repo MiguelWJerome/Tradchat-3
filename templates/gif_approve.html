@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>GIF Approve - TradChat Admin</title>
+    <script src="/static/javascript/jQuery.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f4f4f4;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #218838;
+        }
+
+        .results {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .gif-item {
+            cursor: pointer;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            overflow: hidden;
+            transition: transform 0.2s;
+        }
+
+        .gif-item:hover {
+            transform: scale(1.05);
+            border-color: #28a745;
+        }
+
+        .gif-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>GIF Approval Portal</h1>
+        <p>Search all of Tenor and click a GIF to whitelist it.</p>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search GIPHY GIFs...">
+            <button id="search-btn">Search</button>
+        </div>
+        <div class="results" id="results-container"></div>
+    </div>
+
+    <script>
+        const socket = io();
+
+        const username = prompt("Confirm Admin Username:");
+        const password = prompt("Confirm Admin Password:");
+
+        $('#search-btn').on('click', function () {
+            const query = $('#search-input').val().trim();
+            if (query) {
+                $('#results-container').html('<p>Searching GIPHY...</p>');
+                socket.emit('message', JSON.stringify(['Unfiltered GIF Search', {
+                    username: username,
+                    password: password,
+                    query: query
+                }]));
+            }
+        });
+
+        $('#search-input').on('keypress', function (e) {
+            if (e.key === 'Enter') $('#search-btn').click();
+        });
+
+        socket.on('message', function (msg) {
+            const data = eval(msg);
+            if (data[0] === 'GIF Search Results') {
+                const res = data[1];
+                const $container = $('#results-container');
+                $container.empty();
+
+                if (res.status === 'success') {
+                    res.results.forEach(gif => {
+                        const $item = $('<div class="gif-item"></div>');
+                        const $img = $('<img>').attr('src', gif.url);
+                        $item.append($img);
+                        $item.on('click', function () {
+                            if (confirm("Whitelist this GIF (ID: " + gif.giphy_id + ")?")) {
+                                socket.emit('message', JSON.stringify(['Approve GIF', {
+                                    username: username,
+                                    password: password,
+                                    giphy_id: gif.giphy_id
+                                }]));
+                            }
+                        });
+                        $container.append($item);
+                    });
+                } else {
+                    $container.html('<p style="color: red;">' + res.message + '</p>');
+                }
+            } else if (data[0] === 'Approve GIF Result') {
+                const res = data[1];
+                if (res.status === 'success') {
+                    alert("GIF Approved and added to whitelist!");
+                } else {
+                    alert("Error: " + res.message);
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
