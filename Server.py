@@ -2002,6 +2002,106 @@ def Recv(message, sid):
         else:
             Server.send(str(['Delete Whitelisted GIF Result', {'status': 'error', 'message': 'Invalid password'}]), room=sid)
 
+    elif msg[0] == 'Get Matching Keywords':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        query = data.get('query', '')
+
+        if check_credentials(username, password):
+            try:
+                # Clean query
+                clean_query = clean_keyword(query)
+                
+                # If query is empty, show all unique keywords (limited)
+                if not clean_query:
+                    results = db_sql(
+                        "SELECT DISTINCT keyword FROM gif_tags ORDER BY keyword ASC LIMIT 100;",
+                        'gif_whitelist', chat_room=False
+                    )
+                else:
+                    # Match keywords that START WITH the query
+                    results = db_sql(
+                        "SELECT DISTINCT keyword FROM gif_tags WHERE keyword LIKE ? ORDER BY keyword ASC LIMIT 50;",
+                        'gif_whitelist', params=[clean_query + '%'], chat_room=False
+                    )
+                
+                keyword_list = [row[0] for row in results]
+                Server.send(str(['Matching Keywords Result', {'status': 'success', 'keywords': keyword_list, 'query': query}]), room=sid)
+            except Exception as e:
+                print(f"Get Matching Keywords Error: {e}")
+                Server.send(str(['Matching Keywords Result', {'status': 'error', 'message': 'Failed to fetch keywords'}]), room=sid)
+        else:
+            Server.send(str(['Matching Keywords Result', {'status': 'error', 'message': 'Invalid credentials'}]), room=sid)
+
+    elif msg[0] == 'Get GIF Keywords':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        giphy_id = data['giphy_id']
+
+        if check_credentials(username, password):
+            try:
+                # Find current keywords for this GIF
+                results = db_sql(
+                    "SELECT gt.keyword FROM gif_tags gt JOIN whitelist_gifs wg ON gt.gif_id = wg.id WHERE wg.giphy_id = ?;",
+                    'gif_whitelist', params=[giphy_id], chat_room=False
+                )
+                keyword_list = [row[0] for row in results]
+                Server.send(str(['Get GIF Keywords Result', {'status': 'success', 'giphy_id': giphy_id, 'keywords': keyword_list}]), room=sid)
+            except Exception as e:
+                print(f"Get GIF Keywords Error: {e}")
+                Server.send(str(['Get GIF Keywords Result', {'status': 'error', 'message': 'Failed to fetch keywords'}]), room=sid)
+        else:
+            Server.send(str(['Get GIF Keywords Result', {'status': 'error', 'message': 'Invalid credentials'}]), room=sid)
+
+    elif msg[0] == 'Update GIF Keywords':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        giphy_id = data['giphy_id']
+        keywords = data['keywords']
+
+        if check_credentials(username, password):
+            user_id = find_account_id_or_password_or_gender(username, 'id')
+            if int(user_id) in [1, 2, 3, 4]: # Admin accounts
+                try:
+                    # 1. Get internal gif_id
+                    existing = db_sql("SELECT id FROM whitelist_gifs WHERE giphy_id = ?;", 'gif_whitelist', params=[giphy_id], chat_room=False)
+                    if not existing:
+                        Server.send(str(['Update GIF Keywords Result', {'status': 'error', 'message': 'GIF not found in whitelist'}]), room=sid)
+                        return
+                    
+                    gif_db_id = existing[0][0]
+
+                    # 2. Clean new keywords
+                    cleaned_keywords = []
+                    for kw in keywords:
+                        cleaned = clean_keyword(kw)
+                        if cleaned and cleaned not in cleaned_keywords:
+                            cleaned_keywords.append(cleaned)
+
+                    if len(cleaned_keywords) < 1:
+                        Server.send(str(['Update GIF Keywords Result', {'status': 'error', 'message': 'At least 1 keyword required'}]), room=sid)
+                        return
+
+                    # 3. Delete old tags
+                    db_sql("DELETE FROM gif_tags WHERE gif_id = ?;", 'gif_whitelist', params=[gif_db_id], chat_room=False)
+
+                    # 4. Insert new tags
+                    for kw in cleaned_keywords:
+                        db_sql("INSERT INTO gif_tags (gif_id, keyword) VALUES (?, ?);", 'gif_whitelist', params=[gif_db_id, kw], chat_room=False)
+
+                    print(f"Update GIF: Updated keywords for giphy_id={giphy_id} (User: {username})")
+                    Server.send(str(['Update GIF Keywords Result', {'status': 'success', 'giphy_id': giphy_id}]), room=sid)
+                except Exception as e:
+                    print(f"Update GIF Keywords Error: {e}")
+                    Server.send(str(['Update GIF Keywords Result', {'status': 'error', 'message': 'Database error updating keywords'}]), room=sid)
+            else:
+                Server.send(str(['Update GIF Keywords Result', {'status': 'error', 'message': 'Unauthorized - Admin only'}]), room=sid)
+        else:
+            Server.send(str(['Update GIF Keywords Result', {'status': 'error', 'message': 'Invalid password'}]), room=sid)
+
 @Server.on('disconnect')
 def on_disconnect():
     process_room_leave(request.sid)

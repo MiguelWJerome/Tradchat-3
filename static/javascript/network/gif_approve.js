@@ -79,6 +79,33 @@ function emitGifSearch(username, password, query) {
 }
 
 /**
+ * Get keywords matching a query from the database
+ * @param {string} username - Admin username
+ * @param {string} password - Admin password
+ * @param {string} query - Keyword query
+ */
+function emitGetMatchingKeywords(username, password, query) {
+    cl.send(JSON.stringify(['Get Matching Keywords', {
+        username: username,
+        password: password,
+        query: query
+    }]));
+}
+
+/**
+ * Listen for Matching Keywords results
+ * @param {Function} callback - Handler for results
+ */
+function onMatchingKeywordsResult(callback) {
+    cl.on('message', function(msg) {
+        const data = eval(msg);
+        if (data[0] === 'Matching Keywords Result') {
+            callback(data[1]);
+        }
+    });
+}
+
+/**
  * Send Delete GIF request to server
  * @param {string} username - Admin username
  * @param {string} password - Admin password
@@ -118,14 +145,76 @@ function onDeleteGifResult(callback) {
     });
 }
 
+/**
+ * Request keywords for a specific whitelisted GIF
+ * @param {string} username - Admin username
+ * @param {string} password - Admin password
+ * @param {string} giphyId - Giphy GIF ID
+ */
+function emitGetGifKeywords(username, password, giphyId) {
+    cl.send(JSON.stringify(['Get GIF Keywords', {
+        username: username,
+        password: password,
+        giphy_id: giphyId
+    }]));
+}
+
+/**
+ * Listen for Get GIF Keywords result
+ * @param {Function} callback - Handler for result
+ */
+function onGetGifKeywordsResult(callback) {
+    cl.on('message', function(msg) {
+        const data = eval(msg);
+        if (data[0] === 'Get GIF Keywords Result') {
+            callback(data[1]);
+        }
+    });
+}
+
+/**
+ * Send Update GIF Keywords request to server
+ * @param {string} username - Admin username
+ * @param {string} password - Admin password
+ * @param {string} giphyId - Giphy GIF ID
+ * @param {Array<string>} keywords - New keywords for the GIF
+ */
+function emitUpdateGifKeywords(username, password, giphyId, keywords) {
+    cl.send(JSON.stringify(['Update GIF Keywords', {
+        username: username,
+        password: password,
+        giphy_id: giphyId,
+        keywords: keywords
+    }]));
+}
+
+/**
+ * Listen for Update GIF Keywords result
+ * @param {Function} callback - Handler for result
+ */
+function onUpdateGifKeywordsResult(callback) {
+    cl.on('message', function(msg) {
+        const data = eval(msg);
+        if (data[0] === 'Update GIF Keywords Result') {
+            callback(data[1]);
+        }
+    });
+}
+
 // Export for use in looks layer
 window.GifApproveNetwork = {
     searchGiphy,
     emitAddGif,
     emitGifSearch,
     emitDeleteGif,
+    emitGetMatchingKeywords,
+    emitGetGifKeywords,
+    emitUpdateGifKeywords,
     onAddGifResult,
     onGifSearchResults,
     onDeleteGifResult,
+    onMatchingKeywordsResult,
+    onGetGifKeywordsResult,
+    onUpdateGifKeywordsResult,
     getUsername
 };
