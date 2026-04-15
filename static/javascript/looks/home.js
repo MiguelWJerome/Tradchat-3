@@ -857,8 +857,8 @@ document.body.onclick = function () {
             if (item.startsWith('/static/uploads/')) {
               let $img = $("<img>").attr("src", item).addClass("chat-upload-img").on('click', function () { window.open(item, '_blank'); });
               imageGroup.append($img);
-            } else if (item.includes('giphy.com')) {
-              // GIPHY GIF Rendering
+            } else if (item.includes('giphy.com') || item.includes('giphy_id:')) {
+              // GIPHY GIF Rendering (URL reconstructed from giphy_id)
               let $gif = $("<img>").attr("src", item).addClass("chat-upload-gif");
               imageGroup.append($gif);
             }
@@ -1094,8 +1094,8 @@ document.body.onclick = function () {
             if (item.startsWith('/static/uploads/')) {
               let $img = $("<img>").attr("src", item).addClass("chat-upload-img").on('click', function () { window.open(item, '_blank'); });
               imageGroup.append($img);
-            } else if (item.includes('giphy.com')) {
-              // GIPHY GIF Rendering
+            } else if (item.includes('giphy.com') || item.includes('giphy_id:')) {
+              // GIPHY GIF Rendering (URL reconstructed from giphy_id)
               let $gif = $("<img>").attr("src", item).addClass("chat-upload-gif");
               imageGroup.append($gif);
             }
@@ -1623,7 +1623,7 @@ document.body.onclick = function () {
         const $container = $('#gif-results-container');
         $container.empty();
         if (results.length === 0) {
-          $container.html('<p style="grid-column: span 2; text-align: center; color: #777; margin-top: 20px;">No safe matches found.</p>');
+          $container.html('<p style="grid-column: span 2; text-align: center; color: #777; margin-top: 20px;">No matching GIFs found.</p>');
           return;
         }
 
@@ -1634,14 +1634,105 @@ document.body.onclick = function () {
             'border-radius': '8px',
             'cursor': 'pointer',
           }).on('click', function () {
+            // Attach the GIF directly to the upload preview
             if (typeof window.attachGif === 'function') {
-              window.attachGif(gif.url);
+              window.attachGif(gif.url, gif.giphy_id);
               $('#gif-modal').hide().attr('aria-hidden', 'true');
               $('#gif-btn').focus();
             }
           });
           $container.append($img);
         });
+      };
+
+      /**
+       * showKeywordModal(giphy_id, gifUrl)
+       * Shows a modal asking the admin to enter keywords for a GIF they want to add.
+       * Starts with 3 input boxes, can add more. Minimum 3 keywords required.
+       */
+      window.showKeywordModal = function(giphy_id, gifUrl) {
+        // Remove any existing keyword modal
+        $('#keyword-modal').remove();
+
+        let keywordCount = 3;
+
+        function buildInputRow(index) {
+          return `<div class="keyword-input-row" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <input type="text" class="keyword-input" placeholder="Keyword ${index}" 
+              style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;" />
+            ${index > 3 ? '<button class="remove-keyword-btn" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:16px;padding:4px;"><i class="fa-solid fa-xmark"></i></button>' : ''}
+          </div>`;
+        }
+
+        let modalHtml = `
+        <div id="keyword-modal" class="modal-overlay" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center;">
+          <div style="background:white;border-radius:12px;width:90%;max-width:440px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+            <h3 style="margin:0 0 4px 0;font-size:18px;color:#333;">Add Keywords</h3>
+            <p style="margin:0 0 16px 0;font-size:13px;color:#777;">Enter at least 3 keywords so users can find this GIF.</p>
+            <div style="margin-bottom:12px;">
+              <img src="${gifUrl}" style="width:100%;max-height:140px;object-fit:contain;border-radius:8px;" />
+            </div>
+            <div id="keyword-inputs-container">
+              ${buildInputRow(1)}
+              ${buildInputRow(2)}
+              ${buildInputRow(3)}
+            </div>
+            <button id="add-more-keywords-btn" style="background:none;border:1px dashed #ccc;color:#666;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:16px;width:100%;">
+              <i class="fa-solid fa-plus" style="margin-right:4px;"></i> Add another keyword
+            </button>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+              <button id="keyword-cancel-btn" style="padding:8px 16px;border:1px solid #ddd;border-radius:6px;background:white;cursor:pointer;font-size:14px;">Cancel</button>
+              <button id="keyword-submit-btn" style="padding:8px 20px;border:none;border-radius:6px;background:#28a745;color:white;cursor:pointer;font-size:14px;font-weight:600;">Add GIF</button>
+            </div>
+          </div>
+        </div>`;
+
+        $('body').append(modalHtml);
+
+        // Add more keyword inputs
+        $('#add-more-keywords-btn').on('click', function() {
+          keywordCount++;
+          let $row = $(buildInputRow(keywordCount));
+          $row.find('.remove-keyword-btn').on('click', function() {
+            $row.remove();
+          });
+          $('#keyword-inputs-container').append($row);
+          $row.find('.keyword-input').focus();
+        });
+
+        // Cancel
+        $('#keyword-cancel-btn').on('click', function() {
+          $('#keyword-modal').remove();
+        });
+
+        // Submit
+        $('#keyword-submit-btn').on('click', function() {
+          let keywords = [];
+          $('#keyword-inputs-container .keyword-input').each(function() {
+            let val = $(this).val().trim();
+            if (val) keywords.push(val);
+          });
+
+          if (keywords.length < 3) {
+            // Highlight empty required fields
+            $('#keyword-inputs-container .keyword-input').each(function(i) {
+              if (i < 3 && !$(this).val().trim()) {
+                $(this).css('border-color', '#e53e3e');
+              } else {
+                $(this).css('border-color', '#ddd');
+              }
+            });
+            return;
+          }
+
+          if (typeof window.addGif === 'function') {
+            window.addGif(giphy_id, keywords);
+          }
+          $('#keyword-modal').remove();
+        });
+
+        // Focus first input
+        $('#keyword-inputs-container .keyword-input').first().focus();
       };
     });
 
@@ -1733,46 +1824,30 @@ document.body.onclick = function () {
       $textarea.replaceWith($input);
     }
 
-    /**
-     * handleMobileSubmit()
-     * --------------------
-     * Handles form submission on mobile to ensure textarea works properly
-     */
-    function handleMobileSubmit() {
-      $(document).on("keydown", "#chat-input", function (e) {
-        // Send message on Enter (without Shift) on mobile
-        if (e.key === "Enter" && !e.shiftKey && isMobile()) {
-          e.preventDefault();
+    // Note: convertInputToTextarea() and convertTextareaToInput() are deprecated
+    // We now always use textarea with auto-resize on all devices
 
-          // Trigger send button click or existing send logic
-          $("#send-btn").click();
-        }
+    /**
+     * initAutoResizeTextarea()
+     * ------------------------
+     * Initializes auto-resize for the chat textarea on all devices.
+     * Textarea grows as user types, max 200px height.
+     */
+    function initAutoResizeTextarea() {
+      var $textarea = $("#chat-input");
+      if (!$textarea.length) return;
+
+      $textarea.on("input", function () {
+        this.style.height = "auto";
+        this.style.height = Math.min(this.scrollHeight, 200) + "px";
       });
     }
 
-    // Initialize mobile enhancements when DOM is ready
+    // Initialize textarea enhancements when DOM is ready
     $(document).ready(function () {
-      if (isMobile()) {
-        convertInputToTextarea();
-        handleMobileSubmit();
-      }
-
-      // Handle window resize (e.g., device rotation or browser resize)
-      $(window).on("resize", function () {
-        var $chatInput = $("#chat-input");
-
-        if (isMobile()) {
-          // Convert to textarea if currently input and on mobile
-          if ($chatInput.length && $chatInput.prop("tagName") === "INPUT") {
-            convertInputToTextarea();
-          }
-        } else {
-          // Convert back to input if currently textarea and on desktop
-          if ($chatInput.length && $chatInput.prop("tagName") === "TEXTAREA") {
-            convertTextareaToInput();
-          }
-        }
-      });
+      // Always use textarea now - init auto-resize
+      // Enter key handling is in network/home.js
+      initAutoResizeTextarea();
 
       // Add click handler for new messages button
       $('#new-messages-btn').on('click', function () {
@@ -1817,6 +1892,10 @@ document.body.onclick = function () {
         $chatFeed.on("scroll", function () {
           // Check if scrolled to top (with small threshold for tolerance)
           if ($chatFeed.scrollTop() <= 10) {
+            // --- GUARD: Don't trigger overhead if already attached to bottom ---
+            if (window.attached_to_bottom) {
+              return;
+            }
             // --- THIS IS THE CRITICAL GUARD ---
             if (FetchingMessages) {
               console.log("Scroll sensor triggered, but blocked by FetchingMessages lock.");

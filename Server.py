@@ -12,7 +12,14 @@ import ast
 import base64
 import io
 from PIL import Image, ImageOps 
-import requests
+import re
+
+def clean_keyword(kw):
+    """Lowercase, remove punctuation and leading/trailing spaces."""
+    kw = kw.lower().strip()
+    kw = re.sub(r'[^\w\s]', '', kw)
+    kw = kw.strip()
+    return kw
 
 def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
     # The 'with' statement handles the "waiting" and "releasing" for you!
@@ -44,6 +51,7 @@ def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
     with lock:
         try:
             conn = sqlite3.connect(db_path)
+            conn.execute("PRAGMA foreign_keys = ON;")
             cursor = conn.cursor()
             cursor.execute(sql, params)
             
@@ -522,20 +530,47 @@ if not os.path.exists("gif_whitelist.db"):
     gw_db = sqlite3.connect("gif_whitelist.db")
     gw_cursor = gw_db.cursor()
     gw_cursor.execute('''
-        CREATE TABLE gif_whitelist (
-            giphy_id TEXT PRIMARY KEY
+        CREATE TABLE whitelist_gifs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            giphy_id TEXT NOT NULL UNIQUE
         );
     ''')
+    gw_cursor.execute('''
+        CREATE TABLE gif_tags (
+            gif_id INTEGER NOT NULL,
+            keyword TEXT NOT NULL,
+            FOREIGN KEY (gif_id) REFERENCES whitelist_gifs(id) ON DELETE CASCADE
+        );
+    ''')
+    gw_cursor.execute('CREATE INDEX idx_gif_tags_keyword ON gif_tags(keyword);')
     gw_db.commit()
     gw_db.close()
 else:
-    # Migration check: check if giphy_id exists, if not, rename tenor_id or recreate
+    # Migration: check if new schema exists, if not, migrate from old format
     gw_db = sqlite3.connect("gif_whitelist.db")
     gw_cursor = gw_db.cursor()
-    gw_cursor.execute("PRAGMA table_info(gif_whitelist);")
-    columns = [row[1] for row in gw_cursor.fetchall()]
-    if 'tenor_id' in columns and 'giphy_id' not in columns:
-        gw_cursor.execute("ALTER TABLE gif_whitelist RENAME COLUMN tenor_id TO giphy_id;")
+    gw_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='whitelist_gifs';")
+    if not gw_cursor.fetchone():
+        # Old schema exists — migrate
+        gw_cursor.execute("SELECT giphy_id FROM gif_whitelist;")
+        old_ids = [row[0] for row in gw_cursor.fetchall()]
+        gw_cursor.execute('DROP TABLE IF EXISTS gif_whitelist;')
+        gw_cursor.execute('''
+            CREATE TABLE whitelist_gifs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                giphy_id TEXT NOT NULL UNIQUE
+            );
+        ''')
+        gw_cursor.execute('''
+            CREATE TABLE gif_tags (
+                gif_id INTEGER NOT NULL,
+                keyword TEXT NOT NULL,
+                FOREIGN KEY (gif_id) REFERENCES whitelist_gifs(id) ON DELETE CASCADE
+            );
+        ''')
+        gw_cursor.execute('CREATE INDEX idx_gif_tags_keyword ON gif_tags(keyword);')
+        for gid in old_ids:
+            gw_cursor.execute("INSERT INTO whitelist_gifs (giphy_id) VALUES (?);", (gid,))
         gw_db.commit()
     gw_db.close()
 
@@ -752,8 +787,8 @@ def gif_approve():
         password = session['password']
         if check_credentials(username, password):
             user_id = find_account_id_or_password_or_gender(username, 'id')
-            if int(user_id) in [1, 2]:
-                return render_template('gif_approve.html')
+            if int(user_id) in [1, 2, 3, 4]:
+                return render_template('gif_approve.html', username=username)
             else:
                 return "Unauthorized: Admin Only", 403
         return redirect('/')
@@ -763,6 +798,7 @@ def gif_approve():
 
 
 def Recv(message, sid):
+    print(message)
     msg = ast.literal_eval(message)
     if msg[0] == 'Image Upload':
         print(['Image Upload', {k: (v if k != 'image' else f'<{len(v)} bytes of image data>') for k, v in msg[1].items()}])
@@ -1869,19 +1905,58 @@ def Recv(message, sid):
                 
                 Server.send(str(['Message Deleted', {'id': index, 'room': room}]), room=room)
 
-    elif msg[0] == 'Approve GIF':
+    elif msg[0] == 'Add GIF':
         data = msg[1]
         username = data['username']
         password = data['password']
         giphy_id = data['giphy_id']
+        keywords = data['keywords']
 
         if check_credentials(username, password):
             user_id = find_account_id_or_password_or_gender(username, 'id')
-            if int(user_id) in [1, 2]: # Admin or Server
-                db_sql("INSERT OR REPLACE INTO gif_whitelist (giphy_id) VALUES (?);", 'gif_whitelist', params=[giphy_id], chat_room=False)
-                Server.send(str(['Approve GIF Result', {'status': 'success', 'giphy_id': giphy_id}]), room=sid)
+            if int(user_id) in [1, 2, 3, 4]: # Admin accounts
+                # Validate giphy_id
+                if not giphy_id or not str(giphy_id).strip():
+                    print(f"Add GIF Error: Empty giphy_id received from user {username}")
+                    Server.send(str(['Add GIF Result', {'status': 'error', 'message': 'Invalid GIF ID'}]), room=sid)
+                    return
+
+                giphy_id = str(giphy_id).strip()
+
+                # Clean keywords: lowercase, strip punctuation and spaces
+                cleaned_keywords = []
+                for kw in keywords:
+                    cleaned = clean_keyword(kw)
+                    if cleaned and cleaned not in cleaned_keywords:
+                        cleaned_keywords.append(cleaned)
+
+                if len(cleaned_keywords) < 1:
+                    Server.send(str(['Add GIF Result', {'status': 'error', 'message': 'At least 1 keyword required'}]), room=sid)
+                    return
+
+                # Insert gif into whitelist_gifs (or get existing id)
+                existing = db_sql("SELECT id FROM whitelist_gifs WHERE giphy_id = ?;", 'gif_whitelist', params=[giphy_id], chat_room=False)
+                if existing:
+                    gif_db_id = existing[0][0]
+                    print(f"Add GIF: Using existing gif_db_id={gif_db_id} for giphy_id={giphy_id}")
+                else:
+                    gif_db_id = db_sql("INSERT INTO whitelist_gifs (giphy_id) VALUES (?);", 'gif_whitelist', params=[giphy_id], chat_room=False, provide_id=True)
+                    print(f"Add GIF: Inserted new gif with gif_db_id={gif_db_id}, giphy_id={giphy_id}")
+
+                if not gif_db_id:
+                    print(f"Add GIF Error: Failed to get gif_db_id for giphy_id={giphy_id}")
+                    Server.send(str(['Add GIF Result', {'status': 'error', 'message': 'Database error inserting GIF'}]), room=sid)
+                    return
+
+                # Insert keywords into gif_tags
+                for kw in cleaned_keywords:
+                    db_sql("INSERT INTO gif_tags (gif_id, keyword) VALUES (?, ?);", 'gif_whitelist', params=[gif_db_id, kw], chat_room=False)
+
+                Server.send(str(['Add GIF Result', {'status': 'success', 'giphy_id': giphy_id}]), room=sid)
             else:
-                Server.send(str(['Approve GIF Result', {'status': 'error', 'message': 'Unauthorized'}]), room=sid)
+                Server.send(str(['Add GIF Result', {'status': 'error', 'message': 'Unauthorized - Admin only'}]), room=sid)
+        else:
+            Server.send(str(['Add GIF Result', {'status': 'error', 'message': 'Invalid password'}]), room=sid)
 
     elif msg[0] == 'GIF Search':
         data = msg[1]
@@ -1890,63 +1965,42 @@ def Recv(message, sid):
         query = data['query']
 
         if check_credentials(username, password):
-            GIPHY_API_KEY = "aiWSDACCInT5DQcuk4hnjC7xMCeEspAv"
-
             try:
-                # GIPHY Search API (rating=g for safety)
-                url = f"https://api.giphy.com/v1/gifs/search?q={query}&api_key={GIPHY_API_KEY}&limit=50&rating=g"
-                response = requests.get(url)
-                if response.status_code == 200:
-                    giphy_results = response.json().get('data', [])
-                    
-                    # Interception: Filter against whitelist
-                    whitelisted_ids = [row[0] for row in db_sql("SELECT giphy_id FROM gif_whitelist;", 'gif_whitelist', chat_room=False)]
-                    
-                    approved_matches = []
-                    for result in giphy_results:
-                        g_id = result.get('id')
-                        if g_id in whitelisted_ids:
-                            # Extract fixed_height GIF URL and truncate query params
-                            media_url = result.get('images', {}).get('fixed_height', {}).get('url', '').split('?')[0]
-                            approved_matches.append({'giphy_id': g_id, 'url': media_url})
-                    
-                    if approved_matches:
-                        Server.send(str(['GIF Search Results', {'status': 'success', 'results': approved_matches}]), room=sid)
-                    else:
-                        Server.send(str(['GIF Search Results', {'status': 'success', 'results': [], 'message': 'No safe matches found'}]), room=sid)
-                else:
-                    Server.send(str(['GIF Search Results', {'status': 'error', 'message': 'GIPHY API error'}]), room=sid)
+                # Clean the search query same way as keywords
+                clean_query = clean_keyword(query)
+                if not clean_query:
+                    Server.send(str(['GIF Search Results', {'status': 'success', 'results': []}]), room=sid)
+                    return
+
+                # Local DB search: find giphy_ids where any keyword STARTS WITH the query
+                results = db_sql(
+                    "SELECT DISTINCT wg.giphy_id FROM whitelist_gifs wg JOIN gif_tags gt ON wg.id = gt.gif_id WHERE gt.keyword LIKE ? LIMIT 50;",
+                    'gif_whitelist', params=[clean_query + '%'], chat_room=False
+                )
+
+                gif_list = [{'giphy_id': row[0]} for row in results]
+                Server.send(str(['GIF Search Results', {'status': 'success', 'results': gif_list}]), room=sid)
             except Exception as e:
                 print(f"GIF Search Error: {e}")
                 Server.send(str(['GIF Search Results', {'status': 'error', 'message': 'Internal search error'}]), room=sid)
 
-    elif msg[0] == 'Unfiltered GIF Search':
+    elif msg[0] == 'Delete Whitelisted GIF':
         data = msg[1]
         username = data['username']
         password = data['password']
-        query = data['query']
+        giphy_id = data['giphy_id']
 
         if check_credentials(username, password):
             user_id = find_account_id_or_password_or_gender(username, 'id')
-            if int(user_id) in [1, 2]:
-                GIPHY_API_KEY = "aiWSDACCInT5DQcuk4hnjC7xMCeEspAv"
-
-                try:
-                    url = f"https://api.giphy.com/v1/gifs/search?q={query}&api_key={GIPHY_API_KEY}&limit=50&rating=g"
-                    response = requests.get(url)
-                    if response.status_code == 200:
-                        giphy_results = response.json().get('data', [])
-                        results = []
-                        for result in giphy_results:
-                            g_id = result.get('id')
-                            media_url = result.get('images', {}).get('fixed_height', {}).get('url', '').split('?')[0]
-                            results.append({'giphy_id': g_id, 'url': media_url})
-                        
-                        Server.send(str(['GIF Search Results', {'status': 'success', 'results': results}]), room=sid)
-                    else:
-                        Server.send(str(['GIF Search Results', {'status': 'error', 'message': 'GIPHY API error'}]), room=sid)
-                except Exception as e:
-                    Server.send(str(['GIF Search Results', {'status': 'error', 'message': str(e)}]), room=sid)
+            if int(user_id) in [1, 2, 3, 4]: # Admin accounts
+                # Delete from whitelist_gifs (gif_tags will be deleted by ON DELETE CASCADE)
+                db_sql("DELETE FROM whitelist_gifs WHERE giphy_id = ?;", 'gif_whitelist', params=[giphy_id], chat_room=False)
+                print(f"Delete GIF: Removed giphy_id={giphy_id} from whitelist (User: {username})")
+                Server.send(str(['Delete Whitelisted GIF Result', {'status': 'success', 'giphy_id': giphy_id}]), room=sid)
+            else:
+                Server.send(str(['Delete Whitelisted GIF Result', {'status': 'error', 'message': 'Unauthorized - Admin only'}]), room=sid)
+        else:
+            Server.send(str(['Delete Whitelisted GIF Result', {'status': 'error', 'message': 'Invalid password'}]), room=sid)
 
 @Server.on('disconnect')
 def on_disconnect():

@@ -816,7 +816,7 @@
   position: relative;
   width: 100%;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
 }
 
 /* Main text input field - stripped of border/background to blend into .chat-input-box */
@@ -829,11 +829,14 @@
   font-size: 1rem;
   color: black;
   outline: none;
-  height: 54px;
+  min-height: 54px;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  resize: none;
+  line-height: 1.4;
 }
-
-
-
 
 .inputbar__text::placeholder {
   color: #000;
@@ -848,10 +851,9 @@
   gap: 6px;
   /* Slightly more spacing */
   position: absolute;
-  /* Position inside the input field */
+  /* Position inside the input field - anchored to top-right */
   right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 9px;
 }
 
 /* Square icon buttons in the input bar */

@@ -212,16 +212,21 @@ function recv(message) {
     else if (msg[0] === 'GIF Search Results') {
         const data = msg[1];
         if (data.status === 'success') {
-            if (typeof renderGifResults === 'function') renderGifResults(data.results);
+            // Reconstruct URLs from giphy_id on the client side
+            const results = data.results.map(gif => ({
+                giphy_id: gif.giphy_id,
+                url: `https://media.giphy.com/media/${gif.giphy_id}/giphy.gif`
+            }));
+            if (typeof renderGifResults === 'function') renderGifResults(results);
         } else {
             Alert(data.message || 'Error searching GIFs');
             if (typeof renderGifResults === 'function') renderGifResults([]);
         }
     }
-    else if (msg[0] === 'Approve GIF Result') {
+    else if (msg[0] === 'Add GIF Result') {
         const data = msg[1];
         if (data.status === 'success') {
-            Alert(`GIF ${data.giphy_id} approved!`);
+            Alert(`GIF ${data.giphy_id} added to whitelist!`);
         } else {
             Alert(`Error: ${data.message}`);
         }
@@ -291,9 +296,10 @@ function recv(message) {
 let chatInput = document.querySelector('#chat-input')
 let sendButton = document.querySelector('#send-btn')
 
-chatInput.addEventListener('keypress', function (e) {
-    if (e.key === 'Enter') {
-        sendButton.click()
+chatInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendButton.click();
     }
 })
 
@@ -375,6 +381,7 @@ sendButton.addEventListener('click', function () {
     }
 
     chatInput.value = '';
+    chatInput.style.height = 'auto';
     clearUpload();
     window.attached_to_bottom = true;
     if (typeof cancelReply === 'function') cancelReply();
@@ -452,10 +459,16 @@ function broadcast_removed_reaction(index, emoji) {
 }
 
 window.emitGifSearch = function(query) {
-    cl.send(JSON.stringify(['GIF Search', { 'username': username, 'password': password, 'query': query }]));
+    // Clean query: lowercase, remove punctuation, strip spaces
+    let cleanQuery = query.toLowerCase().trim();
+    cleanQuery = cleanQuery.replace(/[^\w\s]/g, '').trim();
+    if (cleanQuery) {
+        cl.send(JSON.stringify(['GIF Search', { 'username': username, 'password': password, 'query': cleanQuery }]));
+    }
 };
 
-window.attachGif = function(url) {
+window.attachGif = function(url, giphyId) {
+    // Store the full Giphy URL for upload, and giphy_id for reference
     currentUpload.push(url);
     const idx = currentUpload.length - 1;
     const $card = $(`
@@ -494,8 +507,8 @@ window.sendGif = function(url) {
     window.attachGif(url);
 };
 
-window.approveGif = function(giphy_id) {
-    cl.send(JSON.stringify(['Approve GIF', { 'username': username, 'password': password, giphy_id: giphy_id }]));
+window.addGif = function(giphy_id, keywords) {
+    cl.send(JSON.stringify(['Add GIF', { 'username': username, 'password': password, giphy_id: giphy_id, keywords: keywords }]));
 };
 
 document.getElementById('messenger-icon').addEventListener('click', function () {

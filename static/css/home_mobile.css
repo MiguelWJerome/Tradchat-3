@@ -443,10 +443,10 @@ body {
   position: relative;
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
 }
 
-/* Main text input field */
+/* Main text input field - now textarea with auto-resize */
 .inputbar__text {
   width: 100%;
   padding: 14px 140px 14px 18px;  /* Right padding makes space for internal buttons */
@@ -458,7 +458,13 @@ body {
   color: var(--color-dark);
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition);
-  height: 50px;  /* Explicit height for taller input */
+  min-height: 50px;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  resize: none;
+  line-height: 1.4;
 }
 .inputbar__text:focus {
   border-color: var(--color-accent);
@@ -471,10 +477,9 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;  /* Slightly more spacing */
-  position: absolute;  /* Position inside the input field */
+  position: absolute;  /* Position inside the input field - anchored to top-right */
   right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 9px;
 }
 
 /* Square icon buttons in the input bar */
@@ -865,19 +870,3 @@ body {
 /* Message bubbles slightly narrower text for small screens */
 .message__bubble { max-width: 80%; }
 .message__text   { font-size: 0.82rem; }
-
-/* =========================================================================
-   8. MOBILE TEXTAREA STYLING
-   Transform input to textarea on mobile for better typing experience
-   ========================================================================= */
-
-/* Mobile textarea styling */
-.inputbar__text {
-  resize: none;
-  min-height: 50px;
-  max-height: 120px;
-  line-height: 1.4;
-  padding-top: 12px;
-  padding-bottom: 12px;
-  overflow-y: auto;
-}

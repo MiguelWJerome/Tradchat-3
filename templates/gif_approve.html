@@ -1,153 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <title>GIF Approve - TradChat Admin</title>
-    <script src="/static/javascript/jQuery.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <style>
-        body {
-            font-family: sans-serif;
-            padding: 20px;
-            background: #f4f4f4;
-        }
-
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        h1 {
-            color: #333;
-        }
-
-        .search-box {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        input {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        button {
-            padding: 10px 20px;
-            background: #28a745;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: #218838;
-        }
-
-        .results {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 15px;
-        }
-
-        .gif-item {
-            cursor: pointer;
-            border: 2px solid transparent;
-            border-radius: 4px;
-            overflow: hidden;
-            transition: transform 0.2s;
-        }
-
-        .gif-item:hover {
-            transform: scale(1.05);
-            border-color: #28a745;
-        }
-
-        .gif-item img {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIF Admin - TradChat</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.css" />
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/static/css/gif_approve.css" />
 </head>
-
 <body>
-    <div class="container">
-        <h1>GIF Approval Portal</h1>
-        <p>Search all of Tenor and click a GIF to whitelist it.</p>
-        <div class="search-box">
-            <input type="text" id="search-input" placeholder="Search GIPHY GIFs...">
-            <button id="search-btn">Search</button>
+    <!-- Username data for JS -->
+    <div id="username-data" data-username="{{ username }}" style="display: none;"></div>
+
+    <div class="gif-admin-container">
+        <div class="gif-admin-header">
+            <h1>GIF Admin Portal</h1>
+            <p>Manage your local GIF database.</p>
         </div>
-        <div class="results" id="results-container"></div>
+
+        <div class="admin-tabs">
+            <button class="admin-tab-btn active" data-tab="add">Add GIFs</button>
+            <button class="admin-tab-btn" data-tab="edit">Edit/Delete GIFs</button>
+        </div>
+
+        <div id="gif-status-msg" class="gif-status-msg"></div>
+
+        <!-- Add GIFs Tab -->
+        <div id="add-tab" class="tab-content active">
+            <div class="gif-search-box">
+                <input type="text" id="gif-search-input" placeholder="Search GIPHY to add new GIFs...">
+                <select id="gif-rating-select">
+                    <option value="g" selected>G</option>
+                    <option value="pg">PG</option>
+                    <option value="pg-13">PG-13</option>
+                </select>
+                <input type="number" id="gif-limit-input" value="50" min="1" max="100">
+                <button id="gif-search-btn">Search GIPHY</button>
+            </div>
+            <div class="gif-results" id="gif-results"></div>
+        </div>
+
+        <!-- Edit/Delete GIFs Tab -->
+        <div id="edit-tab" class="tab-content">
+            <div class="gif-search-box">
+                <input type="text" id="edit-search-input" placeholder="Search your whitelisted GIFs by keyword...">
+                <button id="edit-search-btn">Search Database</button>
+            </div>
+            <div class="gif-results" id="edit-results"></div>
+        </div>
     </div>
 
-    <script>
-        const socket = io();
-
-        const username = prompt("Confirm Admin Username:");
-        const password = prompt("Confirm Admin Password:");
-
-        $('#search-btn').on('click', function () {
-            const query = $('#search-input').val().trim();
-            if (query) {
-                $('#results-container').html('<p>Searching GIPHY...</p>');
-                socket.emit('message', JSON.stringify(['Unfiltered GIF Search', {
-                    username: username,
-                    password: password,
-                    query: query
-                }]));
-            }
-        });
-
-        $('#search-input').on('keypress', function (e) {
-            if (e.key === 'Enter') $('#search-btn').click();
-        });
-
-        socket.on('message', function (msg) {
-            const data = eval(msg);
-            if (data[0] === 'GIF Search Results') {
-                const res = data[1];
-                const $container = $('#results-container');
-                $container.empty();
-
-                if (res.status === 'success') {
-                    res.results.forEach(gif => {
-                        const $item = $('<div class="gif-item"></div>');
-                        const $img = $('<img>').attr('src', gif.url);
-                        $item.append($img);
-                        $item.on('click', function () {
-                            if (confirm("Whitelist this GIF (ID: " + gif.giphy_id + ")?")) {
-                                socket.emit('message', JSON.stringify(['Approve GIF', {
-                                    username: username,
-                                    password: password,
-                                    giphy_id: gif.giphy_id
-                                }]));
-                            }
-                        });
-                        $container.append($item);
-                    });
-                } else {
-                    $container.html('<p style="color: red;">' + res.message + '</p>');
-                }
-            } else if (data[0] === 'Approve GIF Result') {
-                const res = data[1];
-                if (res.status === 'success') {
-                    alert("GIF Approved and added to whitelist!");
-                } else {
-                    alert("Error: " + res.message);
-                }
-            }
-        });
-    </script>
+    <script src="/static/javascript/socketio.js"></script>
+    <script src="/static/javascript/jQuery.js"></script>
+    <script src="/static/javascript/network/gif_approve.js"></script>
+    <script src="/static/javascript/looks/gif_approve.js"></script>
 </body>
-
 </html>

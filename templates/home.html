@@ -212,8 +212,8 @@
 
         <!-- Text input with nested icons -->
         <div class="input-wrapper">
-          <input type="text" class="inputbar__text" id="chat-input" placeholder="Say something..."
-            aria-label="Message input" />
+          <textarea class="inputbar__text" id="chat-input" placeholder="Say something..."
+            aria-label="Message input" rows="1"></textarea>
 
           <!-- Accessory icon buttons positioned inside input -->
           <div class="inputbar__icons">
@@ -336,21 +336,21 @@
   <div class="modal-container"
     style="background: white; border-radius: 12px; width: 90%; max-width: 500px; max-height: 80vh; display: flex; flex-direction: column;">
     <div class="modal-header">
-      <h2 class="modal-title">Search GIPHY</h2>
+      <h2 class="modal-title">Search GIFs</h2>
       <button class="modal-close-btn" id="gif-modal-close" aria-label="Close modal">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
     <div class="modal-body" style="flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 15px;">
       <div class="sidebar__search" style="margin-bottom: 15px; width: 100%;">
-        <input type="text" id="gif-search-input" class="search-input" placeholder="Search Approved GIFs..."
+        <input type="text" id="gif-search-input" class="search-input" placeholder="Search by keyword..."
           style="width: 100%;" />
         <i class="fa-solid fa-magnifying-glass static-icon" id="gif-search-btn-icon" style="cursor: pointer;"></i>
       </div>
       <div id="gif-results-container"
         style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding-right: 5px;">
         <!-- Results injected by looks/home.js -->
-        <p style="grid-column: span 2; text-align: center; color: #777; margin-top: 20px;">Search for GIFs to share!</p>
+        <p style="grid-column: span 2; text-align: center; color: #777; margin-top: 20px;">Type a keyword and press Enter to search!</p>
       </div>
     </div>
   </div>
