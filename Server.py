@@ -2102,6 +2102,33 @@ def Recv(message, sid):
         else:
             Server.send(str(['Update GIF Keywords Result', {'status': 'error', 'message': 'Invalid password'}]), room=sid)
 
+    elif msg[0] == 'Search Usernames':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        query = data.get('query', '')
+
+        if check_credentials(username, password):
+            try:
+                clean_query = remove_go_spaces(query.lower())
+                
+                if clean_query:
+                    results = db_sql(
+                        "SELECT username, first_name, last_name FROM accounts WHERE LOWER(username) LIKE ? OR LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? LIMIT 50;",
+                        'accounts', params=[f'%{clean_query}%', f'%{clean_query}%', f'%{clean_query}%'], chat_room=False
+                    )
+                else:
+                    results = db_sql(
+                        "SELECT username, first_name, last_name FROM accounts LIMIT 50;",
+                        'accounts', chat_room=False
+                    )
+
+                user_list = [{'username': row[0], 'first_name': row[1], 'last_name': row[2], 'profile_picture': f'/static/profile-pictures/{row[0]}.png'} for row in results]
+                Server.send(str(['Search Usernames Results', {'status': 'success', 'results': user_list}]), room=sid)
+            except Exception as e:
+                print(f"Search Usernames Error: {e}")
+                Server.send(str(['Search Usernames Results', {'status': 'error', 'message': 'Internal search error'}]), room=sid)
+
 @Server.on('disconnect')
 def on_disconnect():
     process_room_leave(request.sid)

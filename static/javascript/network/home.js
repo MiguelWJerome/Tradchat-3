@@ -123,6 +123,16 @@ function recv(message) {
     else if (msg[0] === 'Get Rooms') {
         clearAllChatRoomOptions();
         data = msg[1];
+        
+        // Sort: Unread rooms first
+        data.sort((a, b) => {
+            const aUnread = a['lastTimeStamp'] !== false;
+            const bUnread = b['lastTimeStamp'] !== false;
+            if (aUnread && !bUnread) return -1;
+            if (!aUnread && bUnread) return 1;
+            return 0;
+        });
+
         for (let room of data) {
             let roomId = room['name'];
             let isUnread = room['lastTimeStamp'] !== false;
@@ -134,6 +144,16 @@ function recv(message) {
     else if (msg[0] === 'Get Dms') {
         clearAllChatRoomOptions();
         data = msg[1];
+
+        // Sort: Unread DMs first
+        data.sort((a, b) => {
+            const aUnread = a['lastTimeStamp'] !== false;
+            const bUnread = b['lastTimeStamp'] !== false;
+            if (aUnread && !bUnread) return -1;
+            if (!aUnread && bUnread) return 1;
+            return 0;
+        });
+
         for (let dm of data) {
             let dmId = sortAndJoinStrings(username, dm['username']);
             let otherUsername = dm['username'];
@@ -198,7 +218,7 @@ function recv(message) {
         else if (msg[1] === 'Room Created') Alert('Room created successfully!', function() { location.reload(); });
     }
     else if (msg[0] === 'Create DM Results') {
-        if (msg[1] === 'DM Already Exists') console.log('DM already exists');
+        if (msg[1] === 'DM Already Exists') Alert('DM already exists with this user!');
         else if (msg[1] === 'DM Created') Alert('DM created successfully!', function() { location.reload(); });
     }
     else if (msg[0] === 'Get Room Members Results') {
@@ -405,8 +425,17 @@ document.getElementById('back-to-mainroom').addEventListener('click', function (
 });
 
 document.getElementById('create-btn').addEventListener('click', function () {
-    roomModal('show');
-    emojiPicker.re_attach('#selected-emoji', function (emoji) { document.querySelector('#selected-emoji').innerHTML = emoji })
+    if (document.getElementById('messenger-icon').classList.contains('active')) {
+        // Messenger is active - show user selection modal for DMs
+        choose_usernames(false, function(selectedUsernames) {
+            if (selectedUsernames && selectedUsernames.length > 0) {
+                create_dm(selectedUsernames[0]);
+            }
+        });
+    } else {
+        // Not messenger - show the standard create room modal
+        roomModal('show');
+    }
 });
 
 function create_dm(user) {

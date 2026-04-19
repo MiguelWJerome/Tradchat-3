@@ -7,28 +7,11 @@ function Alert(message, callback=function(){}, shouldFlyUp=false, width=380, hei
     const windowHeight = window.innerHeight;
     const windowWidth = window.innerWidth;
     
-    // Create the dark overlay background
     const alertOverlay = document.createElement('div');
-    alertOverlay.style.position = 'fixed';
-    alertOverlay.style.top = '0';
-    alertOverlay.style.left = '0';
-    alertOverlay.style.width = '100%';
-    alertOverlay.style.height = '100%';
-    alertOverlay.style.backgroundColor = 'black';
-    alertOverlay.style.opacity = '0%';
-    alertOverlay.style.zIndex = '9998';
-    alertOverlay.style.transition = 'none';
+    alertOverlay.className = 'tc-alert-overlay';
     
-    // Create the alert content container
     const alertContent = document.createElement('div');
-    alertContent.style.position = 'fixed';
-    alertContent.style.backgroundColor = '#ffffff';
-    alertContent.style.borderRadius = '22.8px';
-    alertContent.style.boxShadow = '0 8px 32px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1)';
-    alertContent.style.border = '1px solid rgba(0,0,0,0.1)';
-    alertContent.style.zIndex = '9999';
-    alertContent.style.transition = 'none';
-    alertContent.style.cursor = 'default';
+    alertContent.className = 'tc-alert-content';
     alertContent.title = 'Click to put back down';
     
     // Calculate responsive dimensions
@@ -65,47 +48,18 @@ function Alert(message, callback=function(){}, shouldFlyUp=false, width=380, hei
     
     // Create X button for closing
     const closeButton = document.createElement('button');
+    closeButton.className = 'tc-alert-close-btn';
     closeButton.innerHTML = '×';
-    closeButton.style.position = 'absolute';
-    closeButton.style.top = '8px';
-    closeButton.style.right = '8px';
-    closeButton.style.width = '32px';
-    closeButton.style.height = '32px';
-    closeButton.style.borderRadius = '50%';
-    closeButton.style.border = 'none';
-    closeButton.style.backgroundColor = '#f8f9fa';
-    closeButton.style.fontSize = '20px';
-    closeButton.style.fontWeight = 'normal';
-    closeButton.style.color = '#6c757d';
-    closeButton.style.cursor = 'pointer';
-    closeButton.style.zIndex = '10000';
-    closeButton.style.display = 'flex';
-    closeButton.style.alignItems = 'center';
-    closeButton.style.justifyContent = 'center';
     closeButton.title = 'Close alert';
-    closeButton.style.transition = 'background-color 0.2s ease, color 0.2s ease';
     
     // Create gray message container
     const messageContainer = document.createElement('div');
-    messageContainer.style.backgroundColor = '#e9ecef';
-    messageContainer.style.borderRadius = '21.66px'; // Reduced border radius (0.5x)
-    messageContainer.style.padding = '20px';
-    messageContainer.style.marginTop = '40px'; // Position below X button
-    messageContainer.style.marginLeft = 'auto';
-    messageContainer.style.marginRight = 'auto';
-    messageContainer.style.maxWidth = '85%';
-    messageContainer.style.display = 'flex';
-    messageContainer.style.alignItems = 'center';
-    messageContainer.style.justifyContent = 'center';
+    messageContainer.className = 'tc-alert-msg-container';
 
     // Create message text element
     const messageElement = document.createElement('p');
     messageElement.id = 'alert-message-text';
-    messageElement.style.fontWeight = '500';
-    messageElement.style.color = '#212529';
-    messageElement.style.textAlign = 'center';
-    messageElement.style.margin = '0';
-    messageElement.style.lineHeight = '1.5';
+    messageElement.className = 'tc-alert-msg-text';
     
     if (isOnPhone) {
         messageElement.style.fontSize = 30 * (windowHeight / 975) + 'px';
@@ -127,7 +81,7 @@ function Alert(message, callback=function(){}, shouldFlyUp=false, width=380, hei
     // Function to close the alert
     function closeAlert() {
         alertContent.style.bottom = '-3600px';
-        alertOverlay.style.opacity = '0%';
+        alertOverlay.classList.remove('visible');
         setTimeout(function() {
             document.body.removeChild(alertContent);
             document.body.removeChild(alertOverlay);
@@ -135,25 +89,14 @@ function Alert(message, callback=function(){}, shouldFlyUp=false, width=380, hei
         }, 0);
     }
     
-    // Add hover effect for close button
-    closeButton.addEventListener('mouseenter', function() {
-        closeButton.style.backgroundColor = '#e9ecef';
-        closeButton.style.color = '#495057';
-    });
-    
-    closeButton.addEventListener('mouseleave', function() {
-        closeButton.style.backgroundColor = '#f8f9fa';
-        closeButton.style.color = '#6c757d';
-    });
-    
     // Add event listeners
     closeButton.addEventListener('click', function(e) {
         e.stopPropagation(); // Prevent the content click from firing
         closeAlert();
     });
     
-    // No animation - show immediately
-    alertOverlay.style.opacity = '0.9';
+    // No animation - show immediately (via class)
+    alertOverlay.classList.add('visible');
 }
 
 const True = true
@@ -201,5 +144,218 @@ function sortAndJoinStrings(str1, str2) {
     } else {
         // Strings are exactly the same, order doesn't matter
         return str1 + '.$@-@&.' + str2;
+    }
+}
+
+function choose_usernames(plural, callback) {
+    const isOnPhone = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+    
+    const overlay = document.createElement('div');
+    overlay.className = 'tc-cu-overlay';
+    
+    const modal = document.createElement('div');
+    modal.className = 'tc-cu-modal ' + (isOnPhone ? 'mobile' : 'desktop');
+    
+    const header = document.createElement('div');
+    header.className = 'tc-cu-header';
+    
+    const closeBtn = document.createElement('div');
+    closeBtn.className = 'tc-cu-close-btn';
+    closeBtn.innerHTML = '&#x2297;';
+    closeBtn.onclick = () => {
+        document.body.removeChild(overlay);
+        if (typeof cl !== 'undefined' && cl.off) cl.off('message', searchHandler);
+    };
+    
+    const title = document.createElement('h3');
+    title.className = 'tc-cu-title';
+    title.innerText = 'Search Usernames.';
+    
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+    modal.appendChild(header);
+    
+    const searchArea = document.createElement('div');
+    searchArea.className = 'tc-cu-search-area';
+    
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Search Members';
+    searchInput.className = 'tc-cu-search-input';
+    searchArea.appendChild(searchInput);
+    
+    const selectedSpot = document.createElement('div');
+    selectedSpot.className = 'tc-cu-selected-spot ' + (plural ? 'plural' : 'singular');
+    searchArea.appendChild(selectedSpot);
+    
+    const enterBtn = document.createElement('button');
+    enterBtn.className = 'tc-cu-enter-btn';
+    enterBtn.innerText = 'ENTER';
+    enterBtn.onclick = () => {
+        if (enterBtn.disabled) return;
+        enterBtn.disabled = true;
+        document.body.removeChild(overlay);
+        if (typeof cl !== 'undefined' && cl.off) cl.off('message', searchHandler);
+        callback(selectedUsers.map(u => u.username));
+    };
+    searchArea.appendChild(enterBtn);
+    
+    modal.appendChild(searchArea);
+    
+    const resultsList = document.createElement('div');
+    resultsList.className = 'tc-cu-results-list';
+    modal.appendChild(resultsList);
+    
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    
+    let selectedUsers = [];
+    
+    function updateSelectedSpot() {
+        if (!plural) return;
+        selectedSpot.innerHTML = '';
+        if (selectedUsers.length === 0) {
+            selectedSpot.innerText = 'No users selected';
+        } else if (selectedUsers.length === 1) {
+            selectedSpot.innerText = `${selectedUsers[0].first_name} ${selectedUsers[0].last_name}`;
+        } else if (selectedUsers.length === 2) {
+            selectedSpot.innerText = `${selectedUsers[0].first_name} and ${selectedUsers[1].first_name}`;
+        } else {
+            const count = selectedUsers.length - 2;
+            selectedSpot.innerText = `${selectedUsers[0].first_name}, ${selectedUsers[1].first_name} and ${count} other${count > 1 ? 's' : ''}`;
+        }
+    }
+
+    selectedSpot.onclick = () => {
+        if (selectedUsers.length === 0) return;
+        showSelectedUsersModal(selectedUsers);
+    };
+
+    function showSelectedUsersModal(users) {
+        const subOverlay = document.createElement('div');
+        subOverlay.className = 'tc-cu-overlay';
+        subOverlay.style.zIndex = '10000'; 
+        
+        const subModal = document.createElement('div');
+        subModal.className = 'tc-cu-modal ' + (isOnPhone ? 'mobile' : 'desktop');
+        
+        const subHeader = document.createElement('div');
+        subHeader.className = 'tc-cu-header';
+        
+        const subCloseBtn = document.createElement('div');
+        subCloseBtn.className = 'tc-cu-close-btn';
+        subCloseBtn.innerHTML = '&#x2297;';
+        subCloseBtn.onclick = () => document.body.removeChild(subOverlay);
+        
+        const subTitle = document.createElement('h3');
+        subTitle.className = 'tc-cu-title';
+        subTitle.innerText = 'SELECTED PEOPLE';
+        
+        subHeader.appendChild(subTitle);
+        subHeader.appendChild(subCloseBtn);
+        subModal.appendChild(subHeader);
+        
+        const subList = document.createElement('div');
+        subList.className = 'tc-cu-results-list';
+        
+        users.forEach(u => {
+            const row = document.createElement('div');
+            row.className = 'tc-cu-result-row';
+            row.style.cursor = 'default';
+            
+            const img = document.createElement('img');
+            img.src = u.profile_picture;
+            img.className = 'tc-cu-result-img';
+            
+            const name = document.createElement('span');
+            name.innerText = `${u.first_name} ${u.last_name}`;
+            
+            row.appendChild(img);
+            row.appendChild(name);
+            subList.appendChild(row);
+        });
+        
+        subModal.appendChild(subList);
+        subOverlay.appendChild(subModal);
+        document.body.appendChild(subOverlay);
+    }
+    
+    function renderResults(users) {
+        resultsList.innerHTML = '';
+        users.forEach(u => {
+            const row = document.createElement('div');
+            row.className = 'tc-cu-result-row';
+            
+            const isSelected = selectedUsers.some(su => su.username === u.username);
+            if (isSelected) row.classList.add('selected');
+            
+            const img = document.createElement('img');
+            img.src = u.profile_picture;
+            img.className = 'tc-cu-result-img';
+            
+            const name = document.createElement('span');
+            name.innerText = `${u.first_name} ${u.last_name}`;
+            
+            row.appendChild(img);
+            row.appendChild(name);
+            
+            row.onclick = () => {
+                if (plural) {
+                    const idx = selectedUsers.findIndex(su => su.username === u.username);
+                    if (idx > -1) {
+                        selectedUsers.splice(idx, 1);
+                        row.classList.remove('selected');
+                    } else {
+                        selectedUsers.push(u);
+                        row.classList.add('selected');
+                    }
+                    updateSelectedSpot();
+                } else {
+                    selectedUsers = [u];
+                    Array.from(resultsList.children).forEach(c => c.classList.remove('selected'));
+                    row.classList.add('selected');
+                }
+            };
+            
+            resultsList.appendChild(row);
+        });
+    }
+    
+    const searchHandler = function(msg) {
+        const data = eval(msg);
+        if (data[0] === 'Search Usernames Results') {
+            if (data[1].status === 'success') {
+                renderResults(data[1].results);
+            }
+        }
+    };
+    
+    updateSelectedSpot();
+
+    if (typeof cl !== 'undefined') {
+        cl.on('message', searchHandler);
+    }
+    
+    let searchTimeout;
+    searchInput.oninput = (e) => {
+        clearTimeout(searchTimeout);
+        const query = e.target.value;
+        searchTimeout = setTimeout(() => {
+            if (typeof cl !== 'undefined') {
+                cl.send(JSON.stringify(['Search Usernames', {
+                    username: localStorage.getItem('username') || sessionStorage.getItem('username'),
+                    password: localStorage.getItem('password') || sessionStorage.getItem('password'),
+                    query: query
+                }]));
+            }
+        }, 300);
+    };
+    
+    if (typeof cl !== 'undefined') {
+        cl.send(JSON.stringify(['Search Usernames', {
+            username: localStorage.getItem('username') || sessionStorage.getItem('username'),
+            password: localStorage.getItem('password') || sessionStorage.getItem('password'),
+            query: ''
+        }]));
     }
 }

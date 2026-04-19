@@ -465,19 +465,21 @@
 }
 
 /* ---- 4a. Room Header ---- */
-/* The arrow-badge banner at the top of the chat area */
+/* The spikey chevron banner at the top of the chat area (matches wireframe) */
 .chat-panel__header {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
-  padding: 12px 20px;
-  border-bottom: 1.5px solid var(--color-border);
+  padding: 12px 40px 12px 20px;
   width: 50%;
-  border-radius: 20px;
-
-  /* Clip-path chevron / arrow on the right (mirrors wireframe arrow label) */
+  
+  /* Pointed chevron shape (sharp as in wireframe) */
   background: var(--color-medium);
+  clip-path: polygon(0% 0%, 92% 0%, 100% 50%, 92% 100%, 0% 100%);
+  
+  margin-bottom: 10px;
+  transition: transform 0.2s ease;
 }
 
 .room-title {

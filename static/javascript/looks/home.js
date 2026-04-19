@@ -214,11 +214,24 @@ document.body.onclick = function () {
         $('#delete-room-btn').hide();
       }
 
-      // Wire ADD button — calls network callback, no cl.send here
+      // Wire ADD button — calls choose_usernames modal
       $('#add-member-btn').off('click').on('click', function () {
-        const userToAdd = prompt("Enter the username to add:");
-        if (userToAdd && userToAdd.trim() !== '' && typeof callbacks.onAdd === 'function') {
-          callbacks.onAdd(userToAdd.trim());
+        if (typeof choose_usernames === 'function') {
+          choose_usernames(true, function (selectedUsernames) {
+            if (selectedUsernames && selectedUsernames.length > 0) {
+              selectedUsernames.forEach(user => {
+                if (typeof callbacks.onAdd === 'function') {
+                  callbacks.onAdd(user);
+                }
+              });
+            }
+          });
+        } else {
+          // Fallback if modal is not loaded
+          const userToAdd = prompt("Enter the username to add:");
+          if (userToAdd && userToAdd.trim() !== '' && typeof callbacks.onAdd === 'function') {
+            callbacks.onAdd(userToAdd.trim());
+          }
         }
       });
 
@@ -1650,7 +1663,7 @@ document.body.onclick = function () {
        * Shows a modal asking the admin to enter keywords for a GIF they want to add.
        * Starts with 3 input boxes, can add more. Minimum 3 keywords required.
        */
-      window.showKeywordModal = function(giphy_id, gifUrl) {
+      window.showKeywordModal = function (giphy_id, gifUrl) {
         // Remove any existing keyword modal
         $('#keyword-modal').remove();
 
@@ -1690,10 +1703,10 @@ document.body.onclick = function () {
         $('body').append(modalHtml);
 
         // Add more keyword inputs
-        $('#add-more-keywords-btn').on('click', function() {
+        $('#add-more-keywords-btn').on('click', function () {
           keywordCount++;
           let $row = $(buildInputRow(keywordCount));
-          $row.find('.remove-keyword-btn').on('click', function() {
+          $row.find('.remove-keyword-btn').on('click', function () {
             $row.remove();
           });
           $('#keyword-inputs-container').append($row);
@@ -1701,21 +1714,21 @@ document.body.onclick = function () {
         });
 
         // Cancel
-        $('#keyword-cancel-btn').on('click', function() {
+        $('#keyword-cancel-btn').on('click', function () {
           $('#keyword-modal').remove();
         });
 
         // Submit
-        $('#keyword-submit-btn').on('click', function() {
+        $('#keyword-submit-btn').on('click', function () {
           let keywords = [];
-          $('#keyword-inputs-container .keyword-input').each(function() {
+          $('#keyword-inputs-container .keyword-input').each(function () {
             let val = $(this).val().trim();
             if (val) keywords.push(val);
           });
 
           if (keywords.length < 3) {
             // Highlight empty required fields
-            $('#keyword-inputs-container .keyword-input').each(function(i) {
+            $('#keyword-inputs-container .keyword-input').each(function (i) {
               if (i < 3 && !$(this).val().trim()) {
                 $(this).css('border-color', '#e53e3e');
               } else {
@@ -2168,10 +2181,8 @@ document.body.onclick = function () {
 
     // Document ready handlers for modal
     $(document).ready(function () {
-      // Connect Create button from sidebar
-      $("#create-btn").on("click", function () {
-        roomModal('show');
-      });
+      // Connect Create button from sidebar - Handled in network/home.js to support DM selection
+
 
       // Close modal when clicking the X button
       $("#modal-close-x").on("click", function (e) {
