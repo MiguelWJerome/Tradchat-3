@@ -1,0 +1,132 @@
+{% extends "tradchat.html" %}
+
+{% block title %}TradChat — Settings{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/css/settings.css" />
+{% endblock %}
+
+{% block content %}
+<main class="settings-main">
+  <div class="settings-card">
+    <!-- Sidebar -->
+    <div class="settings-sidebar">
+      <ul class="settings-tabs">
+        <li class="tab-item active" data-tab="profile">
+          <div class="tab-icon-wrap"><i class="fa-solid fa-user-circle"></i></div>
+          <span class="tab-label">Profile</span>
+        </li>
+        <li class="tab-item" data-tab="posts">
+          <div class="tab-icon-wrap"><i class="fa-solid fa-images"></i></div>
+          <span class="tab-label">Posts</span>
+          <span class="notification-dot"></span>
+        </li>
+        <li class="tab-item" data-tab="theme">
+          <div class="tab-icon-wrap"><i class="fa-solid fa-palette"></i></div>
+          <span class="tab-label">Theme</span>
+        </li>
+        <li class="tab-item" data-tab="home-page">
+          <div class="tab-icon-wrap"><i class="fa-solid fa-house"></i></div>
+          <span class="tab-label">Home Page</span>
+        </li>
+        <li class="tab-item" data-tab="etc">
+          <div class="tab-icon-wrap"><i class="fa-solid fa-face-smile"></i></div>
+          <span class="tab-label">Etc.</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Content Area -->
+    <div class="settings-content">
+      <!-- Profile Tab Content -->
+      <div class="tab-pane active" id="pane-profile">
+
+        <div class="profile-header-row">
+          <div class="profile-avatar-container">
+            <!-- X placeholder from wireframe (picture insert) -->
+            <div class="avatar-circle">
+              <img src="/static/profile-pictures/{{ username }}.png"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" alt="Avatar"
+                class="avatar-img" />
+              <i class="fa-solid fa-xmark placeholder-x" style="display: none;"></i>
+            </div>
+          </div>
+          <div class="profile-actions-top">
+            <button class="icon-btn lock-btn" id="edit-profile-btn" aria-label="Click to unlock">
+              <i class="fa-solid fa-unlock"></i>
+            </button>
+          </div>
+        </div>
+
+        <form class="profile-form" id="profile-form">
+          <div class="form-grid">
+            <div class="input-group">
+              <label for="prof-username">Username:</label>
+              <input type="text" id="prof-username" name="username" value="{{ username }}" readonly />
+            </div>
+            <div class="input-group">
+              <label for="prof-password">Password:</label>
+              <div class="password-wrapper">
+                <input type="password" id="prof-password" name="password" value="{{ password }}" readonly />
+                <button type="button" class="password-toggle" id="toggle-password-visibility" aria-label="Toggle password visibility">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+              </div>
+            </div>
+            <div class="input-group">
+              <label for="prof-first">First Name:</label>
+              <input type="text" id="prof-first" name="first_name" value="{{ first_name }}" readonly />
+            </div>
+            <div class="input-group">
+              <label for="prof-last">Last Name:</label>
+              <input type="text" id="prof-last" name="last_name" value="{{ last_name }}" readonly />
+            </div>
+          </div>
+
+          <div class="form-actions" id="profile-form-actions" style="display: none;">
+            <button type="button" class="btn-soft cancel-btn" id="cancel-profile-btn">Cancel</button>
+            <button type="button" class="btn-soft save-btn" id="save-profile-btn">Save</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Placeholders for other tabs -->
+      <div class="tab-pane" id="pane-posts">
+        <h2>Posts</h2>
+        <p class="placeholder-text">Content for Posts will go here.</p>
+      </div>
+      <div class="tab-pane" id="pane-theme">
+        <h2>Theme</h2>
+        <p class="placeholder-text">Content for Theme will go here.</p>
+      </div>
+      <div class="tab-pane" id="pane-home-page">
+        <h2>Home Page</h2>
+        <p class="placeholder-text">Content for Home Page will go here.</p>
+      </div>
+      <div class="tab-pane" id="pane-etc">
+        <h2>Etc.</h2>
+        <p class="placeholder-text">Other content will go here.</p>
+      </div>
+
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Expose initial values for cancel button logic
+  const initialProfileData = {
+    username: "{{ username }}",
+    password: "{{ password }}",
+    first_name: "{{ first_name }}",
+    last_name: "{{ last_name }}"
+  };
+</script>
+<script src="/static/javascript/tradchat.js" defer></script>
+<script src="/static/javascript/socketio.js" defer></script>
+<script src="/static/javascript/jQuery.js" defer></script>
+<script src="/static/javascript/emoji.js" defer></script>
+<script src="/static/javascript/looks/settings.js" defer></script>
+<script src="/static/javascript/network/settings.js" defer></script>
+{% endblock %}

@@ -65,7 +65,7 @@
             <polyline points="15 18 9 12 15 6" />
             <line x1="9" y1="12" x2="21" y2="12" />
           </svg>
-          <span>Mainroom</span>
+          <span>Back to Mainroom</span>
         </button>
 
         <!-- Create button -->
@@ -212,6 +212,7 @@
 
         <!-- Text input with nested icons -->
         <div class="input-wrapper">
+          <div id="emoji-typeahead-container" class="emoji-typeahead-container" style="display: none;"></div>
           <textarea class="inputbar__text" id="chat-input" placeholder="Say something..."
             aria-label="Message input" rows="1"></textarea>
 
@@ -239,7 +240,7 @@
       <!-- Send button — separated visually as in wireframe -->
       <i class="fa-solid fa-paper-plane clickable-icon send-icon" id="send-btn" aria-label="Send message"></i>
     </div>
-
+ 
     <!-- Simple emoji picker popover (hidden by default, toggled by JS) -->
     <div class="emoji-picker" id="emoji-picker" aria-hidden="true">
       <!-- Emojis injected by looks/home.js -->

@@ -200,7 +200,8 @@ img {
     transition: all var(--transition-speed);
 }
 
-.navbar-profile-button:hover {
+.navbar-profile-button:hover,
+.navbar-profile-button.active {
     background-color: var(--color-medium);
     color: var(--color-dark);
 }

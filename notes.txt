@@ -1,14 +1,9 @@
-change to search chats or search rooms instead of just search on the sidebar
 
-change back to mainroom
+make room banner half the availble width of main panel
 
-make line between create and search thicker
+get more and better emojis into the json
 
-round the banner abit and thick veritically
-
-cut inwards for banner.. round the banner and also the chat options in the sidebar
-
-removing the day if current day for messages
+get 2000 safe gifs
 
 chats sidebar expand and sidebar
 
@@ -21,8 +16,6 @@ ready options for admin communication
 removing can only be notified if you are the same or level above the remover
 
 ban tfc (trickey fake accounts) allow celelbrity/movie charector 
-
-add colon search for emojis like google chat
 
 voice and video call
 

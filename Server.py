@@ -271,6 +271,12 @@ def process_room_leave(sid):
         if is_dm:
             user1 = find_account_id_or_password_or_gender(room.split('.$@-@&.')[0], 'id')
             user2 = find_account_id_or_password_or_gender(room.split('.$@-@&.')[1], 'id')
+            
+            if user1 is None or user2 is None:
+                # If we can't find one of the users (e.g. name changed), just clean up and exit
+                if sid in sid_to_room_state: del sid_to_room_state[sid]
+                return
+
             ids = sorted([int(user1), int(user2)])
             target_id = f"{ids[0]}-{ids[1]}"
             
@@ -720,7 +726,8 @@ def home():
                 color_light=colors['color_light'],
                 room=room,
                 room_type=room_type,
-                room_emoji=room_emoji
+                room_emoji=room_emoji,
+                active_page='home'
             )
 
         else:
@@ -729,6 +736,40 @@ def home():
     except (KeyError, SyntaxError, ValueError):
         return redirect('/')
 
+@app.route('/settings/')
+def settings():
+    try:
+        username = session['username']
+        password = session['password']
+
+        if check_credentials(username, password):
+            theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+
+            colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
+            colors = ast.literal_eval(colorsFile.read())
+            colorsFile.close()
+            
+            account_info = db_sql("SELECT first_name, last_name FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+            first_name = account_info[0][0] if account_info else ''
+            last_name = account_info[0][1] if account_info else ''
+
+            return render_template(
+                'settings.html',
+                theme=theme,
+                color_dark=colors['color_dark'],
+                color_medium=colors['color_medium'],
+                color_light=colors['color_light'],
+                username=username,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                active_page='settings'
+            )
+        else:
+            raise KeyError('Why do people try to hack accounts?')
+
+    except (KeyError, SyntaxError, ValueError):
+        return redirect('/')
 
 
 # Configure upload settings
@@ -1564,6 +1605,50 @@ def Recv(message, sid):
                 db_sql("""INSERT INTO rooms (room_name, description, room_type, owners, managers, curators, members, emoji) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", 'rooms', params=[roomname, description, roomtype, str(find_account_id_or_password_or_gender(username, 'id')), '', '', '', emoji], chat_room=False)
                 
                 Server.send(str(['Create Room Results', 'Room Created']), room=sid)
+
+    elif msg[0] == 'Update Profile':
+        data = msg[1]
+        old_username = data['username'].replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
+        old_password = data['password'].replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
+        new_username = data['new_username'].replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
+        new_password = data['new_password'].replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
+        new_first_name = data['new_first_name'].replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
+        new_last_name = data['new_last_name'].replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
+
+        if check_credentials(old_username, old_password):
+            user_id = find_account_id_or_password_or_gender(old_username, 'id')
+            
+            # Check if new username is taken
+            if new_username.lower() != old_username.lower():
+                existing = db_sql("SELECT id FROM accounts WHERE LOWER(username) = ?;", 'accounts', params=[new_username.lower()], chat_room=False)
+                if existing:
+                    Server.send(str(['Update Profile Result', {'status': 'error', 'message': 'Username already exists'}]), room=sid)
+                    return
+            
+            # Update database
+            db_sql("""UPDATE accounts SET username = ?, password = ?, first_name = ?, last_name = ? WHERE id = ?;""", 'accounts', params=[new_username, new_password, new_first_name, new_last_name, user_id], chat_room=False)
+            
+            username_changed = (new_username != old_username)
+            if username_changed:
+                # Reset room to mainroom to avoid stale DM room names crashing the server
+                db_sql("UPDATE accounts SET room = 'mainroom' WHERE id = ?;", 'accounts', params=[user_id], chat_room=False)
+                
+                # Remove from caches as requested
+                if old_username in accounts_dict:
+                    del accounts_dict[old_username]
+                if user_id in id_to_accounts_dict:
+                    del id_to_accounts_dict[user_id]
+                
+                # Signal client to log out
+                Server.send(str(['Update Profile Result', {'status': 'success', 'username_changed': True}]), room=sid)
+            else:
+                # Update password in cache if username didn't change
+                if old_username in accounts_dict:
+                    accounts_dict[old_username]['password'] = new_password
+                
+                Server.send(str(['Update Profile Result', {'status': 'success', 'username_changed': False}]), room=sid)
+        else:
+            Server.send(str(['Update Profile Result', {'status': 'error', 'message': 'Invalid credentials'}]), room=sid)
 
     elif msg[0] == 'Get Room Members':
         data = msg[1]

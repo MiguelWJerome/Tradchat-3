@@ -29,7 +29,7 @@ trigger_size : { // (object) defines trigger size
     width: '22px',
 },
 target_r_padding    : 27, // (int) right padding value (in pixels) applied to target field to avoid texts under the trigger
-emoji_json_url      : '.static/emoji.json', // (string) emoji JSON url
+emoji_json_url      : '/static/emoji.json', // (string) emoji JSON url
 trigger_title       : 'insert emoji',
 
 labels : [ // (array) option used to translate script texts
@@ -48,7 +48,7 @@ document.addEventListener('click', function(e) {
     let picker = document.querySelector("#lc-emoji-picker");
     
     // close if clicked elementis not in the picker
-    if(picker.showing && !picker.contains(e.target)) {
+    if(picker && picker.showing && !picker.contains(e.target)) {
         picker.showing = false;
         picker.style.opacity = '0'
         pickerQue.push(picker)
@@ -74,7 +74,7 @@ window.addEventListener('resize', function(e) {
     let picker = document.querySelector("#lc-emoji-picker");
     
     // close if clicked elementis not in the picker
-    if(picker.showing) {
+    if(picker && picker.showing) {
         picker.showing = false;
         picker.style.opacity = '0'
         pickerQue.push(picker)
@@ -120,7 +120,11 @@ window.lc_emoji_picker = function(attachTo, options = {}) {
 
         // load emoji json data on page loaded - stop plugin execution until it is loaded
         if(typeof(emoji_json) != 'object') {
-            document.addEventListener("DOMContentLoaded", () => {this.fetch_emoji_data()});
+            if (document.readyState === 'loading') {
+                document.addEventListener("DOMContentLoaded", () => {this.fetch_emoji_data()});
+            } else {
+                this.fetch_emoji_data();
+            }
             return true;
         }
         
@@ -674,4 +678,42 @@ const maybe_querySelectorAll = (selector) => {
     });
     
     return document.querySelectorAll(selector);
+};
+
+// Global function to search emojis by keyword for typeahead
+window.searchEmojiByKeyword = function(keyword) {
+    if (!emoji_json || typeof emoji_json !== 'object') return [];
+    
+    keyword = keyword ? keyword.toLowerCase() : "";
+    let results = [];
+    
+    for (const category in emoji_json) {
+        if (emoji_json.hasOwnProperty(category)) {
+            const items = emoji_json[category];
+            for (const item of items) {
+                let match = false;
+                
+                // If keyword is empty, just return the first ones
+                if (!keyword) {
+                    match = true;
+                } else {
+                    // Check if description or any keywords match
+                    if (item.description.toLowerCase().includes(keyword)) {
+                        match = true;
+                    } else if (item.keywords && item.keywords.some(k => k.toLowerCase().includes(keyword))) {
+                        match = true;
+                    }
+                }
+                
+                if (match) {
+                    results.push(item);
+                    if (results.length >= 20) {
+                        return results;
+                    }
+                }
+            }
+        }
+    }
+    
+    return results;
 };

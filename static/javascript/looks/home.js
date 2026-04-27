@@ -49,20 +49,51 @@ $(document).ready(function () {
     $(this).addClass('active');
 
     // Get the label to determine what to show
-    var selectedView = $(this).find('.tray-item__label').text().replace(/\s+/g, '').toLowerCase();
+    var label = $(this).find('.tray-item__label').text().replace(/\s+/g, '').toLowerCase();
+    
+    // Update the search placeholder
+    updateSearchPlaceholder(label);
 
-    /* Placeholder for toggling content:
-       Here you can add logic to filter your #sidebar-list 
-       or fetch different data based on 'selectedView' 
-    */
-    if (selectedView === 'messenger') {
-      // Show DMs
-    } else if (selectedView === 'publicrooms') {
-      // Show Public Rooms
-    } else if (selectedView === 'privaterooms') {
-      // Show Private Rooms
-    }
+    // Clear search input when switching views
+    $('.sidebar__search .search-input').val('').trigger('input');
   });
+
+  // Handle Sidebar Search Filtering
+  $(document).ready(function() {
+    $('.sidebar__search .search-input').on('input', function() {
+      const term = $(this).val().toLowerCase().trim();
+      $('.sidebar__list .convo-item').each(function() {
+        const roomName = $(this).find('.convo-item__name').text().toLowerCase();
+        const roomDesc = $(this).find('.convo-item__preview').text().toLowerCase();
+        
+        if (roomName.includes(term) || roomDesc.includes(term)) {
+          $(this).show();
+        } else {
+          $(this).hide();
+        }
+      });
+    });
+  });
+
+  // Function to update the sidebar search input placeholder
+  window.updateSearchPlaceholder = function(view) {
+    const $searchInput = $('.sidebar__search .search-input');
+    if (!$searchInput.length) return;
+
+    if (view === 'messenger') {
+      $searchInput.attr('placeholder', 'Search Chats');
+    } else if (view === 'publicrooms' || view === 'privaterooms') {
+      $searchInput.attr('placeholder', 'Search Rooms');
+    } else {
+      $searchInput.attr('placeholder', 'Search');
+    }
+  };
+
+  // Initial placeholder update based on active tray item
+  const activeLabel = $('.tray-item.active .tray-item__label').text().replace(/\s+/g, '').toLowerCase();
+  if (activeLabel) {
+    updateSearchPlaceholder(activeLabel);
+  }
 });
 var overhead_spinner = document.querySelector('#overhead-spinner');
 let specialElement_queue = [];
@@ -705,8 +736,13 @@ document.body.onclick = function () {
       var dayShort = msgDate.toLocaleDateString([], { weekday: 'short' });
       var fullDateStr = msgDate.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-      // Header Display: "Mon 10:30 PM" (No year here per your request)
-      var headerStamp = dayShort + " " + timeStr;
+      // Header Display: hide day if it's today
+      var today = new Date();
+      var isToday = msgDate.getDate() === today.getDate() &&
+                    msgDate.getMonth() === today.getMonth() &&
+                    msgDate.getFullYear() === today.getFullYear();
+      
+      var headerStamp = (isToday ? "" : dayShort + " ") + timeStr;
 
       // --- 2. Big Centered Date Stamp and User Grouping Logic ---
       var isSameUser, $targetMsgGroup;
@@ -2179,8 +2215,146 @@ document.body.onclick = function () {
       roomModal('hide');
     }
 
+    /**
+     * =========================================================================
+     * GOOGLE CHAT STYLE EMOJI TYPEAHEAD
+     * =========================================================================
+     */
+    function initEmojiTypeahead() {
+      var emojiSearchState = {
+        active: false,
+        keyword: "",
+        selectedIndex: -1,
+        results: []
+      };
+
+      function hideTypeahead($input) {
+        emojiSearchState.active = false;
+        var $container = $input ? $input.siblings(".emoji-typeahead-container") : $(".emoji-typeahead-container");
+        $container.css("display", "none").empty();
+      }
+
+      function renderTypeahead($input) {
+        var $container = $input.siblings(".emoji-typeahead-container");
+        if (!$container.length) return;
+        
+        $container.empty();
+        if (emojiSearchState.results.length === 0) {
+          hideTypeahead($input);
+          return;
+        }
+
+        emojiSearchState.results.forEach(function(item, index) {
+          var $item = $("<div>").addClass("emoji-typeahead-item");
+          if (index === emojiSearchState.selectedIndex) {
+            $item.addClass("selected");
+          }
+          
+          var $emoji = $("<span>").addClass("emoji").text(item.emoji);
+          var $name = $("<span>").addClass("emoji-name").text(item.description.toLowerCase());
+          
+          $item.append($emoji).append($name);
+          
+          $item.on("click", function() {
+            insertEmoji($input, item.emoji);
+          });
+          
+          $container.append($item);
+        });
+
+        // Use !important just in case
+        $container[0].style.setProperty("display", "flex", "important");
+        
+        // Scroll selected item into view if needed
+        if (emojiSearchState.selectedIndex >= 0) {
+          var selectedEl = $container.children().eq(emojiSearchState.selectedIndex)[0];
+          if (selectedEl) {
+            selectedEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          }
+        }
+      }
+
+      function insertEmoji($input, emoji) {
+        var val = $input.val();
+        var cursor = $input[0].selectionStart;
+        var textBefore = val.substring(0, cursor);
+        var textAfter = val.substring(cursor);
+        
+        // Find the last colon before the cursor
+        var lastColonIdx = textBefore.lastIndexOf(':');
+        if (lastColonIdx !== -1) {
+          textBefore = textBefore.substring(0, lastColonIdx) + emoji + " ";
+        }
+        
+        $input.val(textBefore + textAfter);
+        $input[0].setSelectionRange(textBefore.length, textBefore.length);
+        $input.focus();
+        hideTypeahead($input);
+      }
+
+      $(document).on("input", "#chat-input", function(e) {
+        var $input = $(this);
+        var val = $input.val();
+        var cursor = $input[0].selectionStart;
+        var textBefore = val.substring(0, cursor);
+        
+        // Check if we are currently typing an emoji
+        var match = textBefore.match(/(?:^|\s):([^\s]*)$/);
+        
+        if (match) {
+          var keyword = match[1];
+          emojiSearchState.active = true;
+          emojiSearchState.keyword = keyword;
+          emojiSearchState.selectedIndex = -1;
+          
+          if (typeof window.searchEmojiByKeyword === "function") {
+            emojiSearchState.results = window.searchEmojiByKeyword(keyword);
+            renderTypeahead($input);
+          }
+        } else {
+          if (emojiSearchState.active) {
+            hideTypeahead($input);
+          }
+        }
+      });
+
+      $(document).on("keydown", "#chat-input", function(e) {
+        if (!emojiSearchState.active || emojiSearchState.results.length === 0) return;
+        var $input = $(this);
+
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          emojiSearchState.selectedIndex = (emojiSearchState.selectedIndex + 1) % emojiSearchState.results.length;
+          renderTypeahead($input);
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          emojiSearchState.selectedIndex = (emojiSearchState.selectedIndex - 1 + emojiSearchState.results.length) % emojiSearchState.results.length;
+          renderTypeahead($input);
+        } else if (e.key === "Enter") {
+          if (emojiSearchState.selectedIndex >= 0) {
+            e.preventDefault();
+            var selectedItem = emojiSearchState.results[emojiSearchState.selectedIndex];
+            insertEmoji($input, selectedItem.emoji);
+          }
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          hideTypeahead($input);
+        }
+      });
+
+      $(document).on("click", function(e) {
+        if (!$(e.target).closest(".emoji-typeahead-container, #chat-input").length) {
+          if (emojiSearchState.active) {
+            hideTypeahead();
+          }
+        }
+      });
+    }
+
     // Document ready handlers for modal
     $(document).ready(function () {
+      initEmojiTypeahead();
+      
       // Connect Create button from sidebar - Handled in network/home.js to support DM selection
 
 

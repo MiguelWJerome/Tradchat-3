@@ -420,6 +420,12 @@ document.getElementById('back-to-mainroom').addEventListener('click', function (
     document.getElementById('messenger-icon').classList.remove('active');
     document.getElementById('private-rooms-icon').classList.remove('active');
     document.getElementById('public-rooms-icon').classList.add('active');
+    
+    // Update search placeholder via looks layer function
+    if (typeof updateSearchPlaceholder === 'function') {
+        updateSearchPlaceholder('publicrooms');
+    }
+
     cl.send(JSON.stringify(['Get Rooms', { 'username': username, 'password': password, 'roomtype': 'public' }]));
     switch_room('mainroom');
 });
@@ -621,18 +627,21 @@ cl.on('message', recv)
 $(document).ready(function () {
     if (ROOM_TYPE === 'public') {
         document.getElementById('public-rooms-icon').classList.add('active');
+        if (typeof updateSearchPlaceholder === 'function') updateSearchPlaceholder('publicrooms');
         change_banner_picture(ROOM_EMOJI, false);
         document.querySelector('.room-title').textContent = ROOM.toUpperCase()
         changeSelectedRoomOption(ROOM)
         cl.send(JSON.stringify(['Get Rooms', { 'username': username, 'password': password, 'roomtype': 'public' }]))
     } else if (ROOM_TYPE === 'private') {
         document.getElementById('private-rooms-icon').classList.add('active');
+        if (typeof updateSearchPlaceholder === 'function') updateSearchPlaceholder('privaterooms');
         change_banner_picture(ROOM_EMOJI, false);
         document.querySelector('.room-title').textContent = ROOM.toUpperCase()
         changeSelectedRoomOption(ROOM)
         cl.send(JSON.stringify(['Get Rooms', { 'username': username, 'password': password, 'roomtype': 'private' }]))
     } else if (ROOM_TYPE === 'dm') {
         document.getElementById('messenger-icon').classList.add('active');
+        if (typeof updateSearchPlaceholder === 'function') updateSearchPlaceholder('messenger');
         change_banner_picture(ROOM_EMOJI, true);
         let dmParts = ROOM.split('.$@-@&.');
         let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];

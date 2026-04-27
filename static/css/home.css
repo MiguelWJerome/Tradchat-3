@@ -185,7 +185,7 @@
 /* ---- 3b. Sidebar Action Buttons ---- */
 .sidebar__actions {
   padding: 16px;
-  border-bottom: 1.5px solid var(--color-border);
+  border-bottom: 3px solid var(--color-border);
 }
 
 .sidebar-actions-row {
@@ -390,8 +390,10 @@
   align-items: center;
   gap: 10px;
   padding: 9px 14px;
+  margin: 4px 8px;
+  border-radius: 12px;
   cursor: pointer;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom: none;
   transition: background var(--transition);
 }
 
@@ -471,14 +473,16 @@
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
-  padding: 12px 40px 12px 20px;
-  width: 50%;
+  padding: 18px 40px 18px 20px;
+  width: fit-content;
+  min-width: 40%;
   
-  /* Pointed chevron shape (sharp as in wireframe) */
+  /* Notched inward shape */
   background: var(--color-medium);
-  clip-path: polygon(0% 0%, 92% 0%, 100% 50%, 92% 100%, 0% 100%);
+  clip-path: polygon(0% 0%, 100% 0%, 90% 50%, 100% 100%, 0% 100%);
+  border-radius: 12px 0 0 12px;
   
-  margin-bottom: 10px;
+  margin-bottom: 15px;
   transition: transform 0.2s ease;
 }
 
@@ -742,9 +746,10 @@
   background: transparent;
   border: 2px solid var(--color-dark);
   border-radius: 20px;
-  overflow: hidden;
+  overflow: visible;
   transition: all 0.3s ease;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  outline: none;
 }
 
 .chat-input-box:focus-within {
@@ -811,6 +816,53 @@
 .preview-close-btn:hover {
   background: #cc0000;
   transform: scale(1.1);
+}
+
+/* --- Google Chat Style Emoji Typeahead --- */
+.emoji-typeahead-container {
+  position: absolute;
+  bottom: 100%;
+  left: 10px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  max-height: calc(8 * 38px); /* 8 items high */
+  overflow-y: auto;
+  z-index: 1000;
+  width: 250px;
+  margin-bottom: 8px; /* space above the input */
+  padding: 4px 0;
+  flex-direction: column;
+}
+
+.emoji-typeahead-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #333;
+  height: 38px; /* Fixed height for max-height calculation */
+  box-sizing: border-box;
+}
+
+.emoji-typeahead-item:hover, .emoji-typeahead-item.selected {
+  background-color: #f1f3f4;
+  outline: 1px solid #e8eaed;
+}
+
+.emoji-typeahead-item .emoji {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.emoji-typeahead-item .emoji-name {
+  color: #5f6368;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Input wrapper for positioning icons inside */
