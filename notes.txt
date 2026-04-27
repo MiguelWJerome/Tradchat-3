@@ -20,7 +20,7 @@ ready options for admin communication
 
 removing can only be notified if you are the same or level above the remover
 
-ben tfc (trickey fake accounts) allow celelbrity/movie charector 
+ban tfc (trickey fake accounts) allow celelbrity/movie charector 
 
 add colon search for emojis like google chat
 
