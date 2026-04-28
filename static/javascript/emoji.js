@@ -63,9 +63,11 @@ document.addEventListener('click', function(e) {
         return true
     }
 
-    if (document.querySelector(emojiPicker.attachTo).contains(e.target))
-    {
-        picker.showing = true
+    if (typeof emojiPicker !== 'undefined' && emojiPicker.attachTo) {
+        const attachEl = document.querySelector(emojiPicker.attachTo);
+        if (attachEl && attachEl.contains(e.target)) {
+            picker.showing = true;
+        }
     }
 });
 

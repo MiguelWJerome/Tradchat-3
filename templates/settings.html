@@ -4,6 +4,7 @@
 
 {% block styles %}
 <link rel="stylesheet" href="/static/css/settings.css" />
+<link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -50,6 +51,7 @@
                 class="avatar-img" />
               <i class="fa-solid fa-xmark placeholder-x" style="display: none;"></i>
             </div>
+            <input type="file" id="profile-pic-upload" accept="image/*" style="display: none;" />
           </div>
           <div class="profile-actions-top">
             <button class="icon-btn lock-btn" id="edit-profile-btn" aria-label="Click to unlock">
@@ -68,7 +70,8 @@
               <label for="prof-password">Password:</label>
               <div class="password-wrapper">
                 <input type="password" id="prof-password" name="password" value="{{ password }}" readonly />
-                <button type="button" class="password-toggle" id="toggle-password-visibility" aria-label="Toggle password visibility">
+                <button type="button" class="password-toggle" id="toggle-password-visibility"
+                  aria-label="Toggle password visibility">
                   <i class="fa-solid fa-eye"></i>
                 </button>
               </div>
@@ -96,8 +99,9 @@
         <p class="placeholder-text">Content for Posts will go here.</p>
       </div>
       <div class="tab-pane" id="pane-theme">
-        <h2>Theme</h2>
-        <p class="placeholder-text">Content for Theme will go here.</p>
+        <div class="theme-grid" id="theme-grid-container">
+          <!-- Theme cards will be injected here by Javascript -->
+        </div>
       </div>
       <div class="tab-pane" id="pane-home-page">
         <h2>Home Page</h2>
@@ -108,6 +112,21 @@
         <p class="placeholder-text">Other content will go here.</p>
       </div>
 
+    </div>
+  </div>
+
+  <!-- Cropper Modal -->
+  <div id="cropper-modal" class="tc-alert-overlay">
+    <div class="tc-alert-content" style="width: 500px; max-width: 90%; height: auto;">
+      <h3 style="margin-top: 0; color: var(--color-dark); font-family: var(--font-heading);">Crop Profile Picture</h3>
+      <div
+        style="width: 100%; height: 350px; background: #eee; margin-bottom: 1.5rem; overflow: hidden; border-radius: 8px;">
+        <img id="cropper-image" src="" style="max-width: 100%; display: block;">
+      </div>
+      <div class="form-actions" style="justify-content: flex-end;">
+        <button type="button" class="btn-soft cancel-btn" id="cropper-cancel">Cancel</button>
+        <button type="button" class="btn-soft save-btn" id="cropper-save">Crop & Upload</button>
+      </div>
     </div>
   </div>
 </main>
@@ -123,6 +142,7 @@
     last_name: "{{ last_name }}"
   };
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <script src="/static/javascript/tradchat.js" defer></script>
 <script src="/static/javascript/socketio.js" defer></script>
 <script src="/static/javascript/jQuery.js" defer></script>

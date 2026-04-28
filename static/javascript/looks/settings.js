@@ -87,18 +87,99 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Avatar click: placeholder for future upload logic
-  if (avatarCircle) {
+  // Avatar click and upload logic
+  const fileInput = document.getElementById('profile-pic-upload');
+  const cropperModal = document.getElementById('cropper-modal');
+  const cropperImage = document.getElementById('cropper-image');
+  const cropperCancel = document.getElementById('cropper-cancel');
+  const cropperSave = document.getElementById('cropper-save');
+  let cropperInstance = null;
+
+  if (avatarCircle && fileInput) {
     avatarCircle.addEventListener('click', () => {
       if (window.isEditingProfile) {
-        console.log("Avatar click! (Upload logic can go here)");
-        // Trigger hidden file input if one existed
+        fileInput.click();
       } else if (lockBtn) {
         // Shake logic: if avatar clicked while locked
         lockBtn.classList.add('shake');
         setTimeout(() => {
           lockBtn.classList.remove('shake');
         }, 400);
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (file.size > 50 * 1024 * 1024) {
+          Alert(`"${file.name}" is too large. The maximum file size is 50MB.`);
+          fileInput.value = '';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          cropperImage.src = e.target.result;
+          cropperModal.classList.add('visible');
+          
+          if (cropperInstance) {
+            cropperInstance.destroy();
+          }
+          cropperInstance = new Cropper(cropperImage, {
+            aspectRatio: 1,
+            viewMode: 1,
+            autoCropArea: 1,
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+      fileInput.value = ''; // Reset input so same file can be chosen again
+    });
+  }
+
+  if (cropperCancel) {
+    cropperCancel.addEventListener('click', () => {
+      cropperModal.classList.remove('visible');
+      if (cropperInstance) {
+        cropperInstance.destroy();
+        cropperInstance = null;
+      }
+    });
+  }
+
+  if (cropperSave) {
+    cropperSave.addEventListener('click', () => {
+      if (cropperInstance) {
+        try {
+          const canvas = cropperInstance.getCroppedCanvas({ width: 800, height: 800 });
+          if (!canvas) {
+            Alert('Could not crop the image. Please try selecting it again.');
+            return;
+          }
+          const base64Image = canvas.toDataURL('image/png');
+
+          // Store pending image - only apply to avatar after server confirms success
+          window.pendingProfilePicture = base64Image;
+
+          // Send to server
+          if (typeof cl !== 'undefined') {
+            console.log('[DEBUG] Sending Update Profile Picture to server...');
+            cl.send(JSON.stringify(['Update Profile Picture', {
+              username: initialProfileData.username,
+              password: initialProfileData.password,
+              image: base64Image
+            }]));
+          } else {
+            console.error('[DEBUG] cl is undefined — socket not connected');
+            Alert('Connection error. Please refresh the page and try again.');
+          }
+
+          cropperModal.classList.remove('visible');
+          cropperInstance.destroy();
+          cropperInstance = null;
+        } catch(err) {
+          console.error('[DEBUG] Error in cropperSave:', err);
+          Alert('An unexpected error occurred while processing the image.');
+        }
       }
     });
   }

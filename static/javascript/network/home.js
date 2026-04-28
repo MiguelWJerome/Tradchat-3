@@ -692,8 +692,8 @@ $(document).ready(function() {
         if (!files.length) return;
 
         files.forEach(file => {
-            if (file.size > 20 * 1024 * 1024) {
-                if (typeof Alert === 'function') Alert(`"${file.name}" is too large. Please select images under 20MB.`);
+            if (file.size > 50 * 1024 * 1024) {
+                if (typeof Alert === 'function') Alert(`"${file.name}" is too large. The maximum file size is 50MB.`);
                 return;
             }
 

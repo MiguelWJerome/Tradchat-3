@@ -11,6 +11,7 @@ from threading import Thread, Lock
 import ast
 import base64
 import io
+import json
 from PIL import Image, ImageOps 
 import re
 
@@ -408,7 +409,7 @@ def get_reactions_with_usernames(reaction_str):
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(64)
-Server = SocketIO(app, max_http_payload_size=50 * 1024 * 1024)
+Server = SocketIO(app, max_http_buffer_size=50 * 1024 * 1024)
 
 
 accounts_lock = Lock()
@@ -838,12 +839,16 @@ def gif_approve():
 
 
 
-def Recv(message, sid):
-    print(message)
-    msg = ast.literal_eval(message)
-    if msg[0] == 'Image Upload':
-        print(['Image Upload', {k: (v if k != 'image' else f'<{len(v)} bytes of image data>') for k, v in msg[1].items()}])
+def Recv(message, sid): 
+    try:
+        msg = json.loads(message)
+    except (json.JSONDecodeError, TypeError):
+        msg = ast.literal_eval(message)
+
+    if msg[0] in ['Image Upload', 'Update Profile Picture']:
+        print([msg[0], {k: (v if k != 'image' else f'<{len(v)} bytes of image data>') for k, v in msg[1].items()}])
     else:
+        print(message)
         print(msg)
 
     if msg[0] == 'Message':
@@ -1618,6 +1623,13 @@ def Recv(message, sid):
         if check_credentials(old_username, old_password):
             user_id = find_account_id_or_password_or_gender(old_username, 'id')
             
+            # Check for invalid filename characters
+            invalid_chars = r'\/:*?"<>|'
+            found_invalid = [c for c in new_username if c in invalid_chars]
+            if found_invalid:
+                Server.send(str(['Update Profile Result', {'status': 'error', 'message': f'Sorry but {" ".join(list(set(found_invalid)))} symbols are not allowed'}]), room=sid)
+                return
+
             # Check if new username is taken
             if new_username.lower() != old_username.lower():
                 existing = db_sql("SELECT id FROM accounts WHERE LOWER(username) = ?;", 'accounts', params=[new_username.lower()], chat_room=False)
@@ -1633,6 +1645,15 @@ def Recv(message, sid):
                 # Reset room to mainroom to avoid stale DM room names crashing the server
                 db_sql("UPDATE accounts SET room = 'mainroom' WHERE id = ?;", 'accounts', params=[user_id], chat_room=False)
                 
+                # Rename profile picture if it exists
+                old_pic = f'static/profile-pictures/{old_username}.png'
+                new_pic = f'static/profile-pictures/{new_username}.png'
+                if os.path.exists(old_pic):
+                    try:
+                        os.rename(old_pic, new_pic)
+                    except Exception as e:
+                        print(f"Error renaming profile picture: {e}")
+
                 # Remove from caches as requested
                 if old_username in accounts_dict:
                     del accounts_dict[old_username]
@@ -1649,6 +1670,68 @@ def Recv(message, sid):
                 Server.send(str(['Update Profile Result', {'status': 'success', 'username_changed': False}]), room=sid)
         else:
             Server.send(str(['Update Profile Result', {'status': 'error', 'message': 'Invalid credentials'}]), room=sid)
+
+    elif msg[0] == 'Get Themes':
+        themes_dir = 'static/themes'
+        themes_list = []
+        if os.path.exists(themes_dir):
+            for theme_name in os.listdir(themes_dir):
+                theme_path = os.path.join(themes_dir, theme_name)
+                if os.path.isdir(theme_path):
+                    colors_file = os.path.join(theme_path, 'colors.txt')
+                    if os.path.exists(colors_file):
+                        try:
+                            with open(colors_file, 'r') as f:
+                                colors = ast.literal_eval(f.read())
+                                themes_list.append({
+                                    'name': theme_name,
+                                    'colors': colors
+                                })
+                        except Exception as e:
+                            print(f"Error reading theme {theme_name}: {e}")
+        # Sort alphabetically by name
+        themes_list.sort(key=lambda x: x['name'].lower())
+        Server.send(str(['Themes List', themes_list]), room=sid)
+
+    elif msg[0] == 'Update Theme':
+        data = msg[1]
+        username = data.get('username')
+        password = data.get('password')
+        theme = data.get('theme')
+
+        if check_credentials(username, password):
+            user_id = find_account_id_or_password_or_gender(username, 'id')
+            db_sql("UPDATE accounts SET theme = ? WHERE id = ?;", 'accounts', params=[theme, user_id], chat_room=False)
+
+    elif msg[0] == 'Update Profile Picture':
+        data = msg[1]
+        username = data.get('username')
+        password = data.get('password')
+        image_data = data.get('image')
+
+        if check_credentials(username, password):
+            try:
+                # Strip the data URL prefix if present
+                if ',' in image_data:
+                    image_data = image_data.split(',')[1]
+                
+                # Decode base64 string to bytes
+                image_bytes = base64.b64decode(image_data)
+                
+                # Open with Pillow
+                image = Image.open(io.BytesIO(image_bytes))
+                
+                # Ensure it's exactly 800x800, using ImageOps.fit to crop the center if needed
+                image = ImageOps.fit(image, (800, 800), method=Image.Resampling.LANCZOS)
+                
+                # Save as PNG
+                save_path = f'static/profile-pictures/{username}.png'
+                image.save(save_path, 'PNG')
+                
+                Server.send(str(['Update Profile Picture Result', {'status': 'success', 'message': 'Profile picture updated successfully!'}]), room=sid)
+            except Exception as e:
+                print(f"Error processing profile picture: {e}")
+                Server.send(str(['Update Profile Picture Result', {'status': 'error', 'message': 'Failed to process image.'}]), room=sid)
 
     elif msg[0] == 'Get Room Members':
         data = msg[1]

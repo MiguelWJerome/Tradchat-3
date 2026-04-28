@@ -9,8 +9,9 @@ function Recv(message) {
   if (msg[0] === 'Update Profile Result') {
     if (msg[1].status === 'success') {
       if (msg[1].username_changed) {
-        // Log out as requested if username changed
-        window.location.href = '/logout/';
+        Alert("Username changed successfully! You will now be logged out. Please log in with your new credentials.", () => {
+          window.location.href = '/logout/';
+        });
       } else {
         // Update local initial data
         if (typeof initialProfileData !== 'undefined') {
@@ -30,7 +31,76 @@ function Recv(message) {
         }
       }
     } else {
-      alert("Error saving profile: " + msg[1].message);
+      Alert("Error saving profile: " + msg[1].message);
+    }
+  } else if (msg[0] === 'Update Profile Picture Result') {
+    if (msg[1].status === 'success') {
+      // Now that server confirmed, apply the image to the avatar
+      if (window.pendingProfilePicture) {
+        const avatarImg = document.querySelector('.avatar-img');
+        if (avatarImg) {
+          avatarImg.src = window.pendingProfilePicture;
+          avatarImg.style.display = 'block';
+          const placeholder = document.querySelector('.placeholder-x');
+          if (placeholder) placeholder.style.display = 'none';
+        }
+        window.pendingProfilePicture = null;
+      }
+      Alert(msg[1].message);
+    } else {
+      window.pendingProfilePicture = null;
+      Alert("Error updating profile picture: " + msg[1].message);
+    }
+  } else if (msg[0] === 'Themes List') {
+    const themes = msg[1];
+    const container = document.getElementById('theme-grid-container');
+    if (container) {
+      container.innerHTML = ''; // Clear container
+      themes.forEach(theme => {
+        const card = document.createElement('div');
+        card.className = 'theme-card';
+        // Get current theme from body or a global var, for now we can just assume no active state is initially set, 
+        // or check against the current background image
+        const currentBg = document.body.style.backgroundImage;
+        if (currentBg.includes(theme.name)) {
+          card.classList.add('active');
+        }
+
+        card.innerHTML = `
+          <div class="theme-preview" style="background-image: url('/static/themes/${theme.name}/background.jpg')"></div>
+          <div class="theme-info">
+            <div class="theme-name">${theme.name}</div>
+            <div class="theme-colors">
+              <div class="theme-color-swatch" style="background-color: ${theme.colors.color_light}"></div>
+              <div class="theme-color-swatch" style="background-color: ${theme.colors.color_medium}"></div>
+              <div class="theme-color-swatch" style="background-color: ${theme.colors.color_dark}"></div>
+            </div>
+          </div>
+        `;
+
+        card.addEventListener('click', () => {
+          // Update active state on cards
+          document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+
+          // Instantly update CSS variables
+          document.documentElement.style.setProperty('--color-light', theme.colors.color_light);
+          document.documentElement.style.setProperty('--color-medium', theme.colors.color_medium);
+          document.documentElement.style.setProperty('--color-dark', theme.colors.color_dark);
+          
+          // Instantly update background
+          document.body.style.backgroundImage = `url('/static/themes/${theme.name}/background.jpg')`;
+
+          // Send update to server (no save needed)
+          cl.send(JSON.stringify(['Update Theme', {
+            username: initialProfileData.username,
+            password: initialProfileData.password,
+            theme: theme.name
+          }]));
+        });
+
+        container.appendChild(card);
+      });
     }
   }
 }
@@ -58,4 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
       cl.send(JSON.stringify(['Update Profile', data]));
     });
   }
+
+  // Fetch themes for the themes tab
+  cl.send(JSON.stringify(['Get Themes']));
 });
