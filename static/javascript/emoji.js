@@ -684,6 +684,7 @@ const maybe_querySelectorAll = (selector) => {
 
 // Global function to search emojis by keyword for typeahead
 window.searchEmojiByKeyword = function(keyword) {
+    console.log("[EMOJI] searchEmojiByKeyword called. emoji_json state:", typeof emoji_json, emoji_json === false ? "false" : emoji_json === 'loading' ? "'loading'" : "loaded, keys: " + Object.keys(emoji_json).length);
     if (!emoji_json || typeof emoji_json !== 'object') return [];
     
     keyword = keyword ? keyword.toLowerCase() : "";

@@ -318,6 +318,8 @@ let sendButton = document.querySelector('#send-btn')
 
 chatInput.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) {
+        // Don't send if the emoji typeahead is active — let its handler pick the emoji
+        if (window.emojiTypeaheadActive) return;
         e.preventDefault();
         sendButton.click();
     }

@@ -2228,19 +2228,71 @@ document.body.onclick = function () {
         results: []
       };
 
-      function hideTypeahead($input) {
+      var $container = $("#emoji-typeahead-container");
+      console.log("[EMOJI] initEmojiTypeahead() called. Container found:", $container.length, $container[0]);
+
+      // ── Fetch emoji data independently ────────────────────────────────────
+      var typeaheadEmojiData = null;
+      fetch("/static/emoji.json")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          typeaheadEmojiData = data;
+          console.log("[EMOJI] emoji.json loaded independently. Categories:", Object.keys(data).length);
+        })
+        .catch(function(err) {
+          console.error("[EMOJI] Failed to fetch emoji.json:", err);
+        });
+
+      function searchEmoji(keyword) {
+        if (!typeaheadEmojiData) return [];
+        keyword = keyword ? keyword.toLowerCase() : "";
+        var results = [];
+        for (var category in typeaheadEmojiData) {
+          if (!typeaheadEmojiData.hasOwnProperty(category)) continue;
+          var items = typeaheadEmojiData[category];
+          for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var matched = !keyword
+              || item.description.toLowerCase().includes(keyword)
+              || (item.keywords && item.keywords.some(function(k) { return k.toLowerCase().includes(keyword); }));
+            if (matched) {
+              results.push(item);
+              if (results.length >= 20) return results;
+            }
+          }
+        }
+        return results;
+      }
+
+      function showTypeahead() {
+        console.log("[EMOJI] showTypeahead() — setting display:flex on", $container[0]);
+        $container[0].style.display = "flex";
+        $container[0].style.flexDirection = "column";
+        console.log("[EMOJI] After showTypeahead, computed display:", window.getComputedStyle($container[0]).display);
+      }
+
+      function hideTypeahead() {
+        console.log("[EMOJI] hideTypeahead() called");
         emojiSearchState.active = false;
-        var $container = $input ? $input.siblings(".emoji-typeahead-container") : $(".emoji-typeahead-container");
-        $container.css("display", "none").empty();
+        window.emojiTypeaheadActive = false;
+        emojiSearchState.results = [];
+        emojiSearchState.selectedIndex = -1;
+        $container[0].style.display = "none";
+        $container.empty();
       }
 
       function renderTypeahead($input) {
-        var $container = $input.siblings(".emoji-typeahead-container");
-        if (!$container.length) return;
-        
+        console.log("[EMOJI] renderTypeahead() called. Container length:", $container.length, "Results:", emojiSearchState.results.length);
+        if (!$container.length) {
+          console.warn("[EMOJI] renderTypeahead: container not found in DOM!");
+          return;
+        }
+
         $container.empty();
+
         if (emojiSearchState.results.length === 0) {
-          hideTypeahead($input);
+          console.log("[EMOJI] renderTypeahead: no results, hiding silently");
+          $container[0].style.display = "none";
           return;
         }
 
@@ -2249,75 +2301,72 @@ document.body.onclick = function () {
           if (index === emojiSearchState.selectedIndex) {
             $item.addClass("selected");
           }
-          
+
           var $emoji = $("<span>").addClass("emoji").text(item.emoji);
-          var $name = $("<span>").addClass("emoji-name").text(item.description.toLowerCase());
-          
+          var $name  = $("<span>").addClass("emoji-name").text(item.description.toLowerCase());
+
           $item.append($emoji).append($name);
-          
-          $item.on("click", function() {
+
+          $item.on("mousedown", function(e) {
+            e.preventDefault();
+            console.log("[EMOJI] Item mousedown — inserting:", item.emoji);
             insertEmoji($input, item.emoji);
           });
-          
+
           $container.append($item);
         });
 
-        // Use !important just in case
-        $container[0].style.setProperty("display", "flex", "important");
-        
-        // Scroll selected item into view if needed
+        showTypeahead();
+
         if (emojiSearchState.selectedIndex >= 0) {
           var selectedEl = $container.children().eq(emojiSearchState.selectedIndex)[0];
-          if (selectedEl) {
-            selectedEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
-          }
+          if (selectedEl) selectedEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
         }
       }
 
       function insertEmoji($input, emoji) {
-        var val = $input.val();
-        var cursor = $input[0].selectionStart;
+        console.log("[EMOJI] insertEmoji() called with:", emoji);
+        var val        = $input.val();
+        var cursor     = $input[0].selectionStart;
         var textBefore = val.substring(0, cursor);
-        var textAfter = val.substring(cursor);
-        
-        // Find the last colon before the cursor
-        var lastColonIdx = textBefore.lastIndexOf(':');
+        var textAfter  = val.substring(cursor);
+
+        var lastColonIdx = textBefore.lastIndexOf(":");
         if (lastColonIdx !== -1) {
           textBefore = textBefore.substring(0, lastColonIdx) + emoji + " ";
         }
-        
+
         $input.val(textBefore + textAfter);
         $input[0].setSelectionRange(textBefore.length, textBefore.length);
         $input.focus();
-        hideTypeahead($input);
+        hideTypeahead();
       }
 
-      $(document).on("input", "#chat-input", function(e) {
-        var $input = $(this);
-        var val = $input.val();
-        var cursor = $input[0].selectionStart;
+      // ── INPUT ──────────────────────────────────────────────────────────────
+      $(document).on("input", "#chat-input", function() {
+        var $input     = $(this);
+        var val        = $input.val();
+        var cursor     = $input[0].selectionStart;
         var textBefore = val.substring(0, cursor);
-        
-        // Check if we are currently typing an emoji
+
         var match = textBefore.match(/(?:^|\s):([^\s]*)$/);
-        
+        console.log("[EMOJI] input event. textBefore:", JSON.stringify(textBefore), "match:", match);
+
         if (match) {
           var keyword = match[1];
-          emojiSearchState.active = true;
-          emojiSearchState.keyword = keyword;
+          console.log("[EMOJI] Regex matched! Keyword:", JSON.stringify(keyword));
+          emojiSearchState.active        = true;
+          window.emojiTypeaheadActive    = true;
+          emojiSearchState.keyword       = keyword;
           emojiSearchState.selectedIndex = -1;
-          
-          if (typeof window.searchEmojiByKeyword === "function") {
-            emojiSearchState.results = window.searchEmojiByKeyword(keyword);
-            renderTypeahead($input);
-          }
-        } else {
-          if (emojiSearchState.active) {
-            hideTypeahead($input);
-          }
+
+          emojiSearchState.results = searchEmoji(keyword);
+          console.log("[EMOJI] searchEmoji returned", emojiSearchState.results.length, "results. typeaheadEmojiData loaded:", typeaheadEmojiData !== null);
+          renderTypeahead($input);
         }
       });
 
+      // ── KEYDOWN ────────────────────────────────────────────────────────────
       $(document).on("keydown", "#chat-input", function(e) {
         if (!emojiSearchState.active || emojiSearchState.results.length === 0) return;
         var $input = $(this);
@@ -2330,26 +2379,22 @@ document.body.onclick = function () {
           e.preventDefault();
           emojiSearchState.selectedIndex = (emojiSearchState.selectedIndex - 1 + emojiSearchState.results.length) % emojiSearchState.results.length;
           renderTypeahead($input);
-        } else if (e.key === "Enter") {
-          if (emojiSearchState.selectedIndex >= 0) {
-            e.preventDefault();
-            var selectedItem = emojiSearchState.results[emojiSearchState.selectedIndex];
-            insertEmoji($input, selectedItem.emoji);
-          }
-        } else if (e.key === "Escape") {
+        } else if (e.key === "Enter" && emojiSearchState.selectedIndex >= 0) {
           e.preventDefault();
-          hideTypeahead($input);
+          insertEmoji($input, emojiSearchState.results[emojiSearchState.selectedIndex].emoji);
         }
       });
 
-      $(document).on("click", function(e) {
-        if (!$(e.target).closest(".emoji-typeahead-container, #chat-input").length) {
-          if (emojiSearchState.active) {
-            hideTypeahead();
-          }
+      // ── CLICK OUTSIDE ──────────────────────────────────────────────────────
+      $(document).on("mousedown", function(e) {
+        if (!emojiSearchState.active) return;
+        if (!$(e.target).closest("#emoji-typeahead-container, #chat-input").length) {
+          console.log("[EMOJI] Clicked outside — hiding");
+          hideTypeahead();
         }
       });
     }
+
 
     // Document ready handlers for modal
     $(document).ready(function () {
