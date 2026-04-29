@@ -317,14 +317,15 @@ body {
 .chat-panel__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  border-bottom: 1.5px solid var(--color-border);
-  width: 100%;
-  border-radius: 20px;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 12px 40px 12px 20px;
+  width: 50%;
+  border-radius: 12px 0 0 12px;
 
   /* Clip-path chevron / arrow on the right (mirrors wireframe arrow label) */
   background: var(--color-medium);
+  clip-path: polygon(0% 0%, 100% 0%, 90% 50%, 100% 100%, 0% 100%);
 }
 
 .room-title {
@@ -332,6 +333,9 @@ body {
   font-size: 1.4rem;
   letter-spacing: 0.1em;
   color: var(--color-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The ▶ arrow appended to the room title bar */

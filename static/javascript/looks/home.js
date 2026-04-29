@@ -1380,19 +1380,22 @@ document.body.onclick = function () {
       const originalUser = messageExists ? $targetBubble.attr('aria-username') : "...";
       const avatarSrc = `/static/profile-pictures/${originalUser}.png`;
 
-      // Create the reply container
+      // Create the reply container — use .text() for user data to prevent HTML injection
       const $container = $(`
         <div class="reply-container">
             <div class="reply-curve"></div>
             <div class="reply-content">
-                <img src="${avatarSrc}" class="reply-avatar">
+                <img src="" class="reply-avatar">
                 <div class="reply-text-stack">
-                    <span class="reply-username">${originalUser}</span>
-                    <span class="reply-preview-text">${originalText}</span>
+                    <span class="reply-username"></span>
+                    <span class="reply-preview-text"></span>
                 </div>
             </div>
         </div>
     `);
+      $container.find('.reply-avatar').attr('src', avatarSrc);
+      $container.find('.reply-username').text(originalUser);
+      $container.find('.reply-preview-text').text(originalText);
 
       // If message doesn't exist in feed, mark it for backtrace and fetch it
       if (!messageExists) {
@@ -1471,20 +1474,23 @@ document.body.onclick = function () {
 
       const $bar = $('#reply-preview-bar');
 
-      // Injecting the Goal-style HTML with the X button
+      // Build skeleton HTML first, then set user-controlled values via .text() to prevent HTML injection
       $bar.html(`
       <div class="reply-preview-container">
         <div class="reply-preview-hook"></div>
         <div class="reply-preview-content">
-          <img src="${avatar}" class="reply-preview-avatar" onerror="this.src='/static/graphics/defaultMale.png'">
+          <img src="" class="reply-preview-avatar" onerror="this.src='/static/graphics/defaultMale.png'">
           <div class="preview-text-stack">
-            <span class="preview-user">${user}</span>
-            <span class="preview-msg">${text}</span>
+            <span class="preview-user"></span>
+            <span class="preview-msg"></span>
           </div>
         </div>
         <div class="reply-preview-close" onclick="cancelReply()">&times;</div>
       </div>
     `).show();
+      $bar.find('.reply-preview-avatar').attr('src', avatar);
+      $bar.find('.preview-user').text(user);
+      $bar.find('.preview-msg').text(text);
     };
 
     /**
@@ -2073,6 +2079,9 @@ document.body.onclick = function () {
       if (!btn) return;
 
       if (toggle === true) {
+        // Don't show the button if the user is in edit mode (room members panel open)
+        var detailsView = document.getElementById('room-details-view');
+        if (detailsView && detailsView.style.display !== 'none') return;
         // Only increment if button is not already visible (prevents batch increments)
         if (btn.style.display === 'none' || btn.style.display === '') {
           newMessageCount = 1;

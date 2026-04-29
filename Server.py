@@ -613,6 +613,22 @@ def convert_to_gmt(timestamp):
         # Fallback to local time if parsing fails
         return datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
+def post_server_message(room, text):
+    """Fakes a message from the Server account to a specific room."""
+    fake_data = {
+        'setting': 'room',
+        'room': room,
+        'username': 'Server',
+        'password': find_account_id_or_password_or_gender('Server', 'password'),
+        'time-stamp': datetime.datetime.now().strftime("%a %b %d %Y %H:%M:%S GMT-0000 (UTC)"),
+        'message': text,
+        'reply-index': -1,
+        'upload': ''
+    }
+    fake_msg = json.dumps(['Message', fake_data])
+    # Use a dummy sid for the server message
+    Thread(target=Recv, args=(fake_msg, 'SERVER_SYSTEM_SID')).start()
+
 room_dict = {'mainroom': {'file_path': 'mainroom.db', 'lock': Lock()}}
 
 #make room databases dict
@@ -739,6 +755,8 @@ def home():
 
 @app.route('/settings/')
 def settings():
+    if not request.args.get('tab'):
+        return redirect('/settings/?tab=profile')
     try:
         username = session['username']
         password = session['password']
@@ -1886,6 +1904,8 @@ def Recv(message, sid):
                 if success:
                     db_sql("UPDATE rooms SET owners=?, managers=?, curators=?, members=? WHERE room_name=?;", 'rooms', params=[join(owners_list), join(managers_list), join(curators_list), join(members_list), room], chat_room=False)
                     Server.send(str(['Room Member Updated', {}]), room=room)
+                    if action == 'remove':
+                        post_server_message(room, f"{target_username}({target_id}) has been deleted")
 
     elif msg[0] == 'Add Room Member':
         data = msg[1]
@@ -1925,6 +1945,7 @@ def Recv(message, sid):
                         members_list.append(new_id)
                         db_sql("UPDATE rooms SET members=? WHERE room_name=?;", 'rooms', params=[join(members_list), room], chat_room=False)
                     Server.send(str(['Room Member Updated', {}]), room=room)
+                    post_server_message(room, f"{new_username}({new_id}) has been added")
 
     elif msg[0] == 'Delete Room':
         data = msg[1]
@@ -2296,6 +2317,7 @@ def Recv(message, sid):
             except Exception as e:
                 print(f"Search Usernames Error: {e}")
                 Server.send(str(['Search Usernames Results', {'status': 'error', 'message': 'Internal search error'}]), room=sid)
+
 
 @Server.on('disconnect')
 def on_disconnect():

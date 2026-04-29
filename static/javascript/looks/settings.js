@@ -3,23 +3,39 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabItems = document.querySelectorAll('.tab-item');
   const tabPanes = document.querySelectorAll('.tab-pane');
 
-  tabItems.forEach(tab => {
-    tab.addEventListener('click', () => {
+  const switchTab = (tabName, updateUrl = true) => {
+    const tab = document.querySelector(`.tab-item[data-tab="${tabName}"]`);
+    const pane = document.getElementById(`pane-${tabName}`);
+
+    if (tab && pane) {
       // Remove active from all tabs and panes
       tabItems.forEach(t => t.classList.remove('active'));
       tabPanes.forEach(p => p.classList.remove('active'));
 
-      // Add active to clicked tab
+      // Add active to clicked tab and pane
       tab.classList.add('active');
+      pane.classList.add('active');
 
-      // Show corresponding pane
-      const targetId = `pane-${tab.getAttribute('data-tab')}`;
-      const targetPane = document.getElementById(targetId);
-      if (targetPane) {
-        targetPane.classList.add('active');
+      // Update URL without reload
+      if (updateUrl) {
+        window.history.replaceState({ tab: tabName }, '', `?tab=${tabName}`);
       }
+    }
+  };
+
+  tabItems.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabName = tab.getAttribute('data-tab');
+      switchTab(tabName);
     });
   });
+
+  // Handle initial tab from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialTab = urlParams.get('tab');
+  if (initialTab) {
+    switchTab(initialTab, false);
+  }
 
   // Profile Edit Logic
   const lockBtn = document.getElementById('edit-profile-btn');

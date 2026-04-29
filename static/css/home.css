@@ -474,8 +474,7 @@
   justify-content: flex-start;
   gap: 12px;
   padding: 18px 40px 18px 20px;
-  width: fit-content;
-  min-width: 40%;
+  width: 50%;
   
   /* Notched inward shape */
   background: var(--color-medium);
@@ -491,6 +490,9 @@
   font-size: 1.4rem;
   letter-spacing: 0.1em;
   color: var(--color-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The ▶ arrow appended to the room title bar */
