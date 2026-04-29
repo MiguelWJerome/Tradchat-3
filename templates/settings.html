@@ -39,59 +39,87 @@
 
     <!-- Content Area -->
     <div class="settings-content">
+      <button class="icon-btn lock-btn" id="edit-profile-btn" aria-label="Click to unlock">
+        <i class="fa-solid fa-unlock"></i>
+      </button>
       <!-- Profile Tab Content -->
       <div class="tab-pane active" id="pane-profile">
-
-        <div class="profile-header-row">
-          <div class="profile-avatar-container">
-            <!-- X placeholder from wireframe (picture insert) -->
-            <div class="avatar-circle">
-              <img src="/static/profile-pictures/{{ username }}.png"
-                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" alt="Avatar"
-                class="avatar-img" />
-              <i class="fa-solid fa-xmark placeholder-x" style="display: none;"></i>
+        <div class="profile-card-container">
+          <div class="profile-business-card">
+            <div class="pbc-left">
+              <div class="avatar-circle">
+                <img src="/static/profile-pictures/{{ username }}.png"
+                  onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" alt="Avatar"
+                  class="avatar-img" />
+                <i class="fa-solid fa-xmark placeholder-x" style="display: none;"></i>
+              </div>
+              <input type="file" id="profile-pic-upload" accept="image/*" style="display: none;" />
             </div>
-            <input type="file" id="profile-pic-upload" accept="image/*" style="display: none;" />
-          </div>
-          <div class="profile-actions-top">
-            <button class="icon-btn lock-btn" id="edit-profile-btn" aria-label="Click to unlock">
-              <i class="fa-solid fa-unlock"></i>
-            </button>
-          </div>
-        </div>
-
-        <form class="profile-form" id="profile-form">
-          <div class="form-grid">
-            <div class="input-group">
-              <label for="prof-username">Username:</label>
-              <input type="text" id="prof-username" name="username" value="{{ username }}" readonly />
-            </div>
-            <div class="input-group">
-              <label for="prof-password">Password:</label>
-              <div class="password-wrapper">
-                <input type="password" id="prof-password" name="password" value="{{ password }}" readonly />
-                <button type="button" class="password-toggle" id="toggle-password-visibility"
-                  aria-label="Toggle password visibility">
-                  <i class="fa-solid fa-eye"></i>
-                </button>
+            <div class="pbc-middle">
+              <div class="pbc-field pbc-username">
+                <label>Username</label>
+                <div class="pbc-input-wrap">
+                  <input type="text" id="prof-username" value="{{ username }}" readonly />
+                  <i class="fa-solid fa-triangle-exclamation logout-warning"
+                    title="Changing username will log you out"></i>
+                </div>
+              </div>
+              <div class="pbc-field pbc-location">
+                <label>Location</label>
+                <div class="pbc-input-wrap">
+                  <input type="text" id="prof-location" value="{{ location }}" placeholder="City, State"
+                    class="permanent-readonly" readonly />
+                  <button type="button" class="visibility-toggle {{ 'active' if show_location else '' }}"
+                    id="toggle-location-visibility" title="Toggle visibility">
+                    <span class="toggle-dot"></span>
+                  </button>
+                </div>
               </div>
             </div>
-            <div class="input-group">
-              <label for="prof-first">First Name:</label>
-              <input type="text" id="prof-first" name="first_name" value="{{ first_name }}" readonly />
-            </div>
-            <div class="input-group">
-              <label for="prof-last">Last Name:</label>
-              <input type="text" id="prof-last" name="last_name" value="{{ last_name }}" readonly />
+            <div class="pbc-right">
+              <!-- Lock moved to container level for top-right placement -->
             </div>
           </div>
 
-          <div class="form-actions" id="profile-form-actions" style="display: none;">
-            <button type="button" class="btn-soft cancel-btn" id="cancel-profile-btn">Cancel</button>
-            <button type="button" class="btn-soft save-btn" id="save-profile-btn">Save</button>
-          </div>
-        </form>
+
+          <form class="profile-form" id="profile-form">
+            <div class="form-grid profile-details-grid">
+              <div class="input-group full-width">
+                <label for="prof-password">Password:</label>
+                <div class="password-wrapper">
+                  <input type="password" id="prof-password" name="password" value="{{ password }}" readonly />
+                  <button type="button" class="password-toggle" id="toggle-password-visibility"
+                    aria-label="Toggle password visibility">
+                    <i class="fa-solid fa-eye"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="input-group">
+                <label for="prof-first">First Name:</label>
+                <input type="text" id="prof-first" name="first_name" value="{{ first_name }}" readonly />
+              </div>
+              <div class="input-group">
+                <label for="prof-last">Last Name:</label>
+                <input type="text" id="prof-last" name="last_name" value="{{ last_name }}" readonly />
+              </div>
+              <div class="input-group">
+                <label for="prof-email">Email:</label>
+                <input type="email" id="prof-email" name="email" value="{{ email }}" readonly />
+              </div>
+              <div class="input-group">
+                <label for="prof-dob">Date of Birth:</label>
+                <input type="text" id="prof-dob" name="dob" value="{{ dob }}" class="permanent-readonly" readonly />
+              </div>
+            </div>
+
+            <div class="form-actions" id="profile-form-actions" style="display: none;">
+              <button type="button" class="btn-soft cancel-btn" id="cancel-profile-btn">Cancel</button>
+              <button type="button" class="btn-soft save-btn" id="save-profile-btn">Save Changes</button>
+            </div>
+          </form>
+        </div>
       </div>
+
 
       <!-- Placeholders for other tabs -->
       <div class="tab-pane" id="pane-posts">
@@ -139,7 +167,11 @@
     username: "{{ username }}",
     password: "{{ password }}",
     first_name: "{{ first_name }}",
-    last_name: "{{ last_name }}"
+    last_name: "{{ last_name }}",
+    location: "{{ location }}",
+    show_location: eval("{{ show_location }}"),
+    email: "{{ email }}",
+    dob: "{{ dob }}"
   };
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>

@@ -18,6 +18,10 @@ function Recv(message) {
           initialProfileData.first_name = document.getElementById('prof-first').value;
           initialProfileData.last_name = document.getElementById('prof-last').value;
           initialProfileData.password = document.getElementById('prof-password').value;
+          initialProfileData.location = document.getElementById('prof-location').value;
+          initialProfileData.email = document.getElementById('prof-email').value;
+          initialProfileData.dob = document.getElementById('prof-dob').value;
+          initialProfileData.show_location = document.getElementById('toggle-location-visibility').classList.contains('active') ? 1 : 0;
         }
         if (typeof window.toggleEditMode === 'function') {
           window.toggleEditMode(false);
@@ -115,6 +119,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const p = document.getElementById('prof-password');
       const f = document.getElementById('prof-first');
       const l = document.getElementById('prof-last');
+      const loc = document.getElementById('prof-location');
+      const email = document.getElementById('prof-email');
+      const showLoc = document.getElementById('toggle-location-visibility').classList.contains('active') ? 1 : 0;
 
       const data = {
         username: initialProfileData.username,
@@ -122,7 +129,10 @@ document.addEventListener('DOMContentLoaded', () => {
         new_username: u.value,
         new_password: p.value,
         new_first_name: f.value,
-        new_last_name: l.value
+        new_last_name: l.value,
+        new_location: loc.value,
+        new_email: email.value,
+        new_show_location: showLoc
       };
 
       cl.send(JSON.stringify(['Update Profile', data]));

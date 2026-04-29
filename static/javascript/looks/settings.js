@@ -40,9 +40,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Profile Edit Logic
   const lockBtn = document.getElementById('edit-profile-btn');
   const formActions = document.getElementById('profile-form-actions');
-  const profileInputs = document.querySelectorAll('.profile-form input');
+  const profileInputs = document.querySelectorAll('.profile-form input, .profile-business-card input');
   const cancelBtn = document.getElementById('cancel-profile-btn');
   const avatarCircle = document.querySelector('.avatar-circle');
+  const locationToggle = document.getElementById('toggle-location-visibility');
   
   window.isEditingProfile = false;
 
@@ -52,7 +53,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Toggle input read-only state
     profileInputs.forEach(input => {
       if (edit) {
-        input.removeAttribute('readonly');
+        if (!input.classList.contains('permanent-readonly')) {
+          input.removeAttribute('readonly');
+        }
       } else {
         input.setAttribute('readonly', 'true');
       }
@@ -75,11 +78,13 @@ document.addEventListener('DOMContentLoaded', () => {
         icon.classList.remove('fa-unlock');
         icon.classList.add('fa-lock');
         if (formActions) formActions.style.display = 'flex';
+        if (locationToggle) locationToggle.style.display = 'block';
       } else {
         lockBtn.classList.remove('unlocked');
         icon.classList.remove('fa-lock');
         icon.classList.add('fa-unlock');
         if (formActions) formActions.style.display = 'none';
+        if (locationToggle) locationToggle.style.display = 'none';
       }
     }
   };
@@ -208,6 +213,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const p = document.getElementById('prof-password');
         const f = document.getElementById('prof-first');
         const l = document.getElementById('prof-last');
+        const e = document.getElementById('prof-email');
+        const d = document.getElementById('prof-dob');
+        const loc = document.getElementById('prof-location');
+        const locToggle = document.getElementById('toggle-location-visibility');
         
         if(u) u.value = initialProfileData.username;
         if(p) {
@@ -221,8 +230,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if(f) f.value = initialProfileData.first_name;
         if(l) l.value = initialProfileData.last_name;
+        if(e) e.value = initialProfileData.email;
+        if(d) d.value = initialProfileData.dob;
+        if(loc) loc.value = initialProfileData.location;
+        if(locToggle) {
+          if (initialProfileData.show_location) {
+            locToggle.classList.add('active');
+          } else {
+            locToggle.classList.remove('active');
+          }
+        }
       }
       window.toggleEditMode(false);
+    });
+  }
+
+  // Location Visibility Toggle
+  if (locationToggle) {
+    locationToggle.addEventListener('click', () => {
+      if (window.isEditingProfile) {
+        locationToggle.classList.toggle('active');
+      }
     });
   }
 
@@ -245,6 +273,14 @@ document.addEventListener('DOMContentLoaded', () => {
           icon.classList.add('fa-eye');
         }
       }
+    });
+  }
+
+  // Logout Warning Interaction
+  const logoutWarning = document.querySelector('.logout-warning');
+  if (logoutWarning) {
+    logoutWarning.addEventListener('click', () => {
+      Alert("⚠️ Warning: Changing your username has consequences:\n\n1. You will be automatically logged out.\n2. You will need to log back in with your new username.\n3. Your current room state and active DMs will be reset.");
     });
   }
 });

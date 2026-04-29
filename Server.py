@@ -14,6 +14,7 @@ import io
 import json
 from PIL import Image, ImageOps 
 import re
+import requests
 
 def clean_keyword(kw):
     """Lowercase, remove punctuation and leading/trailing spaces."""
@@ -458,6 +459,28 @@ if not os.path.exists("accounts.db"):
     ''')
     accounts_db.close()
 
+# Migration: Add location fields if they don't exist
+try:
+    with accounts_lock:
+        conn = sqlite3.connect('accounts.db')
+        cursor = conn.cursor()
+        columns = [info[1] for info in cursor.execute("PRAGMA table_info(accounts);").fetchall()]
+        new_cols = {
+            'location': 'TEXT DEFAULT ""',
+            'show_location': 'BOOLEAN DEFAULT 1',
+            'latitude': 'REAL DEFAULT 0.0',
+            'longitude': 'REAL DEFAULT 0.0',
+            'city': 'TEXT DEFAULT ""',
+            'state': 'TEXT DEFAULT ""'
+        }
+        for col, definition in new_cols.items():
+            if col not in columns:
+                cursor.execute(f"ALTER TABLE accounts ADD COLUMN {col} {definition};")
+        conn.commit()
+        conn.close()
+except Exception as e:
+    print(f"Migration error: {e}")
+
 # Ensure last_read table exists in dedicated database
 if not os.path.exists("last_read.db"):
     lr_db = sqlite3.connect("last_read.db")
@@ -613,6 +636,26 @@ def convert_to_gmt(timestamp):
         # Fallback to local time if parsing fails
         return datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
+def get_location_data(ip):
+    try:
+        # Use ipapi.co (JSON endpoint)
+        # Note: For local development, ip might be '127.0.0.1', ipapi will return info for the server's public IP
+        # If IP is local, ipapi will use the request's origin IP.
+        url = f"https://ipapi.co/{ip}/json/" if ip != '127.0.0.1' else "https://ipapi.co/json/"
+        response = requests.get(url, timeout=5, headers={'User-Agent': 'Tradchat-App'})
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                'city': data.get('city', ''),
+                'state': data.get('region', ''),
+                'latitude': data.get('latitude', 0.0),
+                'longitude': data.get('longitude', 0.0),
+                'country': data.get('country_name', '')
+            }
+    except Exception as e:
+        print(f"Error fetching location: {e}")
+    return {'city': '', 'state': '', 'latitude': 0.0, 'longitude': 0.0, 'country': ''}
+
 def post_server_message(room, text):
     """Fakes a message from the Server account to a specific room."""
     fake_data = {
@@ -716,6 +759,16 @@ def home():
         password = session['password']
 
         if check_credentials(username, password):
+            # Update location data in the background
+            ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+            if ',' in str(ip): ip = ip.split(',')[0].strip() # Handle proxy lists
+            
+            def update_loc(u, ip_addr):
+                loc = get_location_data(ip_addr)
+                if loc['city'] or loc['state']: # Only update if we got valid data
+                    db_sql("UPDATE accounts SET location = ?, latitude = ?, longitude = ?, city = ?, state = ? WHERE username = ?;", 'accounts', params=[f"{loc['city']}, {loc['state']}", loc['latitude'], loc['longitude'], loc['city'], loc['state'], u], chat_room=False)
+            
+            Thread(target=update_loc, args=(username, ip)).start()
 
             theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
 
@@ -768,9 +821,15 @@ def settings():
             colors = ast.literal_eval(colorsFile.read())
             colorsFile.close()
             
-            account_info = db_sql("SELECT first_name, last_name FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+            account_info = db_sql("SELECT first_name, last_name, location, show_location, city, state, email, dob FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
             first_name = account_info[0][0] if account_info else ''
             last_name = account_info[0][1] if account_info else ''
+            location = account_info[0][2] if account_info else ''
+            show_location = account_info[0][3] if account_info else 1
+            city = account_info[0][4] if account_info else ''
+            state = account_info[0][5] if account_info else ''
+            email = account_info[0][6] if account_info else ''
+            dob = account_info[0][7] if account_info else ''
 
             return render_template(
                 'settings.html',
@@ -782,6 +841,12 @@ def settings():
                 password=password,
                 first_name=first_name,
                 last_name=last_name,
+                location=location,
+                show_location=show_location,
+                city=city,
+                state=state,
+                email=email,
+                dob=dob,
                 active_page='settings'
             )
         else:
@@ -1570,8 +1635,12 @@ def Recv(message, sid):
         dob = data['dob']
         gender = data['gender']
 
+        # Get IP and Fetch Location Data
+        ip = Server.server.environ[sid].get('REMOTE_ADDR', '127.0.0.1')
+        loc = get_location_data(ip)
+        
         # Username available - create account
-        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2'], chat_room=False)
+        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms, location, show_location, latitude, longitude, city, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2', f"{loc['city']}, {loc['state']}", 1, loc['latitude'], loc['longitude'], loc['city'], loc['state']], chat_room=False)
 
         # Get new user ID and add to Server/Admin dms
         new_id = str(find_account_id_or_password_or_gender(username, 'id'))
@@ -1637,6 +1706,9 @@ def Recv(message, sid):
         new_password = data['new_password'].replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
         new_first_name = data['new_first_name'].replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
         new_last_name = data['new_last_name'].replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
+        new_location = data.get('new_location', '').replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
+        new_email = data.get('new_email', '').replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
+        new_show_location = data.get('new_show_location', 1)
 
         if check_credentials(old_username, old_password):
             user_id = find_account_id_or_password_or_gender(old_username, 'id')
@@ -1656,7 +1728,7 @@ def Recv(message, sid):
                     return
             
             # Update database
-            db_sql("""UPDATE accounts SET username = ?, password = ?, first_name = ?, last_name = ? WHERE id = ?;""", 'accounts', params=[new_username, new_password, new_first_name, new_last_name, user_id], chat_room=False)
+            db_sql("""UPDATE accounts SET username = ?, password = ?, first_name = ?, last_name = ?, location = ?, show_location = ?, email = ? WHERE id = ?;""", 'accounts', params=[new_username, new_password, new_first_name, new_last_name, new_location, new_show_location, new_email, user_id], chat_room=False)
             
             username_changed = (new_username != old_username)
             if username_changed:

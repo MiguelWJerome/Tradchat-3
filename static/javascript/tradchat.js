@@ -1,19 +1,18 @@
-function Alert(message, callback=function(){}, shouldFlyUp=false, width=380, height=300, border=5) 
-{
+function Alert(message, callback = function () { }, shouldFlyUp = false, width = 380, height = 300, border = 5) {
     // Determine if device is mobile
     const isOnPhone = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-    
+
     // Get window dimensions for responsive sizing
     const windowHeight = window.innerHeight;
     const windowWidth = window.innerWidth;
-    
+
     const alertOverlay = document.createElement('div');
     alertOverlay.className = 'tc-alert-overlay';
-    
+
     const alertContent = document.createElement('div');
     alertContent.className = 'tc-alert-content';
     alertContent.title = 'Click to put back down';
-    
+
     // Calculate responsive dimensions
     if (isOnPhone) {
         alertContent.style.width = (windowWidth / 2) + 'px';
@@ -34,7 +33,7 @@ function Alert(message, callback=function(){}, shouldFlyUp=false, width=380, hei
         alertContent.style.paddingLeft = 20 * (windowWidth / 1920) + 'px';
         alertContent.style.paddingRight = 20 * (windowWidth / 1920) + 'px';
     }
-    
+
     // Set initial position (off-screen for animation)
     if (shouldFlyUp) {
         alertContent.style.bottom = '-3600px';
@@ -45,13 +44,13 @@ function Alert(message, callback=function(){}, shouldFlyUp=false, width=380, hei
             alertContent.style.bottom = (windowHeight / 2) - (150 * (windowHeight / 975)) + 'px';
         }
     }
-    
+
     // Create X button for closing
     const closeButton = document.createElement('button');
     closeButton.className = 'tc-alert-close-btn';
     closeButton.innerHTML = '×';
     closeButton.title = 'Close alert';
-    
+
     // Create gray message container
     const messageContainer = document.createElement('div');
     messageContainer.className = 'tc-alert-msg-container';
@@ -60,56 +59,90 @@ function Alert(message, callback=function(){}, shouldFlyUp=false, width=380, hei
     const messageElement = document.createElement('p');
     messageElement.id = 'alert-message-text';
     messageElement.className = 'tc-alert-msg-text';
-    
+
     if (isOnPhone) {
         messageElement.style.fontSize = 30 * (windowHeight / 975) + 'px';
     } else {
         messageElement.style.fontSize = 25 * (windowHeight / 975) + 'px';
     }
-    
+
     messageElement.textContent = message;
-    
+
     // Assemble the alert
     alertContent.appendChild(closeButton);
     messageContainer.appendChild(messageElement);
     alertContent.appendChild(messageContainer);
-    
-    // Add to DOM
+
+    // Expansion Logic (Measure and adjust before showing)
+    alertContent.style.opacity = '0';
     document.body.appendChild(alertOverlay);
     document.body.appendChild(alertContent);
-    
+
+    if (!isOnPhone) {
+        const defaultWidth = parseFloat(alertContent.style.width);
+        const defaultHeight = parseFloat(alertContent.style.height);
+        
+        // 1. Check for initial overflow
+        const needsWidthExpansion = (messageContainer.scrollHeight > messageContainer.offsetHeight) || 
+                                    (messageElement.scrollWidth > messageElement.offsetWidth);
+        
+        if (needsWidthExpansion) {
+            const newWidth = defaultWidth * 1.3;
+            alertContent.style.width = newWidth + 'px';
+            alertContent.style.left = (windowWidth / 2) - (newWidth / 2) + 'px';
+        }
+
+        // 2. Determine necessary height
+        alertContent.style.height = 'auto';
+        const autoHeight = alertContent.offsetHeight;
+        
+        if (autoHeight > defaultHeight) {
+            // Add vertical cushion
+            const cushion = 40 * (windowHeight / 975);
+            const finalHeight = autoHeight + cushion;
+            alertContent.style.height = finalHeight + 'px';
+            
+            // Recenter vertically
+            if (!shouldFlyUp) {
+                alertContent.style.bottom = (windowHeight / 2) - (finalHeight / 2) + 'px';
+            }
+        } else {
+            // Restore default height if it didn't overflow
+            alertContent.style.height = defaultHeight + 'px';
+        }
+    }
+
     // Function to close the alert
     function closeAlert() {
         alertContent.style.bottom = '-3600px';
         alertOverlay.classList.remove('visible');
-        setTimeout(function() {
-            document.body.removeChild(alertContent);
-            document.body.removeChild(alertOverlay);
+        setTimeout(function () {
+            if (alertContent.parentNode) document.body.removeChild(alertContent);
+            if (alertOverlay.parentNode) document.body.removeChild(alertOverlay);
             callback();
-        }, 0);
+        }, 300); // Wait for transition
     }
-    
+
     // Add event listeners
-    closeButton.addEventListener('click', function(e) {
+    closeButton.addEventListener('click', function (e) {
         e.stopPropagation(); // Prevent the content click from firing
         closeAlert();
     });
-    
-    // No animation - show immediately (via class)
+
+    // Show
     alertOverlay.classList.add('visible');
+    alertContent.style.opacity = '1';
 }
 
 const True = true
 const False = false
 
 
-function form(url, dic, method='post')
-{
+function form(url, dic, method = 'post') {
     newForm = document.createElement('form')
     newForm.action = url
     newForm.method = method
-    for (var key in dic)
-    {
+    for (var key in dic) {
         newInput = document.createElement('input')
         newInput.style.display = 'none'
         newInput.name = key
@@ -123,18 +156,18 @@ function form(url, dic, method='post')
 function sortAndJoinStrings(str1, str2) {
     // Compare strings alphabetically character by character
     const minLength = Math.min(str1.length, str2.length);
-    
+
     for (let i = 0; i < minLength; i++) {
         const char1 = str1[i].toLowerCase();
         const char2 = str2[i].toLowerCase();
-        
+
         if (char1 < char2) {
             return str2 + '.$@-@&.' + str1;
         } else if (char1 > char2) {
             return str1 + '.$@-@&.' + str2;
         }
     }
-    
+
     // If we get here, the strings are identical up to minLength
     // The longer string comes first
     if (str1.length > str2.length) {
@@ -149,16 +182,16 @@ function sortAndJoinStrings(str1, str2) {
 
 function choose_usernames(plural, callback) {
     const isOnPhone = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-    
+
     const overlay = document.createElement('div');
     overlay.className = 'tc-cu-overlay';
-    
+
     const modal = document.createElement('div');
     modal.className = 'tc-cu-modal ' + (isOnPhone ? 'mobile' : 'desktop');
-    
+
     const header = document.createElement('div');
     header.className = 'tc-cu-header';
-    
+
     const closeBtn = document.createElement('div');
     closeBtn.className = 'tc-cu-close-btn';
     closeBtn.innerHTML = '&#x2297;';
@@ -166,28 +199,28 @@ function choose_usernames(plural, callback) {
         document.body.removeChild(overlay);
         if (typeof cl !== 'undefined' && cl.off) cl.off('message', searchHandler);
     };
-    
+
     const title = document.createElement('h3');
     title.className = 'tc-cu-title';
     title.innerText = 'Search Usernames.';
-    
+
     header.appendChild(title);
     header.appendChild(closeBtn);
     modal.appendChild(header);
-    
+
     const searchArea = document.createElement('div');
     searchArea.className = 'tc-cu-search-area';
-    
+
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.placeholder = 'Search Members';
     searchInput.className = 'tc-cu-search-input';
     searchArea.appendChild(searchInput);
-    
+
     const selectedSpot = document.createElement('div');
     selectedSpot.className = 'tc-cu-selected-spot ' + (plural ? 'plural' : 'singular');
     searchArea.appendChild(selectedSpot);
-    
+
     const enterBtn = document.createElement('button');
     enterBtn.className = 'tc-cu-enter-btn';
     enterBtn.innerText = 'ENTER';
@@ -199,18 +232,18 @@ function choose_usernames(plural, callback) {
         callback(selectedUsers.map(u => u.username));
     };
     searchArea.appendChild(enterBtn);
-    
+
     modal.appendChild(searchArea);
-    
+
     const resultsList = document.createElement('div');
     resultsList.className = 'tc-cu-results-list';
     modal.appendChild(resultsList);
-    
+
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
-    
+
     let selectedUsers = [];
-    
+
     function updateSelectedSpot() {
         if (!plural) return;
         selectedSpot.innerHTML = '';
@@ -234,71 +267,71 @@ function choose_usernames(plural, callback) {
     function showSelectedUsersModal(users) {
         const subOverlay = document.createElement('div');
         subOverlay.className = 'tc-cu-overlay';
-        subOverlay.style.zIndex = '10000'; 
-        
+        subOverlay.style.zIndex = '10000';
+
         const subModal = document.createElement('div');
         subModal.className = 'tc-cu-modal ' + (isOnPhone ? 'mobile' : 'desktop');
-        
+
         const subHeader = document.createElement('div');
         subHeader.className = 'tc-cu-header';
-        
+
         const subCloseBtn = document.createElement('div');
         subCloseBtn.className = 'tc-cu-close-btn';
         subCloseBtn.innerHTML = '&#x2297;';
         subCloseBtn.onclick = () => document.body.removeChild(subOverlay);
-        
+
         const subTitle = document.createElement('h3');
         subTitle.className = 'tc-cu-title';
         subTitle.innerText = 'SELECTED PEOPLE';
-        
+
         subHeader.appendChild(subTitle);
         subHeader.appendChild(subCloseBtn);
         subModal.appendChild(subHeader);
-        
+
         const subList = document.createElement('div');
         subList.className = 'tc-cu-results-list';
-        
+
         users.forEach(u => {
             const row = document.createElement('div');
             row.className = 'tc-cu-result-row';
             row.style.cursor = 'default';
-            
+
             const img = document.createElement('img');
             img.src = u.profile_picture;
             img.className = 'tc-cu-result-img';
-            
+
             const name = document.createElement('span');
             name.innerText = `${u.first_name} ${u.last_name}`;
-            
+
             row.appendChild(img);
             row.appendChild(name);
             subList.appendChild(row);
         });
-        
+
         subModal.appendChild(subList);
         subOverlay.appendChild(subModal);
         document.body.appendChild(subOverlay);
     }
-    
+
     function renderResults(users) {
         resultsList.innerHTML = '';
         users.forEach(u => {
             const row = document.createElement('div');
             row.className = 'tc-cu-result-row';
-            
+
             const isSelected = selectedUsers.some(su => su.username === u.username);
             if (isSelected) row.classList.add('selected');
-            
+
             const img = document.createElement('img');
             img.src = u.profile_picture;
             img.className = 'tc-cu-result-img';
-            
+
             const name = document.createElement('span');
             name.innerText = `${u.first_name} ${u.last_name}`;
-            
+
             row.appendChild(img);
             row.appendChild(name);
-            
+
             row.onclick = () => {
                 if (plural) {
                     const idx = selectedUsers.findIndex(su => su.username === u.username);
@@ -316,12 +349,12 @@ function choose_usernames(plural, callback) {
                     row.classList.add('selected');
                 }
             };
-            
+
             resultsList.appendChild(row);
         });
     }
-    
-    const searchHandler = function(msg) {
+
+    const searchHandler = function (msg) {
         const data = eval(msg);
         if (data[0] === 'Search Usernames Results') {
             if (data[1].status === 'success') {
@@ -329,13 +362,13 @@ function choose_usernames(plural, callback) {
             }
         }
     };
-    
+
     updateSelectedSpot();
 
     if (typeof cl !== 'undefined') {
         cl.on('message', searchHandler);
     }
-    
+
     let searchTimeout;
     searchInput.oninput = (e) => {
         clearTimeout(searchTimeout);
@@ -350,7 +383,7 @@ function choose_usernames(plural, callback) {
             }
         }, 300);
     };
-    
+
     if (typeof cl !== 'undefined') {
         cl.send(JSON.stringify(['Search Usernames', {
             username: localStorage.getItem('username') || sessionStorage.getItem('username'),
