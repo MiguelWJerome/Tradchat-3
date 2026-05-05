@@ -87,3 +87,111 @@ No wait... make a button the size and position of a input in the same grid like 
 last paper Note...
 
 Parental locks request to settings along with maps and Julianne things
+
+
+
+
+
+
+NOTES FROM MEETING NUMBER TWO:
+
+
+
+2-3 posts a day and can use audio, video, and pictures
+
+
+
+admin see all messages
+
+
+make finer options for controlling location
+
+
+make friend feature in the future so you can notified of their posts
+
+
+gaming logging saved in minimal space format till scanned
+
+
+have team brainstom suprise checks
+
+have little star next to friends profile picture
+
+swear word sensor
+
+
+ADMIN TOOLS
+
+#1 Report-system number one pritority
+#2 delete any message or picture or post
+#3 abitly too see dms and rooms
+#4 abilty to delete accounts and freeze accounts with a buddy (2 admins to freeze and 3 to delete)
+#5 
+
+
+Parental Controls:
+they want admins to read the dms
+the ability not to see pictures, posts, or videos, or gifs
+dm lock (you can't dm certain people)
+how late the child is allowed to be on
+they can't play games
+
+Age segregation is the ONLY PARENTAL CONTROL that is defaulted to ON but only as in a younger kid is allowed to talk to an older kid
+
+cutoff year is 13
+
+
+
+
+HAVE premade rooms like girls ages 13 to 18 ect very accessible
+
+FIX all fonts in the homepage
+
+
+
+side ideas:
+maybe change you in the sending message to your username
+
+add speech to text
+
+when being challenged to a game if you deny you can give a short message on why you had to decline
+
+
+chat bots:
+
+the abilty for users to make chat bots or apps (MAYBE)
+
+
+technicianbot - code maybe ai (only lives in dm)
+roombot - code powered (only lives in dm)
+pollbot (can live inside of chats)
+
+
+
+
+
+
+CHECKLIST
+
+Admin Page
+Post-system
+Parental Controls
+Make Profile
+Friends Page and Members Page (you have two tabs inside of the page)
+News Page
+Policy Page
+Revamp Welcome Page
+Make old games from tc2 work
+Make Friends System
+Finishing Settings Page
+Set up event system
+
+
+RELEASE TRADCHAT
+
+POST RELEEASE: 
+
+Set up the guild system
+set up trophies and awards
+
+
