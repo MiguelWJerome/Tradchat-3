@@ -170,8 +170,28 @@ pollbot (can live inside of chats)
 
 
 
+########### thoughts for the welcome page ##################
+thoughts for welcome page
 
-CHECKLIST
+welcome banner takes up whole page
+
+
+and change all the text on the welcome page
+
+
+about us image should be tradchat's patron saint
+
+learn more button should tell more about team tradchat show pictures of us and tell who did what
+
+################# end of welcome page thoughts #########################################
+
+
+
+
+
+
+
+################## CHECKLIST ################## !important
 
 Admin Page
 Post-system
@@ -185,7 +205,7 @@ Make old games from tc2 work
 Make Friends System
 Finishing Settings Page
 Set up event system
-MAKE IT ALL PHONE AND MOBILE COMPATIPLE
+MAKE IT ALL PHONE AND MOBILE COMPATIBLE
 
 
 RELEASE TRADCHAT
