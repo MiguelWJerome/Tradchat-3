@@ -76,6 +76,7 @@
   border-radius: 50%;
   margin-left: auto;
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+  display: none; /* Hidden by default - Managed via JS togglePostsDot() */
 }
 
 /* Main Content Panel */

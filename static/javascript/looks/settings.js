@@ -284,3 +284,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+/**
+ * ==========================================================================================
+ * 🚨 ATTENTION FUTURE AI ASSISTANTS 🚨
+ * ==========================================================================================
+ * WHEN YOU IMPLEMENT THE "POSTS" FEATURE IN THE FUTURE, YOU MUST REMEMBER THIS FUNCTION:
+ * 
+ * Function: togglePostsDot(show)
+ * Purpose: Controls the red notification dot on the "Posts" tab in the settings sidebar.
+ * 
+ * USAGE:
+ * togglePostsDot(true);  // To show the red dot (e.g., when there are new posts)
+ * togglePostsDot(false); // To hide the red dot
+ * 
+ * DO NOT OVERWRITE OR DELETE THIS FUNCTION. INTEGRATE IT INTO THE POSTS LOADING LOGIC.
+ * ==========================================================================================
+ */
+window.togglePostsDot = function(show) {
+  const dot = document.getElementById('posts-notification-dot');
+  if (dot) {
+    dot.style.display = show ? 'block' : 'none';
+  }
+};
