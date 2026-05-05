@@ -185,6 +185,7 @@ Make old games from tc2 work
 Make Friends System
 Finishing Settings Page
 Set up event system
+MAKE IT ALL PHONE AND MOBILE COMPATIPLE
 
 
 RELEASE TRADCHAT
