@@ -205,6 +205,7 @@ Make old games from tc2 work
 Make Friends System
 Finishing Settings Page
 Set up event system
+get video calls working
 MAKE IT ALL PHONE AND MOBILE COMPATIBLE
 
 
