@@ -197,15 +197,16 @@ Admin Page
 Post-system
 Parental Controls
 Make Profile
+Make Friends System
 Friends Page and Members Page (you have two tabs inside of the page)
 News Page
 Policy Page
 Revamp Welcome Page
 Make old games from tc2 work
-Make Friends System
 Finishing Settings Page
 Set up event system
 get video calls working
+get gif database full
 MAKE IT ALL PHONE AND MOBILE COMPATIBLE
 
 
