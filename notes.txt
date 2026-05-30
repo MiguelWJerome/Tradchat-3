@@ -191,6 +191,52 @@ learn more button should tell more about team tradchat show pictures of us and t
 
 
 
+
+############################################################
+Improved admin page thoughts
+
+
+floating box in the middle with radar and control tabs
+
+RADAR SUB-TABS:
+
+Reports - 
+Triggered when someone messages the Admin or files a actual report (outline blue for messaging admin and yellow for actual reports)
+Can mark as read and make it go to bottom of the list but must respond to make it go away - automatically assigns which admin responded to the reply
+
+
+Alerts - 
+System alerts
+Swear word deteted
+algorthim triggered ect
+
+
+Search - 
+
+Offer indepth search into an room, dm, or guild
+
+
+
+
+CONTROL SUB-TABS:
+
+
+Action Zone -
+
+All Actions you can take against that require more than one admin approval (freeze or delete accounts) or that require less lol
+
+
+Parental Locks - 
+
+Only one admin required, change parental locks
+
+
+Publish - 
+The admins can publish news articles, events, and ads here
+
+
+
+
 ################## CHECKLIST ################## !important
 
 Admin Page
@@ -216,5 +262,4 @@ POST RELEEASE:
 
 Set up the guild system
 set up trophies and awards
-
-
+think about having the parents control parental locks with a code

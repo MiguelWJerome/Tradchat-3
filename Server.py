@@ -920,6 +920,31 @@ def gif_approve():
     except:
         return redirect('/')
 
+@app.route('/admin/')
+def admin():
+    try:
+        username = session['username']
+        password = session['password']
+        if check_credentials(username, password):
+            theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+            colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
+            colors = ast.literal_eval(colorsFile.read())
+            colorsFile.close()
+            return render_template(
+                'admin.html',
+                theme=theme,
+                color_dark=colors['color_dark'],
+                color_medium=colors['color_medium'],
+                color_light=colors['color_light'],
+                active_page='admin'
+            )
+        return redirect('/')
+    except Exception as e:
+        print(f"Error loading admin page: {e}")
+        return redirect('/')
+
+
+
 
 
 def Recv(message, sid): 

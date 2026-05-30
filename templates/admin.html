@@ -1,0 +1,163 @@
+{% extends "tradchat.html" %}
+
+{% block title %}TradChat — Admin{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/css/admin.css" />
+{% endblock %}
+
+{% block content %}
+<main class="admin-main">
+  <div class="admin-card">
+    
+    <!-- Left Sidebar Menu -->
+    <aside class="admin-sidebar">
+      
+      <!-- Radar Section -->
+      <section class="sidebar-section">
+        <h2 class="section-title">Radar</h2>
+        <ul class="admin-menu">
+          <li>
+            <a href="#" class="menu-item active" data-target="reports">
+              <span>Reports</span>
+            </a>
+          </li>
+          <li>
+            <a href="#" class="menu-item" data-target="alerts">
+              <span>Alerts</span>
+              <span class="badge-dot"></span>
+            </a>
+          </li>
+          <li>
+            <a href="#" class="menu-item" data-target="search">
+              <span>Search</span>
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Control Section -->
+      <section class="sidebar-section">
+        <h2 class="section-title">Control</h2>
+        <ul class="admin-menu">
+          <li>
+            <a href="#" class="menu-item" data-target="action-zone">
+              <span>Action Zone</span>
+            </a>
+          </li>
+          <li>
+            <a href="#" class="menu-item" data-target="publish">
+              <span>Publish</span>
+              <span class="badge-dot"></span>
+            </a>
+          </li>
+          <li>
+            <a href="#" class="menu-item" data-target="parental-locks">
+              <span>Parental Locks</span>
+            </a>
+          </li>
+        </ul>
+      </section>
+      
+    </aside>
+
+    <!-- Right Main Content Area -->
+    <section class="admin-content">
+      
+      <!-- Top Search Container -->
+      <div class="search-container">
+        <i class="fa-solid fa-search search-icon"></i>
+        <input type="text" class="search-input" id="adminSearchInput" placeholder="Search..." aria-label="Search admin portal" />
+      </div>
+
+      <!-- Divider line -->
+      <hr class="content-divider" />
+
+      <!-- Dynamic Content Pane -->
+      <div class="content-pane" id="adminContentPane">
+        
+        <!-- Default Tab: Reports View -->
+        <div class="tab-view active" id="view-reports">
+          <div class="placeholder-view">
+            <i class="fa-solid fa-chart-line"></i>
+            <h3>Reports Dashboard</h3>
+            <p>Select an option from the menu to manage reports, system alerts, policy publication, and access controls.</p>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const menuItems = document.querySelectorAll('.menu-item');
+    const contentPane = document.getElementById('adminContentPane');
+
+    // Tab content descriptions to show dynamic updating in this first draft
+    const tabData = {
+      'reports': {
+        title: 'Reports Dashboard',
+        icon: 'fa-chart-line',
+        desc: 'Review submitted reports and user activity flags.'
+      },
+      'alerts': {
+        title: 'System Alerts',
+        icon: 'fa-bell',
+        desc: 'Monitor system status, warnings, and error notifications.'
+      },
+      'search': {
+        title: 'Advanced Search',
+        icon: 'fa-magnifying-glass',
+        desc: 'Search accounts, chat rooms, and logs across the platform.'
+      },
+      'action-zone': {
+        title: 'Action Zone',
+        icon: 'fa-shield-halved',
+        desc: 'Manage global suspensions, bans, and critical server interventions.'
+      },
+      'publish': {
+        title: 'Publish Tools',
+        icon: 'fa-bullhorn',
+        desc: 'Publish global policy announcements, platform updates, and news feeds.'
+      },
+      'parental-locks': {
+        title: 'Parental Locks',
+        icon: 'fa-user-lock',
+        desc: 'Configure parental controls, age verification filters, and safety features.'
+      }
+    };
+
+    menuItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        
+        // Remove active class from all menu items
+        menuItems.forEach(mi => mi.classList.remove('active'));
+        
+        // Add active class to clicked item
+        item.classList.add('active');
+
+        // Update the main content pane dynamically with styled templates
+        const target = item.getAttribute('data-target');
+        const data = tabData[target] || { title: 'Admin Section', icon: 'fa-gears', desc: 'Administrative tools and configuration settings.' };
+        
+        contentPane.innerHTML = `
+          <div class="tab-view active">
+            <div class="placeholder-view">
+              <i class="fa-solid ${data.icon}"></i>
+              <h3>${data.title}</h3>
+              <p>${data.desc}</p>
+            </div>
+          </div>
+        `;
+      });
+    });
+  });
+</script>
+{% endblock %}
