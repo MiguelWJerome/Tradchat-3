@@ -1,0 +1,499 @@
+<!-- 
+=================================================================================
+HUGE WARNING: DEVELOPMENT USE ONLY - MUST BE REMOVED BEFORE LAUNCH!
+HUGE WARNING: DEVELOPMENT USE ONLY - MUST BE REMOVED BEFORE LAUNCH!
+HUGE WARNING: DEVELOPMENT USE ONLY - MUST BE REMOVED BEFORE LAUNCH!
+=================================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Database Modifier [DEV USE ONLY]</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.css" />
+  
+  <style>
+    :root {
+      --color-bg: #121212;
+      --color-card: #1E1E1E;
+      --color-dark: #E0E0E0;
+      --color-accent: #E74C3C;
+      --color-success: #2ECC71;
+      --font-body: 'DM Sans', sans-serif;
+      --transition: 0.2s ease;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--color-bg);
+      color: var(--color-dark);
+      font-family: var(--font-body);
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Warning Banner */
+    .warning-banner {
+      background-color: #962D22;
+      color: #FFF;
+      padding: 16px;
+      border-radius: 12px;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.9; }
+      50% { opacity: 1; }
+      100% { opacity: 0.9; }
+    }
+
+    /* Header controls */
+    .header-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      gap: 20px;
+    }
+
+    .btn {
+      background: #E0E0E0;
+      color: #121212;
+      border: none;
+      padding: 12px 24px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all var(--transition);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+      opacity: 0.95;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: #E0E0E0;
+      border: 2px solid #E0E0E0;
+    }
+
+    .btn-secondary:hover {
+      background: #E0E0E0;
+      color: #121212;
+    }
+
+    .btn-success {
+      background: var(--color-success);
+      color: #FFF;
+    }
+
+    .file-info {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: var(--color-dark);
+    }
+
+    /* Tabs list */
+    .tabs-container {
+      display: flex;
+      gap: 8px;
+      border-bottom: 2px solid rgba(255,255,255,0.1);
+      margin-bottom: 24px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--color-dark);
+      opacity: 0.6;
+      cursor: pointer;
+      border-radius: 8px 8px 0 0;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      opacity: 0.9;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .tab-btn.active {
+      opacity: 1;
+      border-bottom: 3px solid #E0E0E0;
+      background: rgba(255,255,255,0.08);
+      color: #FFF;
+    }
+
+    /* Editor Box */
+    .editor-card {
+      background: var(--color-card);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* Grid layout for rows and columns */
+    .grid-container {
+      overflow-x: auto;
+      margin-bottom: 24px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: #181818;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      background: #252525;
+      color: var(--color-dark);
+      padding: 12px 16px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      border-bottom: 2px solid rgba(255,255,255,0.15);
+    }
+
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .cell-input {
+      width: 100%;
+      min-width: 120px;
+      padding: 8px 12px;
+      border: 1.5px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      font-family: var(--font-body);
+      font-size: 0.88rem;
+      background: rgba(35,35,35,0.9);
+      color: #FFF;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    .cell-input:focus {
+      border-color: #FFF;
+      background: #202020;
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 40px;
+      opacity: 0.6;
+      font-weight: 500;
+    }
+
+    .actions-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <!-- Large Security Disclaimer Warning Banner -->
+    <div class="warning-banner">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      DEVELOPMENT ONLY: Database modifier. This file and associated endpoints must be completely deleted before production launch.
+    </div>
+
+    <!-- Top control buttons -->
+    <div class="header-controls">
+      <div class="file-info" id="fileInfoText">No database loaded. Select a file to start editing.</div>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn btn-secondary" onclick="triggerFileSelect()">
+          <i class="fa-solid fa-file-import"></i> Change File
+        </button>
+        <button class="btn btn-success" id="downloadBtn" style="display:none;" onclick="downloadDatabase()">
+          <i class="fa-solid fa-download"></i> Download Database
+        </button>
+      </div>
+      <input type="file" id="dbFileInput" accept=".db,.sqlite,.sqlite3" style="display:none;" onchange="handleFileChange(event)">
+    </div>
+
+    <!-- Div for dynamic table tabs -->
+    <div class="tabs-container" id="tabsContainer"></div>
+
+    <!-- Div container for dynamic table content -->
+    <div class="editor-card" id="editorCard" style="display:none;">
+      <form id="tableEditForm" onsubmit="handleFormSubmit(event)">
+        <div class="grid-container">
+          <table id="dataTable">
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+        
+        <div class="actions-footer">
+          <button type="submit" class="btn">
+            <i class="fa-solid fa-floppy-disk"></i> Submit Changes
+          </button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+
+  <script>
+    let activeTable = '';
+    let tableColumns = [];
+    let tableTypes = {};
+    let currentFileName = '';
+
+    function triggerFileSelect() {
+      document.getElementById('dbFileInput').click();
+    }
+
+    function handleFileChange(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('db_file', file);
+
+      document.getElementById('fileInfoText').innerText = `Uploading & loading ${file.name}...`;
+
+      fetch('/db/load/', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          currentFileName = file.name;
+          document.getElementById('fileInfoText').innerText = `Editing: ${file.name}`;
+          document.getElementById('downloadBtn').style.display = 'inline-flex';
+          renderTabs(data.tables);
+        } else {
+          alert('Error loading file: ' + data.message);
+          document.getElementById('fileInfoText').innerText = 'Failed to load database.';
+        }
+      })
+      .catch(err => {
+        alert('Server connection error.');
+        document.getElementById('fileInfoText').innerText = 'Connection error.';
+      });
+    }
+
+    function renderTabs(tables) {
+      const container = document.getElementById('tabsContainer');
+      container.innerHTML = '';
+      
+      if (tables.length === 0) {
+        container.innerHTML = '<div class="no-data">No tables found in this database.</div>';
+        document.getElementById('editorCard').style.display = 'none';
+        return;
+      }
+
+      tables.forEach((table, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `tab-btn ${idx === 0 ? 'active' : ''}`;
+        btn.innerText = table;
+        btn.onclick = () => switchTable(table, btn);
+        container.appendChild(btn);
+      });
+
+      // Load first table by default
+      switchTable(tables[0]);
+    }
+
+    function switchTable(tableName, btnElement) {
+      activeTable = tableName;
+      
+      // Update active styling
+      if (btnElement) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        btnElement.classList.add('active');
+      }
+
+      fetch(`/db/table/?name=${encodeURIComponent(tableName)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          tableColumns = data.columns;
+          tableTypes = data.types || {};
+          renderGrid(data.columns, data.types || {}, data.rows);
+        } else {
+          alert('Error fetching table content: ' + data.message);
+        }
+      });
+    }
+
+    function renderGrid(columns, types, rows) {
+      const head = document.getElementById('tableHead');
+      const body = document.getElementById('tableBody');
+      
+      head.innerHTML = '';
+      body.innerHTML = '';
+
+      document.getElementById('editorCard').style.display = 'block';
+
+      // Render headers
+      const trHead = document.createElement('tr');
+      // Row Index column
+      const thIndex = document.createElement('th');
+      thIndex.innerText = '#';
+      trHead.appendChild(thIndex);
+
+      columns.forEach(col => {
+        const th = document.createElement('th');
+        th.innerText = col;
+        trHead.appendChild(th);
+      });
+      head.appendChild(trHead);
+
+      // Render rows
+      if (rows.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = columns.length + 1;
+        td.className = 'no-data';
+        td.innerText = 'No records in this table.';
+        tr.appendChild(td);
+        body.appendChild(tr);
+        return;
+      }
+
+      rows.forEach((row, rowIdx) => {
+        const tr = document.createElement('tr');
+        
+        // Row index number helper
+        const tdIdx = document.createElement('td');
+        tdIdx.innerText = rowIdx + 1;
+        tdIdx.style.fontWeight = 'bold';
+        tdIdx.style.opacity = '0.5';
+        tr.appendChild(tdIdx);
+
+        columns.forEach((col, colIdx) => {
+          const td = document.createElement('td');
+          const colType = types[col] ? types[col].toUpperCase() : 'TEXT';
+          let input;
+
+          if (colType.includes('BOOL')) {
+            input = document.createElement('input');
+            input.type = 'checkbox';
+            input.className = 'cell-checkbox';
+            input.name = `cell_${rowIdx}_${col}`;
+            input.checked = (row[colIdx] === 1 || String(row[colIdx]).toLowerCase() === 'true');
+          } else if (colType.includes('INT') || colType.includes('REAL') || colType.includes('FLOAT') || colType.includes('DOUBLE') || colType.includes('NUM')) {
+            input = document.createElement('input');
+            input.type = 'number';
+            if (colType.includes('INT')) {
+              input.step = '1';
+            } else {
+              input.step = 'any';
+            }
+            input.className = 'cell-input';
+            input.name = `cell_${rowIdx}_${col}`;
+            input.value = row[colIdx] !== null ? row[colIdx] : '';
+          } else {
+            input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'cell-input';
+            input.name = `cell_${rowIdx}_${col}`;
+            input.value = row[colIdx] !== null ? row[colIdx] : '';
+          }
+          
+          td.appendChild(input);
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    }
+
+    function handleFormSubmit(event) {
+      event.preventDefault();
+      if (!activeTable) return;
+
+      const form = document.getElementById('tableEditForm');
+      const inputs = form.querySelectorAll('.cell-input, .cell-checkbox');
+      
+      // Group values by row index
+      const rowUpdates = {};
+      inputs.forEach(input => {
+        const parts = input.name.split('_');
+        const rowIdx = parts[1];
+        const colName = parts.slice(2).join('_');
+        
+        if (!rowUpdates[rowIdx]) {
+          rowUpdates[rowIdx] = {};
+        }
+        
+        if (input.type === 'checkbox') {
+          rowUpdates[rowIdx][colName] = input.checked ? 1 : 0;
+        } else {
+          rowUpdates[rowIdx][colName] = input.value;
+        }
+      });
+
+      // Convert updates object to an array
+      const updatesList = Object.values(rowUpdates);
+
+      fetch('/db/update/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: activeTable,
+          updates: updatesList
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          alert('Changes submitted and saved successfully!');
+          // Refresh current table
+          switchTable(activeTable);
+        } else {
+          alert('Error saving changes: ' + data.message);
+        }
+      })
+      .catch(err => {
+        alert('Server saving failure.');
+      });
+    }
+
+    function downloadDatabase() {
+      window.location.href = `/db/download/?filename=${encodeURIComponent(currentFileName)}`;
+    }
+  </script>
+</body>
+</html>

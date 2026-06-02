@@ -1,4 +1,4 @@
-from flask import Flask, render_template, render_template_string, redirect, request, flash, session 
+from flask import Flask, render_template, render_template_string, redirect, request, flash, session, send_file
 from flask_socketio import SocketIO, join_room, leave_room
 from werkzeug.utils import secure_filename
 import werkzeug
@@ -49,6 +49,9 @@ def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
         elif db_string == "gif_whitelist":
             lock = gif_whitelist_lock
             db_path = 'gif_whitelist.db'
+        elif db_string == "reports_alerts":
+            lock = reports_alerts_lock
+            db_path = 'reportsAndAlerts.db'
     
     with lock:
         try:
@@ -419,6 +422,24 @@ boys_dm_lock = Lock()
 girls_dm_lock = Lock()
 last_read_lock = Lock()
 gif_whitelist_lock = Lock()
+reports_alerts_lock = Lock()
+
+if not os.path.exists("reportsAndAlerts.db"):
+    ra_db = sqlite3.connect("reportsAndAlerts.db")
+    ra_cursor = ra_db.cursor()
+    ra_cursor.execute('''
+        CREATE TABLE alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL,
+            resolved BOOLEAN NOT NULL DEFAULT 0,
+            seen BOOLEAN NOT NULL DEFAULT 0
+        );
+    ''')
+    # Seed some initial alerts for testing
+    ra_cursor.execute("INSERT INTO alerts (text, resolved, seen) VALUES (?, 0, 0);", ("Swear word detected in room 'mainroom' from user 'Bob'.",))
+    ra_cursor.execute("INSERT INTO alerts (text, resolved, seen) VALUES (?, 0, 0);", ("Failed login attempt from IP 192.168.1.50.",))
+    ra_db.commit()
+    ra_db.close()
 
 if not os.path.exists("mainroom.db"):
     room_db = sqlite3.connect("mainroom.db")
@@ -926,22 +947,228 @@ def admin():
         username = session['username']
         password = session['password']
         if check_credentials(username, password):
+            user_id = find_account_id_or_password_or_gender(username, 'id')
+            if int(user_id) not in [1, 2, 3, 4]:
+                return "Unauthorized: Admin Only", 403
+                
             theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
             colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
             colors = ast.literal_eval(colorsFile.read())
             colorsFile.close()
+            
+            # Check if there are any unseen & unresolved alerts
+            unseen = db_sql("SELECT COUNT(*) FROM alerts WHERE seen = 0 AND resolved = 0;", 'reports_alerts')
+            has_unseen_alerts = (unseen[0][0] > 0) if unseen else False
+            
             return render_template(
                 'admin.html',
                 theme=theme,
                 color_dark=colors['color_dark'],
                 color_medium=colors['color_medium'],
                 color_light=colors['color_light'],
-                active_page='admin'
+                active_page='admin',
+                has_unseen_alerts=has_unseen_alerts
             )
         return redirect('/')
     except Exception as e:
         print(f"Error loading admin page: {e}")
         return redirect('/')
+
+@app.route('/admin/alerts/', methods=['GET'])
+def get_admin_alerts():
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+            
+        user_id = find_account_id_or_password_or_gender(username, 'id')
+        if int(user_id) not in [1, 2, 3, 4]:
+            return {"status": "error", "message": "Unauthorized"}, 403
+            
+        # Get all unresolved alerts ordered by seen ASC, id DESC
+        rows = db_sql("SELECT id, text, resolved, seen FROM alerts WHERE resolved = 0 ORDER BY seen ASC, id DESC;", 'reports_alerts')
+        alerts_list = []
+        for r in rows:
+            alerts_list.append({
+                "id": r[0],
+                "text": r[1],
+                "resolved": r[2],
+                "seen": r[3]
+            })
+            
+        # Also get current unseen count for header/sidebar updates
+        unseen = db_sql("SELECT COUNT(*) FROM alerts WHERE seen = 0 AND resolved = 0;", 'reports_alerts')
+        unseen_count = unseen[0][0] if unseen else 0
+        
+        return {"status": "success", "alerts": alerts_list, "unseen_count": unseen_count}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.route('/admin/alerts/seen/<int:alert_id>/', methods=['POST'])
+def mark_alert_seen(alert_id):
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+            
+        user_id = find_account_id_or_password_or_gender(username, 'id')
+        if int(user_id) not in [1, 2, 3, 4]:
+            return {"status": "error", "message": "Unauthorized"}, 403
+            
+        db_sql("UPDATE alerts SET seen = 1 WHERE id = ?;", 'reports_alerts', params=[alert_id])
+        
+        unseen = db_sql("SELECT COUNT(*) FROM alerts WHERE seen = 0 AND resolved = 0;", 'reports_alerts')
+        unseen_count = unseen[0][0] if unseen else 0
+        
+        return {"status": "success", "unseen_count": unseen_count}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.route('/admin/alerts/resolve/<int:alert_id>/', methods=['POST'])
+def mark_alert_resolved(alert_id):
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+            
+        user_id = find_account_id_or_password_or_gender(username, 'id')
+        if int(user_id) not in [1, 2, 3, 4]:
+            return {"status": "error", "message": "Unauthorized"}, 403
+            
+        db_sql("UPDATE alerts SET resolved = 1 WHERE id = ?;", 'reports_alerts', params=[alert_id])
+        
+        unseen = db_sql("SELECT COUNT(*) FROM alerts WHERE seen = 0 AND resolved = 0;", 'reports_alerts')
+        unseen_count = unseen[0][0] if unseen else 0
+        
+        return {"status": "success", "unseen_count": unseen_count}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/db/')
+def db_modifier_page():
+    return render_template('db_modifier.html')
+
+@app.route('/db/load/', methods=['POST'])
+def db_modifier_load():
+    try:
+        if 'db_file' not in request.files:
+            return {"status": "error", "message": "No file uploaded"}, 400
+        file = request.files['db_file']
+        if file.filename == '':
+            return {"status": "error", "message": "No file selected"}, 400
+        
+        temp_path = "temp_modifier.db"
+        file.save(temp_path)
+        session['loaded_db_path'] = temp_path
+        
+        conn = sqlite3.connect(temp_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+        tables = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return {"status": "success", "tables": tables}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+def parse_modifier_value(val, col_type):
+    if val is None or val == '':
+        return None
+    col_type = col_type.upper()
+    if 'INT' in col_type:
+        try:
+            return int(val)
+        except ValueError:
+            return val
+    elif 'REAL' in col_type or 'FLOAT' in col_type or 'DOUBLE' in col_type or 'NUM' in col_type:
+        try:
+            return float(val)
+        except ValueError:
+            return val
+    elif 'BOOL' in col_type:
+        if str(val).lower() in ['true', '1', 'on', 'checked']:
+            return 1
+        return 0
+    return str(val)
+
+@app.route('/db/table/', methods=['GET'])
+def db_modifier_table():
+    try:
+        temp_path = session.get('loaded_db_path')
+        if not temp_path or not os.path.exists(temp_path):
+            return {"status": "error", "message": "No database loaded"}, 400
+        table_name = request.args.get('name')
+        if not table_name:
+            return {"status": "error", "message": "Table name required"}, 400
+            
+        conn = sqlite3.connect(temp_path)
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA table_info({table_name});")
+        pragma_info = cursor.fetchall()
+        columns = [col[1] for col in pragma_info]
+        types = {col[1]: col[2].upper() for col in pragma_info}
+        
+        cursor.execute(f"SELECT * FROM {table_name};")
+        rows = cursor.fetchall()
+        conn.close()
+        return {"status": "success", "columns": columns, "types": types, "rows": rows}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.route('/db/update/', methods=['POST'])
+def db_modifier_update():
+    try:
+        temp_path = session.get('loaded_db_path')
+        if not temp_path or not os.path.exists(temp_path):
+            return {"status": "error", "message": "No database loaded"}, 400
+        data = request.json
+        table_name = data.get('table')
+        updates = data.get('updates')
+        
+        if not table_name or updates is None:
+            return {"status": "error", "message": "Table name and updates required"}, 400
+            
+        conn = sqlite3.connect(temp_path)
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA table_info({table_name});")
+        pragma_info = cursor.fetchall()
+        columns = [col[1] for col in pragma_info]
+        types = {col[1]: col[2].upper() for col in pragma_info}
+        
+        cursor.execute(f"DELETE FROM {table_name};")
+        
+        placeholders = ", ".join(["?"] * len(columns))
+        cols_str = ", ".join(columns)
+        insert_sql = f"INSERT INTO {table_name} ({cols_str}) VALUES ({placeholders});"
+        
+        for row in updates:
+            vals = []
+            for col in columns:
+                raw_val = row.get(col)
+                col_type = types.get(col, 'TEXT')
+                parsed_val = parse_modifier_value(raw_val, col_type)
+                vals.append(parsed_val)
+            cursor.execute(insert_sql, vals)
+            
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.route('/db/download/', methods=['GET'])
+def db_modifier_download():
+    try:
+        temp_path = session.get('loaded_db_path')
+        if not temp_path or not os.path.exists(temp_path):
+            return "No database loaded", 400
+        filename = request.args.get('filename', 'database.db')
+        return send_file(temp_path, as_attachment=True, download_name=filename)
+    except Exception as e:
+        return str(e), 500
 
 
 

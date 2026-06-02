@@ -25,7 +25,7 @@
           <li>
             <a href="#" class="menu-item" data-target="alerts">
               <span>Alerts</span>
-              <span class="badge-dot"></span>
+              <span class="badge-dot" style="display: {% if has_unseen_alerts %}inline-block{% else %}none{% endif %};"></span>
             </a>
           </li>
           <li>
@@ -99,17 +99,139 @@
     const menuItems = document.querySelectorAll('.menu-item');
     const contentPane = document.getElementById('adminContentPane');
 
+    const updateBadgeDot = (unseenCount) => {
+      const dot = document.querySelector('[data-target="alerts"] .badge-dot');
+      if (dot) {
+        dot.style.display = unseenCount > 0 ? 'inline-block' : 'none';
+      }
+    };
+
+    const loadAlerts = () => {
+      contentPane.innerHTML = `
+        <div class="tab-view active">
+          <div class="alerts-loading">
+            <i class="fa-solid fa-spinner fa-spin"></i> Loading alerts...
+          </div>
+        </div>
+      `;
+      fetch('/admin/alerts/')
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'success') {
+            updateBadgeDot(data.unseen_count);
+            renderAlertsList(data.alerts);
+          } else {
+            contentPane.innerHTML = `
+              <div class="tab-view active">
+                <div class="error-view">
+                  <i class="fa-solid fa-triangle-exclamation"></i>
+                  <h3>Error Loading Alerts</h3>
+                  <p>${data.message || 'Unknown error occurred.'}</p>
+                </div>
+              </div>
+            `;
+          }
+        })
+        .catch(err => {
+          contentPane.innerHTML = `
+            <div class="tab-view active">
+              <div class="error-view">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <h3>Error Loading Alerts</h3>
+                <p>Failed to communicate with the server.</p>
+              </div>
+            </div>
+          `;
+        });
+    };
+
+    const renderAlertsList = (alerts) => {
+      if (alerts.length === 0) {
+        contentPane.innerHTML = `
+          <div class="tab-view active">
+            <div class="placeholder-view">
+              <i class="fa-solid fa-bell-slash"></i>
+              <h3>All Quiet</h3>
+              <p>No system alerts at this time.</p>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      let alertsHtml = alerts.map(alert => {
+        return `
+          <div class="alert-box" id="alert-box-${alert.id}">
+            <div class="alert-content-wrapper">
+              <div class="alert-icon-container">
+                <i class="fa-solid fa-triangle-exclamation warning-icon"></i>
+              </div>
+              <div class="alert-text">${alert.text}</div>
+            </div>
+            <div class="alert-actions">
+              <button class="btn-soft alert-btn mark-read-btn" onclick="markAsRead(${alert.id})">Mark as Read</button>
+              <button class="btn-soft alert-btn resolve-btn" onclick="resolveAlert(${alert.id})">Resolve</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      contentPane.innerHTML = `
+        <div class="tab-view active">
+          <div class="alerts-header">
+            <h3>System Alerts</h3>
+            <span class="alerts-count">${alerts.length} Active</span>
+          </div>
+          <div class="alerts-list">
+            ${alertsHtml}
+          </div>
+        </div>
+      `;
+    };
+
+    window.markAsRead = (alertId) => {
+      fetch(`/admin/alerts/seen/${alertId}/`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'success') {
+            updateBadgeDot(data.unseen_count);
+            loadAlerts();
+          } else {
+            alert('Failed to mark alert as read: ' + data.message);
+          }
+        });
+    };
+
+    window.resolveAlert = (alertId) => {
+      const box = document.getElementById(`alert-box-${alertId}`);
+      if (box) {
+        box.classList.add('resolving');
+      }
+      fetch(`/admin/alerts/resolve/${alertId}/`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'success') {
+            updateBadgeDot(data.unseen_count);
+            setTimeout(() => {
+              loadAlerts();
+            }, 300);
+          } else {
+            if (box) box.classList.remove('resolving');
+            alert('Failed to resolve alert: ' + data.message);
+          }
+        })
+        .catch(err => {
+          if (box) box.classList.remove('resolving');
+          alert('Failed to connect to the server');
+        });
+    };
+
     // Tab content descriptions to show dynamic updating in this first draft
     const tabData = {
       'reports': {
         title: 'Reports Dashboard',
         icon: 'fa-chart-line',
         desc: 'Review submitted reports and user activity flags.'
-      },
-      'alerts': {
-        title: 'System Alerts',
-        icon: 'fa-bell',
-        desc: 'Monitor system status, warnings, and error notifications.'
       },
       'search': {
         title: 'Advanced Search',
@@ -145,6 +267,11 @@
 
         // Update the main content pane dynamically with styled templates
         const target = item.getAttribute('data-target');
+        if (target === 'alerts') {
+          loadAlerts();
+          return;
+        }
+
         const data = tabData[target] || { title: 'Admin Section', icon: 'fa-gears', desc: 'Administrative tools and configuration settings.' };
         
         contentPane.innerHTML = `

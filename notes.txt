@@ -1,3 +1,9 @@
+HUGE DISCLAIMER:
+
+REMOVE DB MODIFIER BEFORE LAUNCHING THE APP
+
+
+
 chats sidebar expand and sidebar
 
 events notification
