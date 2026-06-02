@@ -252,6 +252,17 @@
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
 }
 
+.alert-box.read {
+  border-left: 5px solid #7F8C8D;
+  background: rgba(236, 240, 241, 0.6);
+  opacity: 0.75;
+}
+
+.alert-box.read .warning-icon {
+  color: #7F8C8D;
+  filter: none;
+}
+
 .alert-content-wrapper {
   display: flex;
   align-items: center;

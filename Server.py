@@ -1,6 +1,9 @@
+# pyrefly: ignore [missing-import]
 from flask import Flask, render_template, render_template_string, redirect, request, flash, session, send_file
 from flask_socketio import SocketIO, join_room, leave_room
+# pyrefly: ignore [missing-import]
 from werkzeug.utils import secure_filename
+# pyrefly: ignore [missing-import]
 import werkzeug
 import sqlite3
 import datetime
@@ -12,6 +15,7 @@ import ast
 import base64
 import io
 import json
+# pyrefly: ignore [missing-import]
 from PIL import Image, ImageOps 
 import re
 import requests
@@ -313,14 +317,27 @@ def find_account_id_or_password_or_gender(user, id_or_password_or_gender='id', R
                 return [user, accounts_dict[user]['gender']]
             return accounts_dict[user]['gender']
         
+        elif id_or_password_or_gender == 'admin':
+            if RU:
+                return [user, accounts_dict[user]['admin']]
+            return accounts_dict[user]['admin']
 
     except KeyError:
-        data_list = db_sql("""SELECT username, password, id, gender FROM accounts WHERE LOWER(username) = ?;""", 'accounts', params=[user.lower()], chat_room=False)
+        data_list = db_sql("""SELECT username, password, id, gender, admin FROM accounts WHERE LOWER(username) = ?;""", 'accounts', params=[user.lower()], chat_room=False)
         if data_list:
             data = data_list[0]
-            accounts_dict[data[0]] = {'password': data[1], 'id': data[2], 'gender': data[3]}
+            accounts_dict[data[0]] = {'password': data[1], 'id': data[2], 'gender': data[3], 'admin': bool(data[4])}
             id_to_accounts_dict[data[2]] = data[0]
-            returnable = data[1] if id_or_password_or_gender == 'password' else data[2] if id_or_password_or_gender == 'id' else data[3]
+            if id_or_password_or_gender == 'password':
+                returnable = data[1]
+            elif id_or_password_or_gender == 'id':
+                returnable = data[2]
+            elif id_or_password_or_gender == 'gender':
+                returnable = data[3]
+            elif id_or_password_or_gender == 'admin':
+                returnable = bool(data[4])
+            else:
+                returnable = None
             if RU:
                 return [data[0], returnable]
             return returnable
@@ -335,6 +352,12 @@ def find_username_from_id(user_id):
             id_to_accounts_dict[user_id] = username
             return username
         return None
+
+def is_admin(username):
+    if not username:
+        return False
+    val = find_account_id_or_password_or_gender(username, 'admin')
+    return bool(val)
 
 
 true = True
@@ -475,7 +498,8 @@ if not os.path.exists("accounts.db"):
             gender TEXT NOT NULL,
             theme TEXT NOT NULL,
             room TEXT NOT NULL,
-            dms TEXT NOT NULL
+            dms TEXT NOT NULL,
+            admin BOOLEAN NOT NULL DEFAULT 0
         );
     ''')
     accounts_db.close()
@@ -492,7 +516,8 @@ try:
             'latitude': 'REAL DEFAULT 0.0',
             'longitude': 'REAL DEFAULT 0.0',
             'city': 'TEXT DEFAULT ""',
-            'state': 'TEXT DEFAULT ""'
+            'state': 'TEXT DEFAULT ""',
+            'admin': 'BOOLEAN DEFAULT 0'
         }
         for col, definition in new_cols.items():
             if col not in columns:
@@ -932,8 +957,7 @@ def gif_approve():
         username = session['username']
         password = session['password']
         if check_credentials(username, password):
-            user_id = find_account_id_or_password_or_gender(username, 'id')
-            if int(user_id) in [1, 2, 3, 4]:
+            if is_admin(username):
                 return render_template('gif_approve.html', username=username)
             else:
                 return "Unauthorized: Admin Only", 403
@@ -947,8 +971,7 @@ def admin():
         username = session['username']
         password = session['password']
         if check_credentials(username, password):
-            user_id = find_account_id_or_password_or_gender(username, 'id')
-            if int(user_id) not in [1, 2, 3, 4]:
+            if not is_admin(username):
                 return "Unauthorized: Admin Only", 403
                 
             theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
@@ -982,8 +1005,7 @@ def get_admin_alerts():
         if not username or not check_credentials(username, password):
             return {"status": "error", "message": "Unauthorized"}, 401
             
-        user_id = find_account_id_or_password_or_gender(username, 'id')
-        if int(user_id) not in [1, 2, 3, 4]:
+        if not is_admin(username):
             return {"status": "error", "message": "Unauthorized"}, 403
             
         # Get all unresolved alerts ordered by seen ASC, id DESC
@@ -1013,11 +1035,13 @@ def mark_alert_seen(alert_id):
         if not username or not check_credentials(username, password):
             return {"status": "error", "message": "Unauthorized"}, 401
             
-        user_id = find_account_id_or_password_or_gender(username, 'id')
-        if int(user_id) not in [1, 2, 3, 4]:
+        if not is_admin(username):
             return {"status": "error", "message": "Unauthorized"}, 403
             
-        db_sql("UPDATE alerts SET seen = 1 WHERE id = ?;", 'reports_alerts', params=[alert_id])
+        # Toggle seen status
+        current = db_sql("SELECT seen FROM alerts WHERE id = ?;", 'reports_alerts', params=[alert_id])
+        new_seen = 0 if (current and current[0][0] == 1) else 1
+        db_sql("UPDATE alerts SET seen = ? WHERE id = ?;", 'reports_alerts', params=[new_seen, alert_id])
         
         unseen = db_sql("SELECT COUNT(*) FROM alerts WHERE seen = 0 AND resolved = 0;", 'reports_alerts')
         unseen_count = unseen[0][0] if unseen else 0
@@ -1034,8 +1058,7 @@ def mark_alert_resolved(alert_id):
         if not username or not check_credentials(username, password):
             return {"status": "error", "message": "Unauthorized"}, 401
             
-        user_id = find_account_id_or_password_or_gender(username, 'id')
-        if int(user_id) not in [1, 2, 3, 4]:
+        if not is_admin(username):
             return {"status": "error", "message": "Unauthorized"}, 403
             
         db_sql("UPDATE alerts SET resolved = 1 WHERE id = ?;", 'reports_alerts', params=[alert_id])
@@ -1064,6 +1087,7 @@ def db_modifier_load():
         temp_path = "temp_modifier.db"
         file.save(temp_path)
         session['loaded_db_path'] = temp_path
+        session['original_db_name'] = file.filename
         
         conn = sqlite3.connect(temp_path)
         cursor = conn.cursor()
@@ -1075,20 +1099,26 @@ def db_modifier_load():
         return {"status": "error", "message": str(e)}, 500
 
 def parse_modifier_value(val, col_type):
-    if val is None or val == '':
+    if val is None:
         return None
     col_type = col_type.upper()
     if 'INT' in col_type:
+        if val == '':
+            return None
         try:
             return int(val)
         except ValueError:
             return val
     elif 'REAL' in col_type or 'FLOAT' in col_type or 'DOUBLE' in col_type or 'NUM' in col_type:
+        if val == '':
+            return None
         try:
             return float(val)
         except ValueError:
             return val
     elif 'BOOL' in col_type:
+        if val == '':
+            return 0
         if str(val).lower() in ['true', '1', 'on', 'checked']:
             return 1
         return 0
@@ -1155,6 +1185,23 @@ def db_modifier_update():
             
         conn.commit()
         conn.close()
+
+        # Copy the updated temp_path back to the original database file location if it exists on the server
+        original_name = session.get('original_db_name')
+        if original_name:
+            # Let's locate the live database file
+            target_path = None
+            if os.path.exists(original_name):
+                target_path = original_name
+            elif os.path.exists(os.path.join("rooms", original_name)):
+                target_path = os.path.join("rooms", original_name)
+            elif os.path.exists(os.path.join("dms", original_name)):
+                target_path = os.path.join("dms", original_name)
+
+            if target_path:
+                print(f"Syncing temp_modifier.db back to live database: {target_path}")
+                shutil.copyfile(temp_path, target_path)
+
         return {"status": "success"}
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
@@ -2426,8 +2473,7 @@ def Recv(message, sid):
         keywords = data['keywords']
 
         if check_credentials(username, password):
-            user_id = find_account_id_or_password_or_gender(username, 'id')
-            if int(user_id) in [1, 2, 3, 4]: # Admin accounts
+            if is_admin(username):
                 # Validate giphy_id
                 if not giphy_id or not str(giphy_id).strip():
                     print(f"Add GIF Error: Empty giphy_id received from user {username}")
@@ -2504,8 +2550,7 @@ def Recv(message, sid):
         giphy_id = data['giphy_id']
 
         if check_credentials(username, password):
-            user_id = find_account_id_or_password_or_gender(username, 'id')
-            if int(user_id) in [1, 2, 3, 4]: # Admin accounts
+            if is_admin(username):
                 # Delete from whitelist_gifs (gif_tags will be deleted by ON DELETE CASCADE)
                 db_sql("DELETE FROM whitelist_gifs WHERE giphy_id = ?;", 'gif_whitelist', params=[giphy_id], chat_room=False)
                 print(f"Delete GIF: Removed giphy_id={giphy_id} from whitelist (User: {username})")
@@ -2576,8 +2621,7 @@ def Recv(message, sid):
         keywords = data['keywords']
 
         if check_credentials(username, password):
-            user_id = find_account_id_or_password_or_gender(username, 'id')
-            if int(user_id) in [1, 2, 3, 4]: # Admin accounts
+            if is_admin(username):
                 try:
                     # 1. Get internal gif_id
                     existing = db_sql("SELECT id FROM whitelist_gifs WHERE giphy_id = ?;", 'gif_whitelist', params=[giphy_id], chat_room=False)

@@ -25,7 +25,7 @@
           <li>
             <a href="#" class="menu-item" data-target="alerts">
               <span>Alerts</span>
-              <span class="badge-dot" style="display: {% if has_unseen_alerts %}inline-block{% else %}none{% endif %};"></span>
+              <span class="badge-dot" {% if not has_unseen_alerts %}style="display: none;"{% endif %}></span>
             </a>
           </li>
           <li>
@@ -160,8 +160,11 @@
       }
 
       let alertsHtml = alerts.map(alert => {
+        const isRead = alert.seen === 1 || alert.seen === true;
+        const readClass = isRead ? 'read' : '';
+        const buttonLabel = isRead ? 'Mark as Unread' : 'Mark as Read';
         return `
-          <div class="alert-box" id="alert-box-${alert.id}">
+          <div class="alert-box ${readClass}" id="alert-box-${alert.id}">
             <div class="alert-content-wrapper">
               <div class="alert-icon-container">
                 <i class="fa-solid fa-triangle-exclamation warning-icon"></i>
@@ -169,7 +172,7 @@
               <div class="alert-text">${alert.text}</div>
             </div>
             <div class="alert-actions">
-              <button class="btn-soft alert-btn mark-read-btn" onclick="markAsRead(${alert.id})">Mark as Read</button>
+              <button class="btn-soft alert-btn mark-read-btn" onclick="markAsRead(${alert.id})">${buttonLabel}</button>
               <button class="btn-soft alert-btn resolve-btn" onclick="resolveAlert(${alert.id})">Resolve</button>
             </div>
           </div>
