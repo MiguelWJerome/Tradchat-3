@@ -499,7 +499,17 @@ if not os.path.exists("accounts.db"):
             theme TEXT NOT NULL,
             room TEXT NOT NULL,
             dms TEXT NOT NULL,
-            admin BOOLEAN NOT NULL DEFAULT 0
+            admin BOOLEAN NOT NULL DEFAULT 0,
+            frozen BOOLEAN NOT NULL DEFAULT 0,
+            pl_read_dms BOOLEAN NOT NULL DEFAULT 0,
+            pl_block_media BOOLEAN NOT NULL DEFAULT 0,
+            pl_dm_lock BOOLEAN NOT NULL DEFAULT 0,
+            pl_restricted_users TEXT NOT NULL DEFAULT '',
+            pl_curfew BOOLEAN NOT NULL DEFAULT 0,
+            pl_curfew_offline TEXT NOT NULL DEFAULT '4:30 AM',
+            pl_curfew_online TEXT NOT NULL DEFAULT '4:30 AM',
+            pl_block_games BOOLEAN NOT NULL DEFAULT 0,
+            pl_age_segregation BOOLEAN NOT NULL DEFAULT 1
         );
     ''')
     accounts_db.close()
@@ -517,7 +527,17 @@ try:
             'longitude': 'REAL DEFAULT 0.0',
             'city': 'TEXT DEFAULT ""',
             'state': 'TEXT DEFAULT ""',
-            'admin': 'BOOLEAN DEFAULT 0'
+            'admin': 'BOOLEAN DEFAULT 0',
+            'frozen': 'BOOLEAN DEFAULT 0',
+            'pl_read_dms': 'BOOLEAN DEFAULT 0',
+            'pl_block_media': 'BOOLEAN DEFAULT 0',
+            'pl_dm_lock': 'BOOLEAN DEFAULT 0',
+            'pl_restricted_users': "TEXT DEFAULT ''",
+            'pl_curfew': 'BOOLEAN DEFAULT 0',
+            'pl_curfew_offline': "TEXT DEFAULT '10:00 PM'",
+            'pl_curfew_online': "TEXT DEFAULT '6:00 AM'",
+            'pl_block_games': 'BOOLEAN DEFAULT 0',
+            'pl_age_segregation': 'BOOLEAN DEFAULT 1'
         }
         for col, definition in new_cols.items():
             if col not in columns:
@@ -2685,6 +2705,89 @@ def Recv(message, sid):
             except Exception as e:
                 print(f"Search Usernames Error: {e}")
                 Server.send(str(['Search Usernames Results', {'status': 'error', 'message': 'Internal search error'}]), room=sid)
+
+    elif msg[0] == 'Get Target Admin Data':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        target_user = data['target_user']
+
+        if check_credentials(username, password) and is_admin(username):
+            try:
+                res = db_sql("SELECT frozen, pl_read_dms, pl_block_media, pl_dm_lock, pl_restricted_users, pl_curfew, pl_curfew_offline, pl_curfew_online, pl_block_games, pl_age_segregation FROM accounts WHERE username = ?;", 'accounts', params=[target_user], chat_room=False)
+                if res:
+                    row = res[0]
+                    target_data = {
+                        'status': 'success',
+                        'target_user': target_user,
+                        'frozen': bool(row[0]),
+                        'pl_read_dms': bool(row[1]),
+                        'pl_block_media': bool(row[2]),
+                        'pl_dm_lock': bool(row[3]),
+                        'pl_restricted_users': row[4],
+                        'pl_curfew': bool(row[5]),
+                        'pl_curfew_offline': row[6],
+                        'pl_curfew_online': row[7],
+                        'pl_block_games': bool(row[8]),
+                        'pl_age_segregation': bool(row[9])
+                    }
+                    Server.send(str(['Get Target Admin Data Result', target_data]), room=sid)
+                else:
+                    Server.send(str(['Get Target Admin Data Result', {'status': 'error', 'message': 'User not found'}]), room=sid)
+            except Exception as e:
+                print(f"Get Target Admin Data Error: {e}")
+                Server.send(str(['Get Target Admin Data Result', {'status': 'error', 'message': str(e)}]), room=sid)
+
+    elif msg[0] == 'Update Freeze Status':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        target_user = data['target_user']
+        frozen = int(data['frozen'])
+
+        if check_credentials(username, password) and is_admin(username):
+            try:
+                db_sql("UPDATE accounts SET frozen = ? WHERE username = ?;", 'accounts', params=[frozen, target_user], chat_room=False)
+                Server.send(str(['Update Freeze Status Result', {'status': 'success', 'target_user': target_user, 'frozen': frozen}]), room=sid)
+            except Exception as e:
+                print(f"Update Freeze Status Error: {e}")
+                Server.send(str(['Update Freeze Status Result', {'status': 'error', 'message': str(e)}]), room=sid)
+
+    elif msg[0] == 'Update Parental Locks':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        target_user = data['target_user']
+        locks = data['locks']
+
+        if check_credentials(username, password) and is_admin(username):
+            try:
+                db_sql("""UPDATE accounts SET 
+                    pl_read_dms = ?, 
+                    pl_block_media = ?, 
+                    pl_dm_lock = ?, 
+                    pl_restricted_users = ?, 
+                    pl_curfew = ?, 
+                    pl_curfew_offline = ?, 
+                    pl_curfew_online = ?, 
+                    pl_block_games = ?, 
+                    pl_age_segregation = ? 
+                    WHERE username = ?;""", 'accounts', params=[
+                        int(locks['readDms']),
+                        int(locks['blockMedia']),
+                        int(locks['dmLock']),
+                        locks['restrictedUsers'],
+                        int(locks['curfew']),
+                        locks['curfewOffline'],
+                        locks['curfewOnline'],
+                        int(locks['blockGames']),
+                        int(locks['ageSegregation']),
+                        target_user
+                    ], chat_room=False)
+                Server.send(str(['Update Parental Locks Result', {'status': 'success', 'target_user': target_user}]), room=sid)
+            except Exception as e:
+                print(f"Update Parental Locks Error: {e}")
+                Server.send(str(['Update Parental Locks Result', {'status': 'error', 'message': str(e)}]), room=sid)
 
 
 @Server.on('disconnect')

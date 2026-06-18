@@ -259,6 +259,7 @@ Finishing Settings Page
 Set up event system
 get video calls working
 get gif database full
+Admin page is tested
 MAKE IT ALL PHONE AND MOBILE COMPATIBLE
 
 

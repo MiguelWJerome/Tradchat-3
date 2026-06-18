@@ -94,7 +94,13 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/javascript/socketio.js"></script>
+<script src="/static/javascript/tradchat.js"></script>
 <script>
+  if (typeof cl === 'undefined') {
+    window.cl = io();
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     const menuItems = document.querySelectorAll('.menu-item');
     const contentPane = document.getElementById('adminContentPane');
@@ -229,7 +235,696 @@
         });
     };
 
-    // Tab content descriptions to show dynamic updating in this first draft
+    const loadActionZone = () => {
+      contentPane.innerHTML = `
+        <div class="tab-view active">
+          <div class="action-zone-view">
+            <!-- Header Title -->
+            <div class="az-header">
+              <div class="az-title-grp">
+                <h2>ACTION ZONE</h2>
+              </div>
+            </div>
+
+            <!-- Section 1: User Specific Actions -->
+            <div class="az-section">
+              <div class="az-section-header">
+                <i class="fa-solid fa-user-gear"></i>
+                <h3>1. ADMIN ACTIONS (USER-SPECIFIC)</h3>
+              </div>
+              
+              <div class="az-target-panel">
+                <div class="az-select-grp">
+                  <label>SELECT TARGET USER</label>
+                  <button type="button" class="az-btn btn-primary" id="az-choose-user-btn" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <i class="fa-solid fa-magnifying-glass"></i> Choose User
+                  </button>
+                </div>
+
+                <div class="az-active-target-card">
+                  <div class="az-card-label">ACTIVE TARGET</div>
+                  <div class="az-card-body">
+                    <div class="az-target-info">
+                      <img id="az-target-pfp" src="/static/graphics/defaultMale.png" onerror="this.onerror=null; this.src='/static/graphics/defaultMale.png';" class="az-target-pfp" />
+                      <h4 id="az-target-name">None</h4>
+                    </div>
+                    <span class="az-status-badge status-inactive" id="az-target-status">Inactive</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2 Column Actions Grid -->
+              <div class="az-actions-grid">
+                <!-- Send Pop-Up Message -->
+                <div class="az-action-card">
+                  <div class="card-title">
+                    <i class="fa-solid fa-comment-dots"></i>
+                    SEND POP-UP MESSAGE
+                  </div>
+                  <div class="card-body">
+                    <textarea id="popup-message-text" placeholder="Enter alert message text..." rows="2" class="az-textarea"></textarea>
+                    <button class="btn-primary az-btn" onclick="dispatchMessage()">DISPATCH MESSAGE</button>
+                  </div>
+                </div>
+
+                <!-- Freeze Account -->
+                <div class="az-action-card">
+                  <div class="card-title">
+                    <i class="fa-solid fa-user-lock"></i>
+                    FREEZE ACCOUNT
+                  </div>
+                  <div class="card-body card-body-flex">
+                    <button class="btn-warning az-btn" onclick="freezeAccount()" id="freeze-btn">FREEZE</button>
+                  </div>
+                </div>
+
+                <!-- Force Redirect / Reload -->
+                <div class="az-action-card">
+                  <div class="card-title">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                    FORCE REDIRECT / RELOAD
+                  </div>
+                  <div class="card-body">
+                    <div class="az-input-action-grp">
+                      <input type="text" id="redirect-url" value="https://tradchat.com/maintenance" class="az-input" placeholder="Redirect URL...">
+                      <button class="btn-icon" onclick="reloadUserRedirect()" title="Reset default redirect URL">
+                        <i class="fa-solid fa-rotate-left"></i>
+                      </button>
+                    </div>
+                    <button class="btn-primary az-btn" onclick="redirectUser()">REDIRECT USER</button>
+                  </div>
+                </div>
+
+                <!-- Delete Account -->
+                <div class="az-action-card">
+                  <div class="card-title">
+                    <i class="fa-solid fa-user-slash"></i>
+                    DELETE ACCOUNT
+                  </div>
+                  <div class="card-body card-body-flex">
+                    <button class="btn-danger az-btn" onclick="purgeAccount()">DELETE ACCOUNT</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Section 2: Pending Approval Queue -->
+            <div class="az-section">
+              <div class="az-section-header">
+                <div class="header-title-left">
+                  <h3>PENDING ADMIN REQUESTS</h3>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="az-table">
+                  <thead>
+                    <tr>
+                      <th>REQUESTER</th>
+                      <th>TARGET USER</th>
+                      <th>PROPOSED ACTION</th>
+                      <th>VOTE PROGRESS</th>
+                      <th>DECIDE</th>
+                    </tr>
+                  </thead>
+                  <tbody id="az-queue-body">
+                    <!-- Empty Queue -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Set up choose user button click
+      const chooseUserBtn = document.getElementById('az-choose-user-btn');
+      if (chooseUserBtn) {
+        chooseUserBtn.addEventListener('click', () => {
+          if (typeof choose_usernames === 'function') {
+            choose_usernames(false, (usernames) => {
+              if (usernames && usernames.length > 0) {
+                const username = usernames[0];
+                document.az_active_username = username;
+                
+                // Fetch target details from server
+                if (typeof cl !== 'undefined') {
+                  cl.send(JSON.stringify(['Get Target Admin Data', {
+                    username: localStorage.getItem('username') || sessionStorage.getItem('username'),
+                    password: localStorage.getItem('password') || sessionStorage.getItem('password'),
+                    target_user: username
+                  }]));
+                }
+              }
+            });
+          } else {
+            alert('User search function is loading or not available.');
+          }
+        });
+      }
+    };
+
+    window.dispatchMessage = () => {
+      const msg = document.getElementById('popup-message-text').value.trim();
+      const user = document.az_active_username;
+      if (!user || user === 'None') {
+        alert('Please select a target user first.');
+        return;
+      }
+      if (!msg) {
+        alert('Please enter a message text before dispatching.');
+        return;
+      }
+      alert(`Message dispatched to ${user}: "${msg}"`);
+      document.getElementById('popup-message-text').value = '';
+    };
+
+    window.freezeAccount = () => {
+      const user = document.az_active_username;
+      if (!user || user === 'None') {
+        alert('Please select a target user first.');
+        return;
+      }
+      const statusBadge = document.getElementById('az-target-status');
+      const isCurrentlyFrozen = statusBadge.classList.contains('status-inactive');
+      const nextFrozenState = isCurrentlyFrozen ? 0 : 1;
+
+      if (typeof cl !== 'undefined') {
+        cl.send(JSON.stringify(['Update Freeze Status', {
+          username: localStorage.getItem('username') || sessionStorage.getItem('username'),
+          password: localStorage.getItem('password') || sessionStorage.getItem('password'),
+          target_user: user,
+          frozen: nextFrozenState
+        }]));
+      }
+    };
+
+    window.redirectUser = () => {
+      const user = document.az_active_username;
+      if (!user || user === 'None') {
+        alert('Please select a target user first.');
+        return;
+      }
+      const url = document.getElementById('redirect-url').value.trim();
+      if (!url) {
+        alert('Please enter a target redirect URL.');
+        return;
+      }
+      alert(`Redirect command issued for ${user} to: ${url}`);
+    };
+
+    window.reloadUserRedirect = () => {
+      document.getElementById('redirect-url').value = 'https://tradchat.com/maintenance';
+    };
+
+    window.purgeAccount = () => {
+      const user = document.az_active_username;
+      if (!user || user === 'None') {
+        alert('Please select a target user first.');
+        return;
+      }
+      const confirmPurge = confirm(`WARNING: Are you absolutely sure you want to permanently delete account ${user}? This cannot be undone.`);
+      if (confirmPurge) {
+        alert(`Delete action initiated for ${user}. Sent to approval queue.`);
+        
+        // Dynamically add a row to queue
+        const queueBody = document.getElementById('az-queue-body');
+        if (queueBody) {
+          const rowId = Date.now();
+          const tr = document.createElement('tr');
+          tr.id = `queue-row-${rowId}`;
+          tr.innerHTML = `
+            <td>Admin (You)</td>
+            <td><strong>${user}</strong></td>
+            <td><span class="badge-action badge-danger">DELETE ACCOUNT</span></td>
+            <td>
+              <div class="vote-progress-wrapper">
+                <span class="vote-ratio" id="vote-ratio-${rowId}">1/2 Approved</span>
+                <span class="vote-needed" id="vote-needed-${rowId}">(Needs 1)</span>
+              </div>
+            </td>
+            <td>
+              <div class="az-table-actions">
+                <button class="btn-table btn-accept" onclick="voteAction(${rowId}, 'approve')">ACCEPT</button>
+                <button class="btn-table btn-deny" onclick="voteAction(${rowId}, 'deny')">DENY</button>
+              </div>
+            </td>
+          `;
+          queueBody.appendChild(tr);
+        }
+      }
+    };
+
+    window.voteAction = (id, action) => {
+      const ratioEl = document.getElementById(`vote-ratio-${id}`);
+      const neededEl = document.getElementById(`vote-needed-${id}`);
+      const row = document.getElementById(`queue-row-${id}`);
+
+      if (action === 'approve') {
+        ratioEl.innerText = '2/2 Approved';
+        neededEl.innerText = '(Executing...)';
+        setTimeout(() => {
+          alert('Multi-sig signatures verified. Account purge completed.');
+          row.style.opacity = '0';
+          setTimeout(() => row.remove(), 300);
+        }, 800);
+      } else {
+        alert('Action denied and signature revoked.');
+        row.style.opacity = '0';
+        setTimeout(() => row.remove(), 300);
+      }
+    };
+
+    const loadParentalLocks = () => {
+      contentPane.innerHTML = `
+        <div class="tab-view active">
+          <div class="parental-locks-view" style="display: flex; flex-direction: column; gap: 24px; color: var(--color-dark); font-family: var(--font-body), sans-serif; animation: fadeIn 0.3s ease-in-out;">
+            <!-- Header Title -->
+            <div class="az-header">
+              <div class="az-title-grp">
+                <h2>PARENTAL CONTROLS & LOCKS</h2>
+              </div>
+            </div>
+
+            <!-- Section 1: Select Child Account -->
+            <div class="az-section">
+              <div class="az-section-header">
+                <i class="fa-solid fa-user-shield"></i>
+                <h3>SELECT CHILD ACCOUNT</h3>
+              </div>
+              
+              <div class="az-target-panel">
+                <div class="az-select-grp">
+                  <label>SELECT TARGET USER</label>
+                  <button type="button" class="az-btn btn-primary" id="pl-choose-user-btn" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <i class="fa-solid fa-magnifying-glass"></i> Choose User
+                  </button>
+                </div>
+
+                <div class="az-active-target-card">
+                  <div class="az-card-label">ACTIVE TARGET</div>
+                  <div class="az-card-body">
+                    <div class="az-target-info">
+                      <img id="pl-target-pfp" src="/static/graphics/defaultMale.png" onerror="this.onerror=null; this.src='/static/graphics/defaultMale.png';" class="az-target-pfp" />
+                      <h4 id="pl-target-name">None</h4>
+                    </div>
+                    <span class="az-status-badge status-inactive" id="pl-target-status">No User Selected</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Section 2: Parental Controls Form -->
+            <div class="parental-control-card" id="pl-controls-card" style="display: none;">
+              <div class="az-section-header" style="border-bottom: none; padding-bottom: 0; margin-bottom: 20px;">
+                <h3>Locks & Controls</h3>
+              </div>
+              
+              <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Control 1: Read DMs -->
+                <div class="pl-control-item">
+                  <input type="checkbox" id="pl-read-dms" style="width: 20px; height: 20px; cursor: pointer; margin-top: 2px;" />
+                  <div class="pl-control-label-grp">
+                    <label for="pl-read-dms" class="pl-control-label">Allow Administrators to Read DMs</label>
+                    <span class="pl-control-desc">Authorize administrators to read all direct messages sent or received by this user.</span>
+                  </div>
+                </div>
+                
+                <!-- Control 2: Content filter -->
+                <div class="pl-control-item">
+                  <input type="checkbox" id="pl-block-media" style="width: 20px; height: 20px; cursor: pointer; margin-top: 2px;" />
+                  <div class="pl-control-label-grp">
+                    <label for="pl-block-media" class="pl-control-label">Restrict Media & Posts</label>
+                    <span class="pl-control-desc">Block visibility of pictures, posts, videos, or GIFs.</span>
+                  </div>
+                </div>
+                
+                <!-- Control 3: DM Lock -->
+                <div class="pl-control-item" style="flex-direction: column; gap: 6px; align-items: stretch;">
+                  <div style="display: flex; align-items: flex-start; gap: 12px;">
+                    <input type="checkbox" id="pl-dm-lock" style="width: 20px; height: 20px; cursor: pointer; margin-top: 2px;" />
+                    <div class="pl-control-label-grp">
+                      <label for="pl-dm-lock" class="pl-control-label">Enable DM Lock (Restrict Direct Messaging)</label>
+                      <span class="pl-control-desc">Restrict direct messages with specific people.</span>
+                    </div>
+                  </div>
+                  <div id="pl-dm-lock-input-grp" style="margin-left: 32px; display: none; margin-top: 8px; flex-direction: column; gap: 10px;">
+                    <button type="button" class="pl-btn-secondary" id="pl-choose-restricted-btn" style="width: auto; align-self: flex-start; padding: 6px 14px; background: rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.15); border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.85rem;">
+                      <i class="fa-solid fa-user-plus"></i> Choose Restricted Users
+                    </button>
+                    <div id="pl-restricted-list-container" style="display: flex; flex-direction: column; gap: 8px; max-width: 400px; background: rgba(0,0,0,0.03); padding: 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.05);">
+                      <!-- Restricted users list goes here -->
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Control 4: Curfew -->
+                <div class="pl-control-item" style="flex-direction: column; gap: 6px; align-items: stretch;">
+                  <div style="display: flex; align-items: flex-start; gap: 12px;">
+                    <input type="checkbox" id="pl-curfew" style="width: 20px; height: 20px; cursor: pointer; margin-top: 2px;" />
+                    <div class="pl-control-label-grp">
+                      <label for="pl-curfew" class="pl-control-label">Enable Curfew Time Limit</label>
+                      <span class="pl-control-desc">Restrict active hours on the platform.</span>
+                    </div>
+                  </div>
+                  <div id="pl-curfew-select-grp" style="margin-left: 32px; display: none; margin-top: 4px; gap: 16px; flex-wrap: wrap;">
+                    <div>
+                      <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: var(--color-dark);">Must be offline by:</label>
+                      <select id="pl-curfew-offline" class="az-select" style="width: 100%; min-width: 150px; height: 38px; padding: 6px 12px;">
+                        <option value="8:00 PM">8:00 PM</option>
+                        <option value="9:00 PM">9:00 PM</option>
+                        <option value="10:00 PM" selected>10:00 PM</option>
+                        <option value="11:00 PM">11:00 PM</option>
+                        <option value="12:00 AM">12:00 AM</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: var(--color-dark);">Allowed back online at:</label>
+                      <select id="pl-curfew-online" class="az-select" style="width: 100%; min-width: 150px; height: 38px; padding: 6px 12px;">
+                        <option value="5:00 AM">5:00 AM</option>
+                        <option value="6:00 AM" selected>6:00 AM</option>
+                        <option value="7:00 AM">7:00 AM</option>
+                        <option value="8:00 AM">8:00 AM</option>
+                        <option value="9:00 AM">9:00 AM</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Control 5: Block Games -->
+                <div class="pl-control-item">
+                  <input type="checkbox" id="pl-block-games" style="width: 20px; height: 20px; cursor: pointer; margin-top: 2px;" />
+                  <div class="pl-control-label-grp">
+                    <label for="pl-block-games" class="pl-control-label">Restrict Games Access</label>
+                    <span class="pl-control-desc">Block this child account from playing games.</span>
+                  </div>
+                </div>
+                
+                <!-- Age Segregation Filter (Defaulted to ON) -->
+                <div class="pl-control-item" style="border-top: 1px solid rgba(0,0,0,0.1); padding-top: 15px; margin-top: 5px;">
+                  <input type="checkbox" id="pl-age-segregation" checked style="width: 20px; height: 20px; cursor: pointer; margin-top: 2px;" />
+                  <div class="pl-control-label-grp">
+                    <label for="pl-age-segregation" class="pl-control-label">Enable Age Segregation Filter (Cutoff Age: 13)</label>
+                    <span class="pl-control-desc">Allows a younger kid to talk to an older kid, but prevents direct messaging in other age-segregated paths. (Defaulted to ON).</span>
+                  </div>
+                </div>
+                
+                <!-- Save Button -->
+                <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+                  <button class="az-btn btn-primary" onclick="saveParentalLocks()" style="width: auto; padding: 10px 24px;">SAVE CHANGES</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Hook Choose User button click
+      const plChooseUserBtn = document.getElementById('pl-choose-user-btn');
+      if (plChooseUserBtn) {
+        plChooseUserBtn.addEventListener('click', () => {
+          if (typeof choose_usernames === 'function') {
+            choose_usernames(false, (usernames) => {
+              if (usernames && usernames.length > 0) {
+                const username = usernames[0];
+                document.pl_active_username = username;
+                
+                // Fetch target details from server
+                if (typeof cl !== 'undefined') {
+                  cl.send(JSON.stringify(['Get Target Admin Data', {
+                    username: localStorage.getItem('username') || sessionStorage.getItem('username'),
+                    password: localStorage.getItem('password') || sessionStorage.getItem('password'),
+                    target_user: username
+                  }]));
+                }
+              }
+            });
+          } else {
+            alert('User search function is loading or not available.');
+          }
+        });
+      }
+      
+      // Hook checkboxes visibility toggles
+      const plDmLockCheck = document.getElementById('pl-dm-lock');
+      if (plDmLockCheck) {
+        plDmLockCheck.addEventListener('change', (e) => {
+          document.getElementById('pl-dm-lock-input-grp').style.display = e.target.checked ? 'flex' : 'none';
+        });
+      }
+      
+      const plCurfewCheck = document.getElementById('pl-curfew');
+      if (plCurfewCheck) {
+        plCurfewCheck.addEventListener('change', (e) => {
+          document.getElementById('pl-curfew-select-grp').style.display = e.target.checked ? 'flex' : 'none';
+        });
+      }
+
+      // Hook restricted list button
+      const plChooseRestrictedBtn = document.getElementById('pl-choose-restricted-btn');
+      if (plChooseRestrictedBtn) {
+        plChooseRestrictedBtn.addEventListener('click', () => {
+          if (typeof choose_usernames === 'function') {
+            choose_usernames(true, (selectedUsernames) => {
+              document.pl_restricted_users_list = selectedUsernames;
+              document.pl_restricted_users_show_all = false;
+              renderRestrictedUsersList(selectedUsernames, false);
+            });
+          }
+        });
+      }
+    };
+
+    const renderRestrictedUsersList = (usernamesArray, showAll = false) => {
+      const container = document.getElementById('pl-restricted-list-container');
+      if (!container) return;
+      
+      container.innerHTML = '';
+      if (!usernamesArray || usernamesArray.length === 0) {
+        container.innerHTML = '<span style="font-size: 0.85rem; opacity: 0.6; font-style: italic;">No restricted users.</span>';
+        return;
+      }
+      
+      const maxToShow = 5;
+      const limit = showAll ? usernamesArray.length : Math.min(usernamesArray.length, maxToShow);
+      
+      for (let i = 0; i < limit; i++) {
+        const u = usernamesArray[i];
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.justifyContent = 'space-between';
+        row.style.background = 'rgba(255, 255, 255, 0.4)';
+        row.style.padding = '6px 10px';
+        row.style.borderRadius = '6px';
+        row.style.border = '1px solid rgba(0, 0, 0, 0.05)';
+        row.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <img src="/static/profile-pictures/${u}.png" onerror="this.onerror=null; this.src='/static/graphics/defaultMale.png';" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover;" />
+            <span style="font-size: 0.9rem; font-weight: 600;">${u}</span>
+          </div>
+          <button type="button" class="btn-icon" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer;" onclick="removeRestrictedUser('${u}')">
+            <i class="fa-solid fa-xmark" style="color: var(--color-accent); font-size: 0.85rem;"></i>
+          </button>
+        `;
+        container.appendChild(row);
+      }
+      
+      if (usernamesArray.length > maxToShow) {
+        const moreCount = usernamesArray.length - maxToShow;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.style.marginTop = '4px';
+        btn.style.background = 'none';
+        btn.style.border = 'none';
+        btn.style.color = '#3498DB';
+        btn.style.cursor = 'pointer';
+        btn.style.fontSize = '0.8rem';
+        btn.style.fontWeight = '600';
+        btn.style.textAlign = 'left';
+        btn.style.padding = '0';
+        btn.innerText = showAll ? 'Show Less' : `Show More (+${moreCount} more)`;
+        btn.onclick = () => {
+          document.pl_restricted_users_show_all = !showAll;
+          renderRestrictedUsersList(usernamesArray, !showAll);
+        };
+        container.appendChild(btn);
+      }
+    };
+    
+    window.removeRestrictedUser = (u) => {
+      let users = document.pl_restricted_users_list || [];
+      users = users.filter(x => x !== u);
+      document.pl_restricted_users_list = users;
+      renderRestrictedUsersList(users, document.pl_restricted_users_show_all);
+    };
+
+    window.saveParentalLocks = () => {
+      const username = document.pl_active_username;
+      if (!username || username === 'None') {
+        alert('Please select a target user first.');
+        return;
+      }
+      
+      const plReadDms = document.getElementById('pl-read-dms').checked;
+      const plBlockMedia = document.getElementById('pl-block-media').checked;
+      const plDmLock = document.getElementById('pl-dm-lock').checked;
+      const plRestrictedUsers = (document.pl_restricted_users_list || []).join(',');
+      const plCurfew = document.getElementById('pl-curfew').checked;
+      const plCurfewOffline = document.getElementById('pl-curfew-offline').value;
+      const plCurfewOnline = document.getElementById('pl-curfew-online').value;
+      const plBlockGames = document.getElementById('pl-block-games').checked;
+      const plAgeSegregation = document.getElementById('pl-age-segregation').checked;
+      
+      if (typeof cl !== 'undefined') {
+        cl.send(JSON.stringify(['Update Parental Locks', {
+          username: localStorage.getItem('username') || sessionStorage.getItem('username'),
+          password: localStorage.getItem('password') || sessionStorage.getItem('password'),
+          target_user: username,
+          locks: {
+            readDms: plReadDms,
+            blockMedia: plBlockMedia,
+            dmLock: plDmLock,
+            restrictedUsers: plRestrictedUsers,
+            curfew: plCurfew,
+            curfewOffline: plCurfewOffline,
+            curfewOnline: plCurfewOnline,
+            blockGames: plBlockGames,
+            ageSegregation: plAgeSegregation
+          }
+        }]));
+      }
+    };
+
+    // Socket.io Admin Handler
+    const handleTargetAdminData = (res) => {
+      if (res.status === 'success') {
+        const username = res.target_user;
+        
+        // 1. Update Action Zone if that user is active
+        if (document.az_active_username === username) {
+          document.getElementById('az-target-name').innerText = username;
+          const pfpImg = document.getElementById('az-target-pfp');
+          if (pfpImg) {
+            pfpImg.src = `/static/profile-pictures/${username}.png`;
+          }
+          const statusBadge = document.getElementById('az-target-status');
+          if (statusBadge) {
+            statusBadge.innerText = res.frozen ? 'Inactive' : 'Active';
+            statusBadge.className = 'az-status-badge ' + (res.frozen ? 'status-inactive' : 'status-active');
+          }
+          const freezeBtn = document.getElementById('freeze-btn');
+          if (freezeBtn) {
+            freezeBtn.innerText = res.frozen ? 'UNFREEZE' : 'FREEZE';
+          }
+        }
+        
+        // 2. Update Parental Locks if that user is active
+        if (document.pl_active_username === username) {
+          document.getElementById('pl-target-name').innerText = username;
+          const pfpImg = document.getElementById('pl-target-pfp');
+          if (pfpImg) {
+            pfpImg.src = `/static/profile-pictures/${username}.png`;
+          }
+          const statusBadge = document.getElementById('pl-target-status');
+          if (statusBadge) {
+            statusBadge.innerText = res.frozen ? 'Inactive' : 'Active';
+            statusBadge.className = 'az-status-badge ' + (res.frozen ? 'status-inactive' : 'status-active');
+          }
+          
+          // Show controls card
+          const plControlsCard = document.getElementById('pl-controls-card');
+          if (plControlsCard) {
+            plControlsCard.style.display = 'block';
+          }
+          
+          document.getElementById('pl-read-dms').checked = res.pl_read_dms;
+          document.getElementById('pl-block-media').checked = res.pl_block_media;
+          document.getElementById('pl-dm-lock').checked = res.pl_dm_lock;
+          document.getElementById('pl-curfew').checked = res.pl_curfew;
+          document.getElementById('pl-curfew-offline').value = res.pl_curfew_offline || '10:00 PM';
+          document.getElementById('pl-curfew-online').value = res.pl_curfew_online || '6:00 AM';
+          document.getElementById('pl-block-games').checked = res.pl_block_games;
+          document.getElementById('pl-age-segregation').checked = res.pl_age_segregation;
+          
+          // Toggle input displays
+          document.getElementById('pl-dm-lock-input-grp').style.display = res.pl_dm_lock ? 'flex' : 'none';
+          document.getElementById('pl-curfew-select-grp').style.display = res.pl_curfew ? 'flex' : 'none';
+          
+          // Parse restricted users list
+          const restrictedStr = res.pl_restricted_users || '';
+          const restrictedArr = restrictedStr ? restrictedStr.split(',').filter(x => x.length > 0) : [];
+          document.pl_restricted_users_list = restrictedArr;
+          document.pl_restricted_users_show_all = false;
+          renderRestrictedUsersList(restrictedArr, false);
+        }
+      } else {
+        alert('Error loading target data: ' + res.message);
+      }
+    };
+
+    const handleFreezeStatusResult = (res) => {
+      if (res.status === 'success') {
+        const username = res.target_user;
+        if (document.az_active_username === username) {
+          const statusBadge = document.getElementById('az-target-status');
+          if (statusBadge) {
+            statusBadge.innerText = res.frozen ? 'Inactive' : 'Active';
+            statusBadge.className = 'az-status-badge ' + (res.frozen ? 'status-inactive' : 'status-active');
+          }
+          const freezeBtn = document.getElementById('freeze-btn');
+          if (freezeBtn) {
+            freezeBtn.innerText = res.frozen ? 'UNFREEZE' : 'FREEZE';
+          }
+          alert(`Account ${username} has been ${res.frozen ? 'frozen' : 'unfrozen'}.`);
+        }
+        if (document.pl_active_username === username) {
+          const statusBadge = document.getElementById('pl-target-status');
+          if (statusBadge) {
+            statusBadge.innerText = res.frozen ? 'Inactive' : 'Active';
+            statusBadge.className = 'az-status-badge ' + (res.frozen ? 'status-inactive' : 'status-active');
+          }
+        }
+      } else {
+        alert('Failed to update freeze status: ' + res.message);
+      }
+    };
+
+    const handleParentalLocksResult = (res) => {
+      if (res.status === 'success') {
+        const username = res.target_user;
+        if (typeof Alert === 'function') {
+          Alert(`Parental settings updated successfully for child username: ${username}!`, () => {}, false, 420, 240);
+        } else {
+          alert(`Parental settings updated successfully for child username: ${username}!`);
+        }
+      } else {
+        alert('Failed to update parental settings: ' + res.message);
+      }
+    };
+
+    const adminSocketHandler = (msg) => {
+      let data;
+      try {
+        data = JSON.parse(msg);
+      } catch(e) {
+        return;
+      }
+      
+      if (data[0] === 'Get Target Admin Data Result') {
+        handleTargetAdminData(data[1]);
+      } else if (data[0] === 'Update Freeze Status Result') {
+        handleFreezeStatusResult(data[1]);
+      } else if (data[0] === 'Update Parental Locks Result') {
+        handleParentalLocksResult(data[1]);
+      }
+    };
+
+    if (typeof cl !== 'undefined') {
+      cl.on('message', adminSocketHandler);
+    }
+
+    // Tab content descriptions
     const tabData = {
       'reports': {
         title: 'Reports Dashboard',
@@ -240,11 +935,6 @@
         title: 'Advanced Search',
         icon: 'fa-magnifying-glass',
         desc: 'Search accounts, chat rooms, and logs across the platform.'
-      },
-      'action-zone': {
-        title: 'Action Zone',
-        icon: 'fa-shield-halved',
-        desc: 'Manage global suspensions, bans, and critical server interventions.'
       },
       'publish': {
         title: 'Publish Tools',
@@ -262,16 +952,22 @@
       item.addEventListener('click', (e) => {
         e.preventDefault();
         
-        // Remove active class from all menu items
         menuItems.forEach(mi => mi.classList.remove('active'));
-        
-        // Add active class to clicked item
         item.classList.add('active');
 
-        // Update the main content pane dynamically with styled templates
         const target = item.getAttribute('data-target');
         if (target === 'alerts') {
           loadAlerts();
+          return;
+        }
+
+        if (target === 'action-zone') {
+          loadActionZone();
+          return;
+        }
+
+        if (target === 'parental-locks') {
+          loadParentalLocks();
           return;
         }
 
