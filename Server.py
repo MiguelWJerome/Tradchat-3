@@ -3003,6 +3003,224 @@ def Recv(message, sid):
                 print(f"Search Usernames Error: {e}")
                 Server.send(str(['Search Usernames Results', {'status': 'error', 'message': 'Internal search error'}]), room=sid)
 
+    elif msg[0] == 'Admin Get User Conversations':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        target_user = data['target_user']
+
+        if check_credentials(username, password) and is_admin(username):
+            try:
+                # 1. Fetch DMs
+                dms = []
+                dms_res = db_sql("SELECT dms FROM accounts WHERE username = ?;", 'accounts', params=[target_user], chat_room=False)
+                target_id = find_account_id_or_password_or_gender(target_user, 'id')
+                if dms_res and dms_res[0][0]:
+                    dms_ids = split(dms_res[0][0])
+                    for dm in dms_ids:
+                        actual_dm_id = str(dm)
+                        if actual_dm_id.startswith('u'):
+                            actual_dm_id = actual_dm_id[1:]
+                        dm_info_row = db_sql("SELECT username, first_name, last_name FROM accounts WHERE id = ?;", 'accounts', params=[actual_dm_id], chat_room=False)
+                        if dm_info_row:
+                            dm_info = dm_info_row[0]
+                            dm_username = dm_info[0]
+                            dms.append({
+                                'username': dm_username,
+                                'display_name': f"with {dm_username} ({dm_info[1]} {dm_info[2]})",
+                                'room_id': f"{target_user}.$@-@&.{dm_username}"
+                            })
+
+                # 2. Fetch Rooms (Private rooms target is in, and all Public rooms)
+                private_rooms = []
+                public_rooms = []
+                all_rooms = db_sql("SELECT room_name, owners, managers, curators, members, emoji, room_type FROM rooms WHERE deleted = 0;", 'rooms', chat_room=False)
+                for room in all_rooms:
+                    room_name = room[0]
+                    owners = split(room[1])
+                    managers = split(room[2])
+                    curators = split(room[3])
+                    members = split(room[4])
+                    emoji = room[5]
+                    room_type = room[6]
+
+                    if room_type == 'public':
+                        public_rooms.append({
+                            'name': room_name,
+                            'emoji': emoji
+                        })
+                    else: # private
+                        all_members = owners + managers + curators + members
+                        if str(target_id) in all_members:
+                            private_rooms.append({
+                                'name': room_name,
+                                'emoji': emoji
+                            })
+
+                Server.send(str(['Admin Get User Conversations Result', {
+                    'status': 'success',
+                    'target_user': target_user,
+                    'dms': dms,
+                    'private_rooms': private_rooms,
+                    'public_rooms': public_rooms
+                }]), room=sid)
+            except Exception as e:
+                print(f"Admin Get User Conversations Error: {e}")
+                Server.send(str(['Admin Get User Conversations Result', {'status': 'error', 'message': str(e)}]), room=sid)
+
+    elif msg[0] == 'Admin Get Conversation Messages':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        target_user = data['target_user']
+        convo_type = data['convo_type']
+        target_id = data['target_id']
+        before_id = data.get('before_id')
+        filter_query = data.get('filter_query', '')
+
+        if check_credentials(username, password) and is_admin(username):
+            try:
+                messages = []
+                if convo_type == 'dm':
+                    user1_id = find_account_id_or_password_or_gender(target_user, 'id')
+                    user2_id = find_account_id_or_password_or_gender(target_id, 'id')
+                    convo_hash = f"{user1_id}-{user2_id}"
+                    anti_convo_hash = f"{user2_id}-{user1_id}"
+
+                    params = []
+                    query_parts = ["(convo_hash = ? OR convo_hash = ?)"]
+                    params.extend([convo_hash, anti_convo_hash])
+
+                    if before_id is not None:
+                        query_parts.append("id < ?")
+                        params.append(before_id)
+
+                    if filter_query:
+                        query_parts.append("LOWER(message) LIKE ?")
+                        params.append(f"%{filter_query.lower()}%")
+
+                    where_clause = " AND ".join(query_parts)
+
+                    sql = f"SELECT id, sender_id, message, timestamp, reply_id, upload, reactions, deleted FROM boys_dm WHERE {where_clause} ORDER BY id DESC LIMIT 100;"
+                    raw_messages = db_sql(sql, 'boys_dm', params=params, chat_room=False)
+                    if not raw_messages:
+                        sql = f"SELECT id, sender_id, message, timestamp, reply_id, upload, reactions, deleted FROM girls_dm WHERE {where_clause} ORDER BY id DESC LIMIT 100;"
+                        raw_messages = db_sql(sql, 'girls_dm', params=params, chat_room=False)
+
+                    if raw_messages:
+                        raw_messages.reverse()
+                    else:
+                        raw_messages = []
+
+                    for msg_row in raw_messages:
+                        sender_username = find_username_from_id(msg_row[1])
+                        if sender_username:
+                            pfp = f'/static/profile-pictures/{sender_username}.png'
+                            sender_info = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[sender_username], chat_room=False)
+                            sender_theme = sender_info[0][0] if sender_info else 'classic'
+                        else:
+                            sender_username = 'Unknown'
+                            pfp = '/static/graphics/defaultMale.png'
+                            sender_theme = 'classic'
+
+                        try:
+                            with open(f'static/themes/{sender_theme}/colors.txt', 'r') as theme_file:
+                                color_dict = eval(theme_file.read())
+                            color_light = color_dict.get('color_light', '#ffc67b')
+                            color_dark = color_dict.get('color_dark', '#7e0808')
+                        except:
+                            color_light = '#ffc67b'
+                            color_dark = '#7e0808'
+
+                        msg_text = msg_row[2]
+                        if msg_row[7]:
+                            msg_text = "(message has been deleted)"
+                        messages.append({
+                            'id': msg_row[0],
+                            'username': sender_username,
+                            'message': msg_text,
+                            'timestamp': msg_row[3],
+                            'upload': msg_row[5] if not msg_row[7] else "",
+                            'reactions': get_reactions_with_usernames(msg_row[6]),
+                            'deleted': msg_row[7],
+                            'avatar': pfp,
+                            'color_light': color_light,
+                            'color_dark': color_dark
+                        })
+
+                elif convo_type == 'room':
+                    params = []
+                    query_parts = []
+
+                    if before_id is not None:
+                        query_parts.append("id < ?")
+                        params.append(before_id)
+
+                    if filter_query:
+                        query_parts.append("LOWER(message) LIKE ?")
+                        params.append(f"%{filter_query.lower()}%")
+
+                    if query_parts:
+                        where_clause = "WHERE " + " AND ".join(query_parts)
+                    else:
+                        where_clause = ""
+
+                    sql = f"SELECT id, user_id, message, timestamp, reply_id, upload, reactions, deleted FROM messages {where_clause} ORDER BY id DESC LIMIT 100;"
+                    raw_messages = db_sql(sql, target_id, params=params, chat_room=True)
+                    if raw_messages:
+                        raw_messages.reverse()
+                    else:
+                        raw_messages = []
+
+                    for msg_row in raw_messages:
+                        sender_username = find_username_from_id(msg_row[1])
+                        if sender_username:
+                            pfp = f'/static/profile-pictures/{sender_username}.png'
+                            sender_info = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[sender_username], chat_room=False)
+                            sender_theme = sender_info[0][0] if sender_info else 'classic'
+                        else:
+                            sender_username = 'Unknown'
+                            pfp = '/static/graphics/defaultMale.png'
+                            sender_theme = 'classic'
+
+                        try:
+                            with open(f'static/themes/{sender_theme}/colors.txt', 'r') as theme_file:
+                                color_dict = eval(theme_file.read())
+                            color_light = color_dict.get('color_light', '#ffc67b')
+                            color_dark = color_dict.get('color_dark', '#7e0808')
+                        except:
+                            color_light = '#ffc67b'
+                            color_dark = '#7e0808'
+
+                        msg_text = msg_row[2]
+                        if msg_row[7]:
+                            msg_text = "(message has been deleted)"
+                        messages.append({
+                            'id': msg_row[0],
+                            'username': sender_username,
+                            'message': msg_text,
+                            'timestamp': msg_row[3],
+                            'upload': msg_row[5] if not msg_row[7] else "",
+                            'reactions': get_reactions_with_usernames(msg_row[6]),
+                            'deleted': msg_row[7],
+                            'avatar': pfp,
+                            'color_light': color_light,
+                            'color_dark': color_dark
+                        })
+
+                Server.send(str(['Admin Get Conversation Messages Result', {
+                    'status': 'success',
+                    'target_user': target_user,
+                    'convo_type': convo_type,
+                    'target_id': target_id,
+                    'before_id': before_id,
+                    'filter_query': filter_query,
+                    'messages': messages
+                }]), room=sid)
+            except Exception as e:
+                print(f"Admin Get Conversation Messages Error: {e}")
+                Server.send(str(['Admin Get Conversation Messages Result', {'status': 'error', 'message': str(e)}]), room=sid)
+
     elif msg[0] == 'Get Target Admin Data':
         data = msg[1]
         username = data['username']

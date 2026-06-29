@@ -978,10 +978,349 @@
                 handleGetGifKeywordsResult(payload);
             } else if (type === 'Update GIF Keywords Result') {
                 handleUpdateGifKeywordsResult(payload);
+            } else if (type === 'Search Usernames Results') {
+                handleSearchUsernamesResults(payload);
+            } else if (type === 'Admin Get User Conversations Result') {
+                handleAdminGetUserConversationsResult(payload);
+            } else if (type === 'Admin Get Conversation Messages Result') {
+                handleAdminGetConversationMessagesResult(payload);
             }
         };
 
         AdminNetwork.setupSocketListener(adminSocketHandler);
+
+        // --- Advanced Search State and Logic ---
+        let activeSearchUser = null;
+        let activeConvoType = 'dms';
+        let activeConversations = { dms: [], private_rooms: [], public_rooms: [] };
+        let activeChatTargetId = null;
+        let loadedMessages = [];
+
+        const loadSearch = () => {
+            const searchContainer = document.querySelector('.search-container');
+            if (searchContainer) searchContainer.style.display = 'none';
+
+            contentPane.innerHTML = `
+                <div class="tab-view active">
+                    <div class="advanced-search-view">
+                        <div class="advanced-search-layout-3box">
+                            <!-- Left Column (Box 1 and Box 2 stacked) -->
+                            <div class="left-column-container">
+                                <!-- Box 1: Select Target User -->
+                                <div class="search-box-panel select-user-box">
+                                    <h3 class="panel-header-title">Select Target User</h3>
+                                    <div class="user-search-wrapper">
+                                        <input type="text" id="adv-user-search-input" class="search-input-field" placeholder="Search accounts by username...">
+                                    </div>
+                                    <div class="user-list-scroll" id="adv-user-list">
+                                        <div class="adv-empty-state">Start typing to search users...</div>
+                                    </div>
+                                </div>
+
+                                <!-- Box 2: Select Conversation -->
+                                <div class="search-box-panel select-convo-box">
+                                    <h3 class="panel-header-title">Conversations</h3>
+                                    <div class="toggle-section-wrapper">
+                                        <div class="chat-type-tabs">
+                                            <button class="adv-tab-btn active" id="adv-tab-dms">Direct Messages</button>
+                                            <button class="adv-tab-btn" id="adv-tab-private-rooms">Private Rooms</button>
+                                            <button class="adv-tab-btn" id="adv-tab-public-rooms">Public Rooms</button>
+                                        </div>
+                                        <div class="chat-list-scroll" id="adv-chat-list">
+                                            <div class="adv-empty-state">Select a user to view conversations</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Box 3: Message History Log -->
+                            <div class="search-box-panel message-log-box">
+                                <div class="viewer-header">
+                                    <h3 class="panel-header-title" id="adv-chat-header-title">Message Log Viewer</h3>
+                                    <div class="viewer-header-meta" id="adv-chat-header-meta"></div>
+                                </div>
+                                <div class="message-log-scroll" id="adv-message-log">
+                                    <div class="placeholder-view">
+                                        <i class="fa-solid fa-folder-open"></i>
+                                        <h3>No Conversation Selected</h3>
+                                        <p>Choose a user, then pick a direct message or room to scroll through logs.</p>
+                                    </div>
+                                </div>
+                                <div class="viewer-footer-bar">
+                                    <div class="search-inside-chat">
+                                        <i class="fa-solid fa-magnifying-glass"></i>
+                                        <input type="text" id="adv-chat-filter-input" placeholder="Filter messages in this conversation...">
+                                    </div>
+                                    <button class="scroll-btn" id="adv-scroll-top-btn">Top ↑</button>
+                                    <button class="scroll-btn" id="adv-scroll-bottom-btn">Bottom ↓</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Bind Event Listeners
+            const searchInput = document.getElementById('adv-user-search-input');
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.trim();
+                cl.send(JSON.stringify(['Search Usernames', {
+                    username: localStorage.getItem('username') || sessionStorage.getItem('username'),
+                    password: localStorage.getItem('password') || sessionStorage.getItem('password'),
+                    query: query
+                }]));
+            });
+
+            document.getElementById('adv-tab-dms').addEventListener('click', () => switchAdvTab('dms'));
+            document.getElementById('adv-tab-private-rooms').addEventListener('click', () => switchAdvTab('private_rooms'));
+            document.getElementById('adv-tab-public-rooms').addEventListener('click', () => switchAdvTab('public_rooms'));
+            document.getElementById('adv-chat-filter-input').addEventListener('input', filterChatMessages);
+            const logContainer = document.getElementById('adv-message-log');
+            if (logContainer) logContainer.addEventListener('scroll', handleLogScroll);
+            
+            document.getElementById('adv-scroll-top-btn').addEventListener('click', () => {
+                const log = document.getElementById('adv-message-log');
+                if (log) log.scrollTop = 0;
+            });
+            document.getElementById('adv-scroll-bottom-btn').addEventListener('click', () => {
+                const log = document.getElementById('adv-message-log');
+                if (log) log.scrollTop = log.scrollHeight;
+            });
+
+            // Initial search load
+            cl.send(JSON.stringify(['Search Usernames', {
+                username: localStorage.getItem('username') || sessionStorage.getItem('username'),
+                password: localStorage.getItem('password') || sessionStorage.getItem('password'),
+                query: ''
+            }]));
+        };
+
+        const handleSearchUsernamesResults = (res) => {
+            const list = document.getElementById('adv-user-list');
+            if (!list) return;
+
+            list.innerHTML = '';
+            if (res.status === 'success' && res.results.length > 0) {
+                res.results.forEach(user => {
+                    const div = document.createElement('div');
+                    div.className = `adv-user-item ${activeSearchUser === user.username ? 'selected' : ''}`;
+                    div.onclick = () => selectAdvUser(user.username);
+                    div.innerHTML = `
+                        <div style="display: flex; align-items: center;">
+                            <img class="adv-user-avatar" src="${user.profile_picture}" onerror="this.onerror=null; this.src='/static/graphics/defaultMale.png';">
+                            <span style="font-weight: 600;">@${user.username}</span>
+                        </div>
+                        <span style="font-size: 0.8rem; opacity: 0.6;">➔</span>
+                    `;
+                    list.appendChild(div);
+                });
+            } else {
+                list.innerHTML = '<div class="adv-empty-state">No users found</div>';
+            }
+        };
+
+        const selectAdvUser = (username) => {
+            activeSearchUser = username;
+            
+            // Highlight selected user in list
+            document.querySelectorAll('.adv-user-item').forEach(el => {
+                if (el.innerText.includes(`@${username}`)) {
+                    el.classList.add('selected');
+                } else {
+                    el.classList.remove('selected');
+                }
+            });
+
+            // Loading conversations state
+            document.getElementById('adv-chat-list').innerHTML = '<div class="adv-empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading conversations...</div>';
+            
+            // Reset message view
+            document.getElementById('adv-message-log').innerHTML = `
+                <div class="placeholder-view">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <h3>@${username} Selected</h3>
+                    <p>Now select a DM or Room to read logs.</p>
+                </div>
+            `;
+            document.getElementById('adv-chat-header-title').innerHTML = 'Message Log Viewer';
+            document.getElementById('adv-chat-header-meta').innerText = '';
+            activeChatTargetId = null;
+
+            // Trigger socket request
+            AdminNetwork.emitAdminGetUserConversations(username);
+        };
+
+        const handleAdminGetUserConversationsResult = (res) => {
+            if (res.status === 'success' && res.target_user === activeSearchUser) {
+                activeConversations = {
+                    dms: res.dms || [],
+                    private_rooms: res.private_rooms || [],
+                    public_rooms: res.public_rooms || []
+                };
+                renderAdvChats();
+            } else if (res.status === 'error') {
+                document.getElementById('adv-chat-list').innerHTML = `<div class="adv-empty-state">Error: ${res.message}</div>`;
+            }
+        };
+
+        const switchAdvTab = (tab) => {
+            activeConvoType = tab;
+            document.getElementById('adv-tab-dms').className = tab === 'dms' ? 'adv-tab-btn active' : 'adv-tab-btn';
+            document.getElementById('adv-tab-private-rooms').className = tab === 'private_rooms' ? 'adv-tab-btn active' : 'adv-tab-btn';
+            document.getElementById('adv-tab-public-rooms').className = tab === 'public_rooms' ? 'adv-tab-btn active' : 'adv-tab-btn';
+            renderAdvChats();
+        };
+
+        const renderAdvChats = () => {
+            const list = document.getElementById('adv-chat-list');
+            if (!list) return;
+
+            list.innerHTML = '';
+            const chats = activeConvoType === 'dms' ? activeConversations.dms :
+                          (activeConvoType === 'private_rooms' ? activeConversations.private_rooms : activeConversations.public_rooms);
+
+            if (chats.length === 0) {
+                list.innerHTML = `<div class="adv-empty-state">No ${activeConvoType.replace('_', ' ')} found</div>`;
+                return;
+            }
+
+            chats.forEach(chat => {
+                const div = document.createElement('div');
+                const chatId = activeConvoType === 'dms' ? chat.username : chat.name;
+                div.className = `adv-chat-item ${activeChatTargetId === chatId ? 'selected' : ''}`;
+                div.onclick = () => selectAdvChat(chatId, activeConvoType === 'dms' ? `@${chat.username}` : chat.name);
+                
+                if (activeConvoType === 'dms') {
+                    div.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <img class="adv-user-avatar" src="/static/profile-pictures/${chat.username}.png" onerror="this.onerror=null; this.src='/static/graphics/defaultMale.png';" style="width: 24px; height: 24px; margin-right: 0;">
+                            <span style="font-weight: 600;">@${chat.username}</span>
+                        </div>
+                    `;
+                } else {
+                    const title = `${chat.emoji || '📁'} ${chat.name}`;
+                    div.innerHTML = `
+                        <span>${title}</span>
+                        <span class="adv-chat-badge">${activeConvoType === 'private_rooms' ? 'Private' : 'Public'}</span>
+                    `;
+                }
+                list.appendChild(div);
+            });
+        };
+
+        const selectAdvChat = (chatId, displayName) => {
+            activeChatTargetId = chatId;
+            renderAdvChats();
+
+            const isDm = activeConvoType === 'dms';
+            const headerIcon = isDm ? '💬' : '📁';
+
+            document.getElementById('adv-message-log').innerHTML = '<div class="adv-empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Fetching logs...</div>';
+            document.getElementById('adv-chat-header-title').innerHTML = `<span>${headerIcon} <strong>${displayName}</strong></span>`;
+            document.getElementById('adv-chat-header-meta').innerHTML = `Filtering: <span class="badge-user">@${activeSearchUser}</span>`;
+
+            // If public or private room, pass 'room' to backend convo_type
+            const backendType = isDm ? 'dm' : 'room';
+            AdminNetwork.emitAdminGetConversationMessages(activeSearchUser, backendType, chatId);
+        };
+
+        let isFetchingOlder = false;
+        let filterTimeout = null;
+
+        const handleLogScroll = (e) => {
+            const log = e.target;
+            // Fetch older messages when scrolling to top
+            if (log.scrollTop === 0 && !isFetchingOlder && loadedMessages.length > 0 && activeChatTargetId) {
+                const oldestMsg = loadedMessages[0];
+                if (oldestMsg && oldestMsg.id) {
+                    isFetchingOlder = true;
+                    const backendType = activeConvoType === 'dms' ? 'dm' : 'room';
+                    const query = document.getElementById('adv-chat-filter-input').value.trim();
+                    AdminNetwork.emitAdminGetConversationMessages(activeSearchUser, backendType, activeChatTargetId, oldestMsg.id, query);
+                }
+            }
+        };
+
+        const handleAdminGetConversationMessagesResult = (res) => {
+            const isResponseDm = res.convo_type === 'dm';
+            const isCurrentDm = activeConvoType === 'dms';
+            const isTypeMatch = (isResponseDm && isCurrentDm) || (!isResponseDm && !isCurrentDm);
+
+            if (res.status === 'success' && res.target_user === activeSearchUser && isTypeMatch && res.target_id === activeChatTargetId) {
+                const container = document.getElementById('adv-message-log');
+                if (!container) return;
+
+                const newMessages = res.messages || [];
+                
+                if (res.before_id !== null && res.before_id !== undefined) {
+                    isFetchingOlder = false;
+                    if (newMessages.length === 0) return; // No more older messages
+
+                    const oldScrollHeight = container.scrollHeight;
+                    loadedMessages = newMessages.concat(loadedMessages);
+                    renderAdvMessages(false);
+                    container.scrollTop = container.scrollHeight - oldScrollHeight;
+                } else {
+                    loadedMessages = newMessages;
+                    renderAdvMessages(true);
+                }
+            } else if (res.status === 'error') {
+                document.getElementById('adv-message-log').innerHTML = `<div class="adv-empty-state">Error: ${res.message}</div>`;
+                isFetchingOlder = false;
+            }
+        };
+
+        const renderAdvMessages = (shouldScrollToBottom = true) => {
+            const container = document.getElementById('adv-message-log');
+            if (!container) return;
+
+            container.innerHTML = '';
+            if (loadedMessages.length === 0) {
+                container.innerHTML = '<div class="adv-empty-state">No messages recorded in this chat</div>';
+                return;
+            }
+
+            loadedMessages.forEach(msg => {
+                const messageEl = document.createElement('div');
+                const isFromTarget = msg.username === activeSearchUser;
+                messageEl.className = `message ${isFromTarget ? 'own' : ''}`;
+                
+                const colorLight = msg.color_light || '#ffc67b';
+                const colorDark = msg.color_dark || '#7e0808';
+                
+                const bubbleStyle = isFromTarget 
+                    ? `background: ${colorLight}; border-color: ${colorDark};` 
+                    : `background: #ffffff; border-color: #000000;`;
+
+                messageEl.innerHTML = `
+                    <img class="message__avatar" src="${msg.avatar}" onerror="this.onerror=null; this.src='/static/graphics/defaultMale.png';">
+                    <div class="message__content">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-direction: ${isFromTarget ? 'row-reverse' : 'row'};">
+                            <span class="message__name">${msg.username}</span>
+                            <span style="font-size: 0.72rem; opacity: 0.6; color: #000000;">${msg.timestamp}</span>
+                        </div>
+                        <div class="message__bubble" style="${bubbleStyle}">
+                            <div class="message__text">${msg.message}</div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(messageEl);
+            });
+
+            if (shouldScrollToBottom) {
+                container.scrollTop = container.scrollHeight;
+            }
+        };
+
+        const filterChatMessages = () => {
+            clearTimeout(filterTimeout);
+            filterTimeout = setTimeout(() => {
+                if (!activeChatTargetId) return;
+                const query = document.getElementById('adv-chat-filter-input').value.trim();
+                const backendType = activeConvoType === 'dms' ? 'dm' : 'room';
+                AdminNetwork.emitAdminGetConversationMessages(activeSearchUser, backendType, activeChatTargetId, null, query);
+            }, 350);
+        };
 
         // Tab content descriptions
         const tabData = {
@@ -1046,6 +1385,11 @@
 
                 if (target === 'gif-approval') {
                     loadGifApproval();
+                    return;
+                }
+
+                if (target === 'search') {
+                    loadSearch();
                     return;
                 }
 

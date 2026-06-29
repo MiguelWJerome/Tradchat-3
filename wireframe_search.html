@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Advanced Search — Wireframe</title>
+  <style>
+    /* Reset & Base System (Skeleton Black and White Wireframe Style) */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: #f0f0f0;
+      color: #000000;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    h1, h2, h3, p {
+      margin-bottom: 8px;
+    }
+
+    .wireframe-header {
+      width: 100%;
+      max-width: 1200px;
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    .wireframe-header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .wireframe-header p {
+      font-size: 14px;
+      color: #666;
+    }
+
+    /* Outer Wrapper Mimicking the Admin Interface Layout */
+    .admin-mock-layout {
+      display: flex;
+      width: 100%;
+      max-width: 1200px;
+      height: 650px; /* Constrained height to simulate small box challenge */
+      background: #ffffff;
+      border: 3px solid #000000;
+      border-radius: 12px;
+      box-shadow: 8px 8px 0px #000000;
+      overflow: hidden;
+    }
+
+    /* Sidebar Mimicking the original admin layout */
+    .admin-mock-sidebar {
+      width: 240px;
+      border-right: 3px solid #000000;
+      background: #fdfdfd;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .mock-logo {
+      font-weight: 800;
+      font-size: 20px;
+      border: 2px solid #000000;
+      padding: 8px;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+    }
+
+    .sidebar-section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .sidebar-menu {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .sidebar-item {
+      padding: 10px 12px;
+      border: 2px solid transparent;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      background: #f9f9f9;
+      color: #666;
+    }
+
+    .sidebar-item.active {
+      border-color: #000000;
+      background: #000000;
+      color: #ffffff;
+      font-weight: bold;
+    }
+
+    /* Main Right Content Area */
+    .admin-mock-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      height: 100%;
+      min-width: 0; /* Prevents overflow */
+    }
+
+    /* Top Search Bar of Context Box */
+    .mock-top-search {
+      display: flex;
+      align-items: center;
+      border: 2px solid #000000;
+      border-radius: 8px;
+      padding: 10px 15px;
+      margin-bottom: 15px;
+      background: #fcfcfc;
+    }
+
+    .mock-top-search span {
+      margin-right: 10px;
+      font-weight: bold;
+    }
+
+    .mock-top-search input {
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 14px;
+      width: 100%;
+    }
+
+    /* The Main Context Container holding the Advanced Search Layout */
+    .advanced-search-container {
+      flex: 1;
+      display: flex;
+      border: 2px solid #000000;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #ffffff;
+      min-height: 0; /* Crucial for internal scrolling */
+    }
+
+    /* LEFT PANELS: Target User Selection & Options (Width: 40%) */
+    .search-nav-panel {
+      width: 40%;
+      border-right: 2px solid #000000;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    /* Step 1: User selector search field */
+    .user-search-wrapper {
+      padding: 12px;
+      border-bottom: 2px dashed #000000;
+      background: #fafafa;
+    }
+
+    .label-header {
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+      color: #000000;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .step-badge {
+      background: #000000;
+      color: #ffffff;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 9px;
+    }
+
+    .input-skeleton {
+      width: 100%;
+      padding: 8px;
+      border: 2px solid #000000;
+      border-radius: 4px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    /* Scrollable Users list */
+    .user-list-scroll {
+      flex: 1;
+      overflow-y: auto;
+      border-bottom: 2px solid #000000;
+    }
+
+    .user-item {
+      padding: 10px 12px;
+      border-bottom: 1px dashed #cccccc;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+
+    .user-item:hover {
+      background: #f0f0f0;
+    }
+
+    .user-item.selected {
+      background: #e0e0e0;
+      font-weight: bold;
+      border-left: 4px solid #000000;
+    }
+
+    .user-avatar-skeleton {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1.5px solid #000000;
+      display: inline-block;
+      margin-right: 8px;
+      background: #fff;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+    }
+
+    .user-username {
+      font-weight: 600;
+    }
+
+    /* Tabs for toggle: DMs vs Rooms */
+    .toggle-section-wrapper {
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      flex: 1.2; /* relative height */
+    }
+
+    .chat-type-tabs {
+      display: flex;
+      border-bottom: 2px solid #000000;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      background: #ffffff;
+      font-weight: bold;
+      font-size: 12px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .tab-btn:not(:last-child) {
+      border-right: 2px solid #000000;
+    }
+
+    .tab-btn.active {
+      background: #000000;
+      color: #ffffff;
+    }
+
+    /* Scrollable DMs/Rooms list */
+    .chat-list-scroll {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .chat-item {
+      padding: 10px 12px;
+      border-bottom: 1px dashed #cccccc;
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chat-item:hover {
+      background: #f0f0f0;
+    }
+
+    .chat-item.selected {
+      background: #000000;
+      color: #ffffff;
+      font-weight: bold;
+    }
+
+    .chat-badge {
+      font-size: 10px;
+      border: 1px solid #000000;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #fff;
+      color: #000;
+    }
+
+    .chat-item.selected .chat-badge {
+      border-color: #fff;
+      background: #000;
+      color: #fff;
+    }
+
+    .empty-state-text {
+      padding: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: #777;
+      font-style: italic;
+    }
+
+    /* RIGHT PANEL: The Message Scroller Panel (Width: 60%) */
+    .message-viewer-panel {
+      width: 60%;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: #ffffff;
+    }
+
+    .viewer-header {
+      padding: 12px 16px;
+      border-bottom: 2px solid #000000;
+      background: #fafafa;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .viewer-header-title {
+      font-size: 14px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .viewer-header-meta {
+      font-size: 11px;
+      color: #666;
+      border: 1px solid #666;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* Messages Log Panel */
+    .message-log-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Message Item block */
+    .message-bubble {
+      display: flex;
+      flex-direction: column;
+      border: 2px solid #000000;
+      border-radius: 8px;
+      padding: 10px;
+      max-width: 90%;
+      background: #ffffff;
+    }
+
+    .message-bubble.incoming {
+      align-self: flex-start;
+      border-top-left-radius: 0;
+    }
+
+    .message-bubble.outgoing {
+      align-self: flex-end;
+      border-top-right-radius: 0;
+      background: #f5f5f5;
+    }
+
+    .message-bubble.target-highlight {
+      border: 3px solid #000000;
+      box-shadow: 3px 3px 0px #000000;
+    }
+
+    .msg-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: bold;
+      margin-bottom: 4px;
+      border-bottom: 1px dashed #ccc;
+      padding-bottom: 2px;
+    }
+
+    .msg-sender {
+      color: #000;
+    }
+
+    .msg-time {
+      color: #666;
+    }
+
+    .msg-body {
+      font-size: 13px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Bottom Control Bar in viewer (Filters / Actions) */
+    .viewer-footer-bar {
+      padding: 10px 16px;
+      border-top: 2px solid #000000;
+      background: #fafafa;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .search-inside-chat {
+      flex: 1;
+      display: flex;
+      border: 1.5px solid #000;
+      border-radius: 4px;
+      padding: 4px 8px;
+      background: #fff;
+    }
+
+    .search-inside-chat input {
+      border: none;
+      outline: none;
+      font-size: 11px;
+      width: 100%;
+    }
+
+    .footer-action-btn {
+      padding: 6px 12px;
+      border: 2px solid #000000;
+      background: #ffffff;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .footer-action-btn:hover {
+      background: #000000;
+      color: #ffffff;
+    }
+
+    /* Helper Utilities */
+    .badge-user {
+      background: #000;
+      color: #fff;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 9px;
+    }
+
+    /* Responsive warning */
+    .responsive-hint {
+      margin-top: 15px;
+      font-size: 12px;
+      text-align: center;
+      color: #888;
+      max-width: 1200px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="wireframe-header">
+    <h1>Advanced Search Skeleton Wireframe</h1>
+    <p>This dummy HTML page presents a clean black-and-white visual structure of the advanced search feature fitting inside the main content box. Open this file in your browser to test interactions.</p>
+  </div>
+
+  <div class="admin-mock-layout">
+    
+    <!-- Left Sidebar (Mimics admin.html sidebar layout) -->
+    <aside class="admin-mock-sidebar">
+      <div class="mock-logo">TradChat</div>
+      
+      <div>
+        <div class="sidebar-section-title">Radar</div>
+        <ul class="sidebar-menu">
+          <li class="sidebar-item">Reports</li>
+          <li class="sidebar-item">Alerts</li>
+          <li class="sidebar-item active">Search</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="sidebar-section-title">Control</div>
+        <ul class="sidebar-menu">
+          <li class="sidebar-item">Action Zone</li>
+          <li class="sidebar-item">Publish</li>
+          <li class="sidebar-item">Parental Locks</li>
+          <li class="sidebar-item">GIF Approval</li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="admin-mock-content">
+      
+      <!-- Top Search Container -->
+      <div class="mock-top-search">
+        <span>🔍</span>
+        <input type="text" placeholder="Global admin search..." disabled>
+      </div>
+
+      <!-- Advanced Search Main Container (Fits context box completely) -->
+      <div class="advanced-search-container">
+        
+        <!-- Left Selection columns -->
+        <div class="search-nav-panel">
+          
+          <!-- Step 1: User selector search field -->
+          <div class="user-search-wrapper">
+            <div class="label-header">
+              <span>Select Target User</span>
+              <span class="step-badge">Step 1</span>
+            </div>
+            <input type="text" id="user-search-input" class="input-skeleton" placeholder="Search accounts by username...">
+          </div>
+
+          <!-- Scrollable Users list -->
+          <div class="user-list-scroll" id="user-list">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Step 2: Toggle & List DMs/Rooms for selected user -->
+          <div class="toggle-section-wrapper">
+            <div class="chat-type-tabs">
+              <button class="tab-btn active" id="tab-dms" onclick="switchTab('dms')">Direct Messages</button>
+              <button class="tab-btn" id="tab-rooms" onclick="switchTab('rooms')">Rooms</button>
+            </div>
+
+            <!-- Scrollable Chats/Rooms List -->
+            <div class="chat-list-scroll" id="chat-list">
+              <div class="empty-state-text">Select a user above to see chats</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right messages scroller pane -->
+        <div class="message-viewer-panel">
+          
+          <!-- Selected chat details header -->
+          <div class="viewer-header">
+            <div class="viewer-header-title" id="chat-header-title">
+              <span>💬 Message Log Viewer</span>
+            </div>
+            <div class="viewer-header-meta" id="chat-header-meta">
+              No chat selected
+            </div>
+          </div>
+
+          <!-- Scrollable message board -->
+          <div class="message-log-scroll" id="message-log">
+            <div class="placeholder-view" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #888; text-align: center;">
+              <span>🗂️</span>
+              <h3 style="margin-top: 10px; font-size: 16px;">No Conversation Selected</h3>
+              <p style="font-size: 12px; max-width: 250px; margin: 8px auto 0;">Choose a user, then pick a direct message or room to scroll through logs.</p>
+            </div>
+          </div>
+
+          <!-- Footer Actions inside viewer -->
+          <div class="viewer-footer-bar">
+            <div class="search-inside-chat">
+              <input type="text" id="chat-filter-input" placeholder="Filter messages in this conversation..." oninput="filterMessages()">
+            </div>
+            <button class="footer-action-btn" onclick="scrollToTop()">Top ↑</button>
+            <button class="footer-action-btn" onclick="scrollToBottom()">Bottom ↓</button>
+          </div>
+
+        </div>
+
+      </div>
+
+    </main>
+
+  </div>
+
+  <div class="responsive-hint">
+    💡 <strong>Design notes:</strong> Three distinct scrollable regions are nested inside the context box. The left navigation splits the space between searching the user (Step 1) and listing the conversation options (Step 2) vertically. The right 60% of the box is dedicated to a spacious message view, avoiding overlap or extra screens.
+  </div>
+
+  <script>
+    // Dummy Data to test interactions
+    const users = [
+      { id: 1, username: "john_doe", realname: "John Doe" },
+      { id: 2, username: "alice_williams", realname: "Alice Williams" },
+      { id: 3, username: "michael_smith", realname: "Michael Smith" },
+      { id: 4, username: "sara_connor", realname: "Sara Connor" },
+      { id: 5, username: "david_miller", realname: "David Miller" },
+    ];
+
+    const chatsData = {
+      // User 1: john_doe
+      1: {
+        dms: [
+          { id: "dm-john-alice", name: "with alice_williams", targetUser: "alice_williams" },
+          { id: "dm-john-michael", name: "with michael_smith", targetUser: "michael_smith" }
+        ],
+        rooms: [
+          { id: "room-lobby", name: "Lobby Chatroom" },
+          { id: "room-trading", name: "Trading Signals" }
+        ]
+      },
+      // User 2: alice_williams
+      2: {
+        dms: [
+          { id: "dm-john-alice", name: "with john_doe", targetUser: "john_doe" },
+          { id: "dm-alice-sara", name: "with sara_connor", targetUser: "sara_connor" }
+        ],
+        rooms: [
+          { id: "room-lobby", name: "Lobby Chatroom" },
+          { id: "room-support", name: "Customer Support" }
+        ]
+      },
+      // User 3: michael_smith
+      3: {
+        dms: [
+          { id: "dm-john-michael", name: "with john_doe", targetUser: "john_doe" }
+        ],
+        rooms: [
+          { id: "room-trading", name: "Trading Signals" },
+          { id: "room-support", name: "Customer Support" }
+        ]
+      },
+      // User 4: sara_connor
+      4: {
+        dms: [
+          { id: "dm-alice-sara", name: "with alice_williams", targetUser: "alice_williams" }
+        ],
+        rooms: [
+          { id: "room-lobby", name: "Lobby Chatroom" }
+        ]
+      },
+      // User 5: david_miller
+      5: {
+        dms: [],
+        rooms: [
+          { id: "room-lobby", name: "Lobby Chatroom" }
+        ]
+      }
+    };
+
+    const messagesData = {
+      // DMs
+      "dm-john-alice": [
+        { sender: "john_doe", text: "Hey Alice, did you see the new trading parameters?", time: "10:15 AM", isTarget: true },
+        { sender: "alice_williams", text: "Yes, I was just looking at them. They look stable.", time: "10:17 AM", isTarget: false },
+        { sender: "john_doe", text: "Awesome. Let's make sure we log the trades accordingly.", time: "10:18 AM", isTarget: true },
+        { sender: "alice_williams", text: "Will do. Let me know if you need anything else.", time: "10:20 AM", isTarget: false },
+      ],
+      "dm-john-michael": [
+        { sender: "john_doe", text: "Hi Michael, are we ready for the afternoon session?", time: "11:02 AM", isTarget: true },
+        { sender: "michael_smith", text: "Almost, just finishing up the report database migration.", time: "11:05 AM", isTarget: false },
+        { sender: "john_doe", text: "Perfect. Do not forget to backup the temp tables first.", time: "11:06 AM", isTarget: true },
+      ],
+      "dm-alice-sara": [
+        { sender: "alice_williams", text: "Hey Sara, did we approve the recent GIF packages?", time: "09:30 AM", isTarget: true },
+        { sender: "sara_connor", text: "Not yet, they are still pending in the GIF approval tab.", time: "09:32 AM", isTarget: false },
+      ],
+      // Rooms
+      "room-lobby": [
+        { sender: "david_miller", text: "Welcome everyone to TradChat 3!", time: "08:00 AM", isTarget: false },
+        { sender: "john_doe", text: "Morning folks!", time: "08:15 AM", isTarget: true },
+        { sender: "alice_williams", text: "Good morning! Excited to trade today.", time: "08:17 AM", isTarget: false },
+        { sender: "sara_connor", text: "Hello! Has anyone checked the daily news feed?", time: "08:22 AM", isTarget: false },
+      ],
+      "room-trading": [
+        { sender: "michael_smith", text: "ALERT: High volatility expected in 10 minutes.", time: "10:00 AM", isTarget: false },
+        { sender: "john_doe", text: "Copy that. Lowering leverage size.", time: "10:01 AM", isTarget: true },
+      ],
+      "room-support": [
+        { sender: "alice_williams", text: "User #459 is reporting a socket disconnection error.", time: "11:15 AM", isTarget: true },
+        { sender: "michael_smith", text: "I am checking the server logs now.", time: "11:17 AM", isTarget: false },
+      ]
+    };
+
+    let selectedUserId = null;
+    let currentTab = 'dms'; // 'dms' or 'rooms'
+    let selectedChatId = null;
+
+    // Initialize Page
+    document.addEventListener("DOMContentLoaded", () => {
+      renderUserList(users);
+
+      // Search user input listener
+      document.getElementById("user-search-input").addEventListener("input", (e) => {
+        const query = e.target.value.toLowerCase();
+        const filtered = users.filter(u => 
+          u.username.toLowerCase().includes(query) || 
+          u.realname.toLowerCase().includes(query)
+        );
+        renderUserList(filtered);
+      });
+    });
+
+    function renderUserList(userArray) {
+      const container = document.getElementById("user-list");
+      container.innerHTML = "";
+
+      if (userArray.length === 0) {
+        container.innerHTML = `<div class="empty-state-text">No users found</div>`;
+        return;
+      }
+
+      userArray.forEach(user => {
+        const div = document.createElement("div");
+        div.className = `user-item ${selectedUserId === user.id ? 'selected' : ''}`;
+        div.onclick = () => selectUser(user.id);
+
+        div.innerHTML = `
+          <div class="user-info">
+            <span class="user-avatar-skeleton"></span>
+            <div>
+              <span class="user-username">@${user.username}</span>
+              <div style="font-size: 10px; color: #666;">${user.realname}</div>
+            </div>
+          </div>
+          <span style="font-size: 11px; font-weight: bold;">➔</span>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function selectUser(userId) {
+      selectedUserId = userId;
+      // Re-render user list to update highlight
+      const query = document.getElementById("user-search-input").value;
+      const filtered = users.filter(u => 
+        u.username.toLowerCase().includes(query) || 
+        u.realname.toLowerCase().includes(query)
+      );
+      renderUserList(filtered);
+
+      // Update chats list
+      renderChatsList();
+
+      // Reset viewer
+      document.getElementById("message-log").innerHTML = `
+        <div class="placeholder-view" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #888; text-align: center;">
+          <span>💬</span>
+          <h3 style="margin-top: 10px; font-size: 16px;">User Selected</h3>
+          <p style="font-size: 12px; max-width: 250px; margin: 8px auto 0;">Now choose one of their Direct Messages or Rooms on the left.</p>
+        </div>
+      `;
+      document.getElementById("chat-header-title").innerHTML = `<span>💬 Message Log Viewer</span>`;
+      document.getElementById("chat-header-meta").innerText = "No chat selected";
+      selectedChatId = null;
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById("tab-dms").className = tab === 'dms' ? 'tab-btn active' : 'tab-btn';
+      document.getElementById("tab-rooms").className = tab === 'rooms' ? 'tab-btn active' : 'tab-btn';
+      renderChatsList();
+    }
+
+    function renderChatsList() {
+      const container = document.getElementById("chat-list");
+      container.innerHTML = "";
+
+      if (!selectedUserId) {
+        container.innerHTML = `<div class="empty-state-text">Select a user above to see chats</div>`;
+        return;
+      }
+
+      const userChats = chatsData[selectedUserId] || { dms: [], rooms: [] };
+      const list = currentTab === 'dms' ? userChats.dms : userChats.rooms;
+
+      if (list.length === 0) {
+        container.innerHTML = `<div class="empty-state-text">No active ${currentTab === 'dms' ? 'direct messages' : 'rooms'} found</div>`;
+        return;
+      }
+
+      list.forEach(chat => {
+        const div = document.createElement("div");
+        div.className = `chat-item ${selectedChatId === chat.id ? 'selected' : ''}`;
+        div.onclick = () => selectChat(chat.id, chat.name);
+
+        const typeBadge = currentTab === 'dms' ? 'DM' : 'Room';
+        div.innerHTML = `
+          <span>${chat.name}</span>
+          <span class="chat-badge">${typeBadge}</span>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function selectChat(chatId, chatName) {
+      selectedChatId = chatId;
+      renderChatsList();
+
+      // Render messages
+      const msgs = messagesData[chatId] || [];
+      const logContainer = document.getElementById("message-log");
+      logContainer.innerHTML = "";
+
+      // Header details
+      const selectedUserObj = users.find(u => u.id === selectedUserId);
+      document.getElementById("chat-header-title").innerHTML = `
+        <span>📂 <strong>${chatName}</strong></span>
+      `;
+      document.getElementById("chat-header-meta").innerHTML = `
+        Filtering: <span class="badge-user">@${selectedUserObj.username}</span>
+      `;
+
+      if (msgs.length === 0) {
+        logContainer.innerHTML = `<div class="empty-state-text">No messages recorded in this chat.</div>`;
+        return;
+      }
+
+      msgs.forEach(msg => {
+        const bubble = document.createElement("div");
+        // Check if message belongs to the user we searched for
+        const isFromTargetUser = msg.sender === selectedUserObj.username;
+        bubble.className = `message-bubble ${isFromTargetUser ? 'outgoing target-highlight' : 'incoming'}`;
+        
+        bubble.innerHTML = `
+          <div class="msg-meta">
+            <span class="msg-sender">${isFromTargetUser ? `★ @${msg.sender} (Target)` : `@${msg.sender}`}</span>
+            <span class="msg-time">${msg.time}</span>
+          </div>
+          <div class="msg-body">${msg.text}</div>
+        `;
+        logContainer.appendChild(bubble);
+      });
+
+      // Scroll to bottom
+      scrollToBottom();
+    }
+
+    function filterMessages() {
+      if (!selectedChatId) return;
+      const query = document.getElementById("chat-filter-input").value.toLowerCase();
+      const bubbles = document.querySelectorAll("#message-log .message-bubble");
+      
+      bubbles.forEach(bubble => {
+        const text = bubble.querySelector(".msg-body").innerText.toLowerCase();
+        const sender = bubble.querySelector(".msg-sender").innerText.toLowerCase();
+        if (text.includes(query) || sender.includes(query)) {
+          bubble.style.display = "flex";
+        } else {
+          bubble.style.display = "none";
+        }
+      });
+    }
+
+    function scrollToBottom() {
+      const log = document.getElementById("message-log");
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function scrollToTop() {
+      const log = document.getElementById("message-log");
+      log.scrollTop = 0;
+    }
+  </script>
+
+</body>
+</html>

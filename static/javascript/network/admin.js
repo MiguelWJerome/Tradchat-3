@@ -132,6 +132,26 @@
         }]));
     }
 
+    function emitAdminGetUserConversations(targetUser) {
+        cl.send(JSON.stringify(['Admin Get User Conversations', {
+            username: localStorage.getItem('username') || sessionStorage.getItem('username'),
+            password: localStorage.getItem('password') || sessionStorage.getItem('password'),
+            target_user: targetUser
+        }]));
+    }
+
+    function emitAdminGetConversationMessages(targetUser, convoType, targetId, beforeId = null, filterQuery = '') {
+        cl.send(JSON.stringify(['Admin Get Conversation Messages', {
+            username: localStorage.getItem('username') || sessionStorage.getItem('username'),
+            password: localStorage.getItem('password') || sessionStorage.getItem('password'),
+            target_user: targetUser,
+            convo_type: convoType,
+            target_id: targetId,
+            before_id: beforeId,
+            filter_query: filterQuery
+        }]));
+    }
+
     // --- Socket Message Routing ---
     function setupSocketListener(onMessageCallback) {
         cl.on('message', function(msg) {
@@ -156,6 +176,8 @@
         emitVoteAdminRequest,
         emitUpdateParentalLocks,
         emitClearUnseenAction,
+        emitAdminGetUserConversations,
+        emitAdminGetConversationMessages,
         // GIF approval emitters
         searchGiphy,
         emitAddGif,
@@ -167,3 +189,4 @@
         setupSocketListener
     };
 })();
+
