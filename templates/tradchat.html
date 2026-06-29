@@ -131,6 +131,12 @@
         <button class="nav-item" data-page="news">News</button>
         <button class="nav-item" data-page="policy">Policy</button>
         <a href="/logout/" class="nav-item logout-btn">Logout</a>
+        {% if is_admin_user %}
+        <a href="/admin/" class="nav-item admin-nav-btn {% if active_page == 'admin' %}active{% endif %}" style="position: relative;">
+          Admin
+          <span class="navbar-alert-dot" id="navbar-admin-dot" {% if not has_unseen_actions %}style="display: none;"{% endif %}></span>
+        </a>
+        {% endif %}
       </div>
 
       <!-- Right side: Profile account section -->
@@ -156,6 +162,12 @@
           <button class="dropdown-item" data-page="news">News</button>
           <button class="dropdown-item" data-page="policy">Policy</button>
           <a href="/logout/" class="dropdown-item logout-dropdown-btn">Logout</a>
+          {% if is_admin_user %}
+          <a href="/admin/" class="dropdown-item admin-dropdown-btn {% if active_page == 'admin' %}active{% endif %}" style="position: relative;">
+            Admin
+            <span class="navbar-alert-dot" id="navbar-admin-dropdown-dot" {% if not has_unseen_actions %}style="display: none;"{% endif %}></span>
+          </a>
+          {% endif %}
         </div>
         <div class="dropdown-section">
           <h3>Account</h3>

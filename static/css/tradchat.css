@@ -132,6 +132,7 @@ img {
     font-weight: 500;
     cursor: pointer;
     transition: background-color 0.2s ease;
+    text-decoration: none;
 }
 
 .nav-item:hover {
@@ -495,11 +496,8 @@ img {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.tc-cu-selected-spot.plural {
+.tc-cu-selected-spot.plural, .tc-cu-selected-spot.singular {
     display: flex;
-}
-.tc-cu-selected-spot.singular {
-    display: none;
 }
 
 .tc-cu-selected-user {
@@ -540,4 +538,17 @@ img {
     height: 30px;
     border-radius: 50%;
     margin-right: 10px;
+}
+
+/* Navbar Alert Dot */
+.navbar-alert-dot {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+    background-color: #ff3333;
+    border-radius: 50%;
+    border: 1px solid white;
+    box-shadow: 0 0 4px rgba(255, 51, 51, 0.6);
 }

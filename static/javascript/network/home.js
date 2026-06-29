@@ -102,6 +102,9 @@ function recv(message) {
                 let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];
                 document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase();
             }
+            if (typeof window.updateInputBarStateForFreeze === 'function') {
+                window.updateInputBarStateForFreeze(data['room']);
+            }
             toggle_overhead_animation(false);
             // Update cache based on server response (at_bottom: true means no more older/newer messages exist)
             window.reached_real_bottom = (data['at_bottom'] === true);
@@ -229,6 +232,14 @@ function recv(message) {
         if (window.isRoomDetailsOpen) cl.send(JSON.stringify(['Get Room Members', { 'username': username, 'password': password, 'room': ROOM }]));
     }
     else if (msg[0] === 'Room Error') Alert(msg[1]);
+    else if (msg[0] === 'Unseen Admin Actions Updated') {
+        const unseenTabs = msg[1].sub_tabs;
+        const hasUnseen = unseenTabs.length > 0;
+        const navbarDot = document.getElementById('navbar-admin-dot');
+        const navbarDropdownDot = document.getElementById('navbar-admin-dropdown-dot');
+        if (navbarDot) navbarDot.style.display = hasUnseen ? 'inline-block' : 'none';
+        if (navbarDropdownDot) navbarDropdownDot.style.display = hasUnseen ? 'inline-block' : 'none';
+    }
     else if (msg[0] === 'GIF Search Results') {
         const data = msg[1];
         if (data.status === 'success') {
@@ -310,6 +321,23 @@ function recv(message) {
                 });
             }
         }
+    }
+    else if (msg[0] === 'Account Freeze Status Changed') {
+        const data = msg[1];
+        window.IS_FROZEN = data.frozen;
+        if (window.IS_FROZEN) {
+            Alert("Your account has been frozen. You have to message the admin to ask it to get it back.");
+        } else {
+            Alert("Your account has been unfrozen.");
+        }
+        if (typeof window.updateInputBarStateForFreeze === 'function') {
+            window.updateInputBarStateForFreeze(ROOM);
+        }
+    }
+    else if (msg[0] === 'Account Deleted Notification') {
+        Alert("Your account has been permanently deleted.", () => {
+            location.href = '/logout/';
+        });
     }
 }
 
@@ -650,6 +678,9 @@ $(document).ready(function () {
         document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase()
         changeSelectedRoomOption(ROOM)
         cl.send(JSON.stringify(['Get Dms', { 'username': username, 'password': password }]))
+    }
+    if (typeof window.updateInputBarStateForFreeze === 'function') {
+        window.updateInputBarStateForFreeze(ROOM);
     }
     setTimeout(function () {
         FetchingMessages = true;

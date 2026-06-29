@@ -136,6 +136,7 @@ function Alert(message, callback = function () { }, shouldFlyUp = false, width =
 
 const True = true
 const False = false
+const None = null
 
 
 function form(url, dic, method = 'post') {
@@ -245,7 +246,6 @@ function choose_usernames(plural, callback) {
     let selectedUsers = [];
 
     function updateSelectedSpot() {
-        if (!plural) return;
         selectedSpot.innerHTML = '';
         if (selectedUsers.length === 0) {
             selectedSpot.innerText = 'No users selected';
@@ -347,6 +347,7 @@ function choose_usernames(plural, callback) {
                     selectedUsers = [u];
                     Array.from(resultsList.children).forEach(c => c.classList.remove('selected'));
                     row.classList.add('selected');
+                    updateSelectedSpot();
                 }
             };
 

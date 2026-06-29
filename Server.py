@@ -57,6 +57,20 @@ def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
             lock = reports_alerts_lock
             db_path = 'reportsAndAlerts.db'
     
+    # Alert hook with recursion guard
+    if not hasattr(db_sql, '_in_alert_check'):
+        db_sql._in_alert_check = False
+    if not db_sql._in_alert_check:
+        sql_upper = sql.upper()
+        if "INSERT INTO ALERTS" in sql_upper:
+            db_sql._in_alert_check = True
+            try:
+                add_unseen_admin_action('alerts')
+            except Exception as e:
+                print(f"Error in db_sql alert hook: {e}")
+            finally:
+                db_sql._in_alert_check = False
+
     with lock:
         try:
             conn = sqlite3.connect(db_path)
@@ -289,7 +303,8 @@ def process_room_leave(sid):
             ids = sorted([int(user1), int(user2)])
             target_id = f"{ids[0]}-{ids[1]}"
             
-        db_sql("INSERT OR REPLACE INTO last_read (user_id, target_id, is_dm, last_viewed) VALUES (?, ?, ?, ?);", 'last_read', params=[user_id, target_id, is_dm, now_str], chat_room=False)
+        if room != 'admin':
+            db_sql("INSERT OR REPLACE INTO last_read (user_id, target_id, is_dm, last_viewed) VALUES (?, ?, ?, ?);", 'last_read', params=[user_id, target_id, is_dm, now_str], chat_room=False)
         del sid_to_room_state[sid]
 
 def process_room_join(sid, username, room):
@@ -322,11 +337,16 @@ def find_account_id_or_password_or_gender(user, id_or_password_or_gender='id', R
                 return [user, accounts_dict[user]['admin']]
             return accounts_dict[user]['admin']
 
+        elif id_or_password_or_gender == 'frozen':
+            if RU:
+                return [user, accounts_dict[user]['frozen']]
+            return accounts_dict[user]['frozen']
+
     except KeyError:
-        data_list = db_sql("""SELECT username, password, id, gender, admin FROM accounts WHERE LOWER(username) = ?;""", 'accounts', params=[user.lower()], chat_room=False)
+        data_list = db_sql("""SELECT username, password, id, gender, admin, frozen FROM accounts WHERE LOWER(username) = ?;""", 'accounts', params=[user.lower()], chat_room=False)
         if data_list:
             data = data_list[0]
-            accounts_dict[data[0]] = {'password': data[1], 'id': data[2], 'gender': data[3], 'admin': bool(data[4])}
+            accounts_dict[data[0]] = {'password': data[1], 'id': data[2], 'gender': data[3], 'admin': bool(data[4]), 'frozen': bool(data[5])}
             id_to_accounts_dict[data[2]] = data[0]
             if id_or_password_or_gender == 'password':
                 returnable = data[1]
@@ -336,6 +356,8 @@ def find_account_id_or_password_or_gender(user, id_or_password_or_gender='id', R
                 returnable = data[3]
             elif id_or_password_or_gender == 'admin':
                 returnable = bool(data[4])
+            elif id_or_password_or_gender == 'frozen':
+                returnable = bool(data[5])
             else:
                 returnable = None
             if RU:
@@ -358,6 +380,90 @@ def is_admin(username):
         return False
     val = find_account_id_or_password_or_gender(username, 'admin')
     return bool(val)
+
+def broadcast_admin_requests():
+    try:
+        res = db_sql("SELECT id, requester, target_user, action_type, approvals, denials FROM admin_requests WHERE resolved = 0;", 'reports_alerts', chat_room=False)
+        requests = []
+        for row in res:
+            requests.append({
+                'id': row[0],
+                'requester': row[1],
+                'target_user': row[2],
+                'action_type': row[3],
+                'approvals': row[4],
+                'denials': row[5]
+            })
+            
+        for client_sid, state in list(sid_to_room_state.items()):
+            user_id = state.get('user_id')
+            if user_id:
+                username = find_username_from_id(user_id)
+                if username and is_admin(username):
+                    Server.send(str(['Admin Requests Results', requests]), room=client_sid)
+    except Exception as e:
+        print(f"Broadcast Admin Requests Error: {e}")
+
+
+def broadcast_unseen_actions_to_user(username):
+    try:
+        res = db_sql("SELECT sub_tabs FROM unseen_admin_actions WHERE LOWER(username) = LOWER(?);", 'accounts', params=[username], chat_room=False)
+        sub_tabs = res[0][0] if res else ''
+        tabs_list = sub_tabs.split('$$') if sub_tabs else []
+        tabs_list = [t for t in tabs_list if t]
+        
+        user_id = find_account_id_or_password_or_gender(username, 'id')
+        if user_id:
+            for client_sid, state in list(sid_to_room_state.items()):
+                if state.get('user_id') == user_id:
+                    Server.send(str(['Unseen Admin Actions Updated', {'sub_tabs': tabs_list}]), room=client_sid)
+    except Exception as e:
+        print(f"Error broadcasting unseen actions: {e}")
+
+
+def add_unseen_admin_action(tab, except_admin=None):
+    try:
+        admins = db_sql("SELECT username FROM accounts WHERE admin = 1;", 'accounts', chat_room=False)
+        for row in admins:
+            adm = row[0]
+            if except_admin and adm.lower() == except_admin.lower():
+                continue
+            
+            res = db_sql("SELECT sub_tabs FROM unseen_admin_actions WHERE LOWER(username) = LOWER(?);", 'accounts', params=[adm], chat_room=False)
+            if res:
+                sub_tabs = res[0][0]
+                tabs_list = sub_tabs.split('$$') if sub_tabs else []
+                tabs_list = [t for t in tabs_list if t]
+                if tab not in tabs_list:
+                    tabs_list.append(tab)
+                new_sub_tabs = '$$'.join(tabs_list)
+                db_sql("INSERT OR REPLACE INTO unseen_admin_actions (username, sub_tabs) VALUES (?, ?);", 'accounts', params=[adm, new_sub_tabs], chat_room=False)
+            else:
+                db_sql("INSERT OR REPLACE INTO unseen_admin_actions (username, sub_tabs) VALUES (?, ?);", 'accounts', params=[adm, tab], chat_room=False)
+            
+            broadcast_unseen_actions_to_user(adm)
+    except Exception as e:
+        print(f"Error in add_unseen_admin_action: {e}")
+
+
+def clear_unseen_admin_action(username, tab):
+    try:
+        res = db_sql("SELECT sub_tabs FROM unseen_admin_actions WHERE LOWER(username) = LOWER(?);", 'accounts', params=[username], chat_room=False)
+        if res:
+            sub_tabs = res[0][0]
+            tabs_list = sub_tabs.split('$$') if sub_tabs else []
+            tabs_list = [t for t in tabs_list if t]
+            if tab in tabs_list:
+                tabs_list.remove(tab)
+            new_sub_tabs = '$$'.join(tabs_list)
+            db_sql("INSERT OR REPLACE INTO unseen_admin_actions (username, sub_tabs) VALUES (?, ?);", 'accounts', params=[username, new_sub_tabs], chat_room=False)
+            
+            broadcast_unseen_actions_to_user(username)
+    except Exception as e:
+        print(f"Error in clear_unseen_admin_action: {e}")
+
+
+
 
 
 true = True
@@ -438,6 +544,20 @@ app = Flask(__name__)
 app.secret_key = secrets.token_hex(64)
 Server = SocketIO(app, max_http_buffer_size=50 * 1024 * 1024)
 
+@app.context_processor
+def inject_admin_status():
+    username = session.get('username')
+    is_admin_user = False
+    has_unseen_actions = False
+    if username:
+        is_admin_user = is_admin(username)
+        if is_admin_user:
+            res = db_sql("SELECT sub_tabs FROM unseen_admin_actions WHERE LOWER(username) = LOWER(?);", 'accounts', params=[username], chat_room=False)
+            if res and res[0][0]:
+                has_unseen_actions = True
+    return dict(is_admin_user=is_admin_user, has_unseen_actions=has_unseen_actions)
+
+
 
 accounts_lock = Lock()
 rooms_lock = Lock()
@@ -458,9 +578,6 @@ if not os.path.exists("reportsAndAlerts.db"):
             seen BOOLEAN NOT NULL DEFAULT 0
         );
     ''')
-    # Seed some initial alerts for testing
-    ra_cursor.execute("INSERT INTO alerts (text, resolved, seen) VALUES (?, 0, 0);", ("Swear word detected in room 'mainroom' from user 'Bob'.",))
-    ra_cursor.execute("INSERT INTO alerts (text, resolved, seen) VALUES (?, 0, 0);", ("Failed login attempt from IP 192.168.1.50.",))
     ra_db.commit()
     ra_db.close()
 
@@ -546,6 +663,45 @@ try:
         conn.close()
 except Exception as e:
     print(f"Migration error: {e}")
+
+
+# Migration: Add unseen_admin_actions table to accounts.db if it doesn't exist
+try:
+    with accounts_lock:
+        conn = sqlite3.connect('accounts.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS unseen_admin_actions (
+                username TEXT PRIMARY KEY,
+                sub_tabs TEXT NOT NULL DEFAULT ''
+            );
+        ''')
+        conn.commit()
+        conn.close()
+except Exception as e:
+    print(f"Unseen admin actions table creation error: {e}")
+
+# Migration: Add admin_requests table to reportsAndAlerts.db if it doesn't exist
+try:
+    with reports_alerts_lock:
+        conn = sqlite3.connect('reportsAndAlerts.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS admin_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                requester TEXT NOT NULL,
+                target_user TEXT NOT NULL,
+                action_type TEXT NOT NULL,
+                approvals TEXT NOT NULL,
+                denials TEXT NOT NULL,
+                resolved BOOLEAN NOT NULL DEFAULT 0
+            );
+        ''')
+        conn.commit()
+        conn.close()
+except Exception as e:
+    print(f"Admin requests migration error: {e}")
+
 
 # Ensure last_read table exists in dedicated database
 if not os.path.exists("last_read.db"):
@@ -756,6 +912,66 @@ if os.path.exists("rooms"):
             }
 
 
+def is_in_curfew(username):
+    try:
+        locks = db_sql("SELECT pl_curfew, pl_curfew_offline, pl_curfew_online FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+        if not locks or not locks[0]:
+            return False
+        
+        pl_curfew = bool(locks[0][0])
+        if not pl_curfew:
+            return False
+            
+        offline_str = locks[0][1]
+        online_str = locks[0][2]
+        
+        def time_to_minutes(time_str):
+            if not time_str:
+                return 0
+            match = re.match(r"^(\d+):(\d+)\s*(AM|PM)$", time_str.strip(), re.IGNORECASE)
+            if not match:
+                return 0
+            hours = int(match.group(1))
+            minutes = int(match.group(2))
+            ampm = match.group(3).upper()
+            
+            if ampm == 'PM' and hours != 12:
+                hours += 12
+            elif ampm == 'AM' and hours == 12:
+                hours = 0
+            return hours * 60 + minutes
+            
+        offline_mins = time_to_minutes(offline_str)
+        online_mins = time_to_minutes(online_str)
+        
+        now = datetime.datetime.now()
+        current_mins = now.hour * 60 + now.minute
+        
+        if offline_mins > online_mins:
+            return current_mins >= offline_mins or current_mins < online_mins
+        elif offline_mins < online_mins:
+            return current_mins >= offline_mins and current_mins < online_mins
+        return False
+    except Exception as e:
+        print(f"Error checking curfew for {username}: {e}")
+        return False
+
+@app.before_request
+def check_curfew_redirect():
+    username = session.get('username')
+    if username:
+        req_path = request.path
+        if req_path.startswith('/static/') or req_path.startswith('/socket.io/') or req_path in ['/go_to_bed/', '/logout/']:
+            return
+            
+        if is_in_curfew(username):
+            return redirect('/go_to_bed/')
+
+@app.route('/go_to_bed/')
+def go_to_bed():
+    return render_template('go_to_bed.html')
+
+
 @app.route('/<smth>/')
 def smth(smth):
     return redirect('/')
@@ -854,6 +1070,8 @@ def home():
                 room_type = room_info[0][0] if room_info else 'public'
                 room_emoji = room_info[0][1] if room_info else '💬'
 
+            frozen_status = bool(find_account_id_or_password_or_gender(username, 'frozen'))
+
             return render_template(
                 'home.html',
                 theme=theme,
@@ -863,7 +1081,8 @@ def home():
                 room=room,
                 room_type=room_type,
                 room_emoji=room_emoji,
-                active_page='home'
+                active_page='home',
+                frozen=frozen_status
             )
 
         else:
@@ -971,19 +1190,7 @@ def upload_file():
     
     return render_template('upload.html')
     
-@app.route('/gif-approve/')
-def gif_approve():
-    try:
-        username = session['username']
-        password = session['password']
-        if check_credentials(username, password):
-            if is_admin(username):
-                return render_template('gif_approve.html', username=username)
-            else:
-                return "Unauthorized: Admin Only", 403
-        return redirect('/')
-    except:
-        return redirect('/')
+
 
 @app.route('/admin/')
 def admin():
@@ -1002,6 +1209,12 @@ def admin():
             # Check if there are any unseen & unresolved alerts
             unseen = db_sql("SELECT COUNT(*) FROM alerts WHERE seen = 0 AND resolved = 0;", 'reports_alerts')
             has_unseen_alerts = (unseen[0][0] > 0) if unseen else False
+
+            # Fetch active unseen sub-tabs
+            res = db_sql("SELECT sub_tabs FROM unseen_admin_actions WHERE LOWER(username) = LOWER(?);", 'accounts', params=[username], chat_room=False)
+            sub_tabs = res[0][0] if res else ''
+            unseen_sub_tabs_list = sub_tabs.split('$$') if sub_tabs else []
+            unseen_sub_tabs_list = [t for t in unseen_sub_tabs_list if t]
             
             return render_template(
                 'admin.html',
@@ -1010,7 +1223,8 @@ def admin():
                 color_medium=colors['color_medium'],
                 color_light=colors['color_light'],
                 active_page='admin',
-                has_unseen_alerts=has_unseen_alerts
+                has_unseen_alerts=has_unseen_alerts,
+                unseen_sub_tabs=unseen_sub_tabs_list
             )
         return redirect('/')
     except Exception as e:
@@ -1269,6 +1483,17 @@ def Recv(message, sid):
             return # Dont bother to return a response to someone who is trying to alter the code
 
         if check_credentials(username, password):
+            if find_account_id_or_password_or_gender(username, 'frozen'):
+                is_admin_dm = False
+                if setting == 'dm' and '.$@-@&.' in room:
+                    dm_parts = room.split('.$@-@&.')
+                    if len(dm_parts) == 2 and (dm_parts[0].lower() == 'admin' or dm_parts[1].lower() == 'admin'):
+                        if not upload:
+                            is_admin_dm = True
+                if not is_admin_dm:
+                    print(f"[SECURITY WARNING] Frozen user {username} blocked from sending message to {room}")
+                    return
+
             if setting == 'room':
                 
                 if check_room_access(room, username):
@@ -1285,6 +1510,10 @@ def Recv(message, sid):
                 # Verify user is a participant in this DM before sending
                 if check_dm_access(room, username):
                     actual_user_dm_username = room.split('.$@-@&.')[1] if room.split('.$@-@&.')[0] == username else room.split('.$@-@&.')[0]
+
+                    if actual_user_dm_username.lower() == 'admin' and username.lower() != 'admin':
+                        alert_text = f"ADMIN MESSAGE: {username} sent {user_message}"
+                        db_sql("INSERT INTO alerts (text, resolved, seen) VALUES (?, 0, 0);", 'reports_alerts', params=[alert_text], chat_room=False)
 
                     username_id = find_account_id_or_password_or_gender(username, 'id')
 
@@ -1317,6 +1546,9 @@ def Recv(message, sid):
         password = data['password']
 
         if check_credentials(username, password):
+            if find_account_id_or_password_or_gender(username, 'frozen'):
+                print(f"[SECURITY WARNING] Frozen user {username} blocked from uploading image.")
+                return
             # 1. Process Image
             try:
                 # Remove header if present
@@ -2493,6 +2725,9 @@ def Recv(message, sid):
         keywords = data['keywords']
 
         if check_credentials(username, password):
+            if find_account_id_or_password_or_gender(username, 'frozen'):
+                print(f"[SECURITY WARNING] Frozen user {username} blocked from adding GIF.")
+                return
             if is_admin(username):
                 # Validate giphy_id
                 if not giphy_id or not str(giphy_id).strip():
@@ -2544,6 +2779,9 @@ def Recv(message, sid):
         query = data['query']
 
         if check_credentials(username, password):
+            if find_account_id_or_password_or_gender(username, 'frozen'):
+                print(f"[SECURITY WARNING] Frozen user {username} blocked from searching GIFs.")
+                return
             try:
                 # Clean the search query same way as keywords
                 clean_query = clean_keyword(query)
@@ -2714,12 +2952,12 @@ def Recv(message, sid):
 
         if check_credentials(username, password) and is_admin(username):
             try:
-                res = db_sql("SELECT frozen, pl_read_dms, pl_block_media, pl_dm_lock, pl_restricted_users, pl_curfew, pl_curfew_offline, pl_curfew_online, pl_block_games, pl_age_segregation FROM accounts WHERE username = ?;", 'accounts', params=[target_user], chat_room=False)
+                res = db_sql("SELECT frozen, pl_read_dms, pl_block_media, pl_dm_lock, pl_restricted_users, pl_curfew, pl_curfew_offline, pl_curfew_online, pl_block_games, pl_age_segregation, username FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_user], chat_room=False)
                 if res:
                     row = res[0]
                     target_data = {
                         'status': 'success',
-                        'target_user': target_user,
+                        'target_user': row[10],
                         'frozen': bool(row[0]),
                         'pl_read_dms': bool(row[1]),
                         'pl_block_media': bool(row[2]),
@@ -2747,8 +2985,32 @@ def Recv(message, sid):
 
         if check_credentials(username, password) and is_admin(username):
             try:
-                db_sql("UPDATE accounts SET frozen = ? WHERE username = ?;", 'accounts', params=[frozen, target_user], chat_room=False)
-                Server.send(str(['Update Freeze Status Result', {'status': 'success', 'target_user': target_user, 'frozen': frozen}]), room=sid)
+                user_res = db_sql("SELECT username FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_user], chat_room=False)
+                if user_res:
+                    canonical_username = user_res[0][0]
+                    
+                    if is_admin(canonical_username):
+                        Server.send(str(['Update Freeze Status Result', {'status': 'error', 'message': 'Admins are not allowed to freeze other admins.'}]), room=sid)
+                        return
+                        
+                    db_sql("UPDATE accounts SET frozen = ? WHERE username = ?;", 'accounts', params=[frozen, canonical_username], chat_room=False)
+                    
+                    # Clear from memory cache
+                    if canonical_username in accounts_dict:
+                        del accounts_dict[canonical_username]
+                    for k in list(accounts_dict.keys()):
+                        if k.lower() == canonical_username.lower():
+                            del accounts_dict[k]
+                            
+                    # Live notify target user
+                    target_id = find_account_id_or_password_or_gender(canonical_username, 'id')
+                    for client_sid, state in list(sid_to_room_state.items()):
+                        if state.get('user_id') == target_id:
+                            Server.send(str(['Account Freeze Status Changed', {'frozen': bool(frozen)}]), room=client_sid)
+                            
+                    Server.send(str(['Update Freeze Status Result', {'status': 'success', 'target_user': canonical_username, 'frozen': frozen}]), room=sid)
+                else:
+                    Server.send(str(['Update Freeze Status Result', {'status': 'error', 'message': 'User not found'}]), room=sid)
             except Exception as e:
                 print(f"Update Freeze Status Error: {e}")
                 Server.send(str(['Update Freeze Status Result', {'status': 'error', 'message': str(e)}]), room=sid)
@@ -2762,32 +3024,215 @@ def Recv(message, sid):
 
         if check_credentials(username, password) and is_admin(username):
             try:
-                db_sql("""UPDATE accounts SET 
-                    pl_read_dms = ?, 
-                    pl_block_media = ?, 
-                    pl_dm_lock = ?, 
-                    pl_restricted_users = ?, 
-                    pl_curfew = ?, 
-                    pl_curfew_offline = ?, 
-                    pl_curfew_online = ?, 
-                    pl_block_games = ?, 
-                    pl_age_segregation = ? 
-                    WHERE username = ?;""", 'accounts', params=[
-                        int(locks['readDms']),
-                        int(locks['blockMedia']),
-                        int(locks['dmLock']),
-                        locks['restrictedUsers'],
-                        int(locks['curfew']),
-                        locks['curfewOffline'],
-                        locks['curfewOnline'],
-                        int(locks['blockGames']),
-                        int(locks['ageSegregation']),
-                        target_user
-                    ], chat_room=False)
-                Server.send(str(['Update Parental Locks Result', {'status': 'success', 'target_user': target_user}]), room=sid)
+                user_res = db_sql("SELECT username FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_user], chat_room=False)
+                if user_res:
+                    canonical_username = user_res[0][0]
+                    db_sql("""UPDATE accounts SET 
+                        pl_read_dms = ?, 
+                        pl_block_media = ?, 
+                        pl_dm_lock = ?, 
+                        pl_restricted_users = ?, 
+                        pl_curfew = ?, 
+                        pl_curfew_offline = ?, 
+                        pl_curfew_online = ?, 
+                        pl_block_games = ?, 
+                        pl_age_segregation = ? 
+                        WHERE username = ?;""", 'accounts', params=[
+                            int(locks['readDms']),
+                            int(locks['blockMedia']),
+                            int(locks['dmLock']),
+                            locks['restrictedUsers'],
+                            int(locks['curfew']),
+                            locks['curfewOffline'],
+                            locks['curfewOnline'],
+                            int(locks['blockGames']),
+                            int(locks['ageSegregation']),
+                            canonical_username
+                        ], chat_room=False)
+                    
+                    # Clear from memory cache
+                    if canonical_username in accounts_dict:
+                        del accounts_dict[canonical_username]
+                    for k in list(accounts_dict.keys()):
+                        if k.lower() == canonical_username.lower():
+                            del accounts_dict[k]
+                            
+                    Server.send(str(['Update Parental Locks Result', {'status': 'success', 'target_user': canonical_username}]), room=sid)
+                else:
+                    Server.send(str(['Update Parental Locks Result', {'status': 'error', 'message': 'User not found'}]), room=sid)
             except Exception as e:
                 print(f"Update Parental Locks Error: {e}")
                 Server.send(str(['Update Parental Locks Result', {'status': 'error', 'message': str(e)}]), room=sid)
+
+    elif msg[0] == 'Clear Unseen Action':
+        data = msg[1]
+        username = data.get('username')
+        password = data.get('password')
+        tab = data.get('tab')
+        if check_credentials(username, password) and is_admin(username):
+            clear_unseen_admin_action(username, tab)
+
+    elif msg[0] == 'Get Admin Requests':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        
+        if check_credentials(username, password) and is_admin(username):
+            try:
+                user_id = find_account_id_or_password_or_gender(username, 'id')
+                sid_to_room_state[sid] = {'user_id': user_id, 'room': 'admin', 'is_dm': False}
+                res = db_sql("SELECT id, requester, target_user, action_type, approvals, denials FROM admin_requests WHERE resolved = 0;", 'reports_alerts', chat_room=False)
+                requests = []
+                for row in res:
+                    requests.append({
+                        'id': row[0],
+                        'requester': row[1],
+                        'target_user': row[2],
+                        'action_type': row[3],
+                        'approvals': row[4],
+                        'denials': row[5]
+                    })
+                Server.send(str(['Admin Requests Results', requests]), room=sid)
+            except Exception as e:
+                print(f"Get Admin Requests Error: {e}")
+
+    elif msg[0] == 'Create Admin Request':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        target_user = data['target_user']
+        action_type = data['action_type']
+        
+        if check_credentials(username, password) and is_admin(username):
+            try:
+                if is_admin(target_user):
+                    Server.send(str(['Admin Request Vote Result', {'status': 'error', 'message': 'Admins are not allowed to modify other admins.'}]), room=sid)
+                    return
+                
+                user_res = db_sql("SELECT username FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_user], chat_room=False)
+                if not user_res:
+                    Server.send(str(['Admin Request Vote Result', {'status': 'error', 'message': 'User not found.'}]), room=sid)
+                    return
+                canonical_username = user_res[0][0]
+                
+                existing = db_sql("SELECT id FROM admin_requests WHERE target_user = ? AND action_type = ? AND resolved = 0;", 'reports_alerts', params=[canonical_username, action_type], chat_room=False)
+                if existing:
+                    Server.send(str(['Admin Request Vote Result', {'status': 'error', 'message': f'A request to {action_type} this user is already pending.'}]), room=sid)
+                    return
+                
+                db_sql("INSERT INTO admin_requests (requester, target_user, action_type, approvals, denials, resolved) VALUES (?, ?, ?, ?, '', 0);", 
+                       'reports_alerts', params=[username, canonical_username, action_type, username], chat_room=False)
+                
+                try:
+                    add_unseen_admin_action('action-zone', except_admin=username)
+                except Exception as e:
+                    print(f"Error alerting action-zone: {e}")
+
+                broadcast_admin_requests()
+                Server.send(str(['Admin Request Vote Result', {'status': 'success', 'message': f'Proposed {action_type} request for {canonical_username} successfully.'}]), room=sid)
+            except Exception as e:
+                print(f"Create Admin Request Error: {e}")
+                Server.send(str(['Admin Request Vote Result', {'status': 'error', 'message': str(e)}]), room=sid)
+
+    elif msg[0] == 'Vote Admin Request':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        request_id = int(data['request_id'])
+        vote = data['vote']
+        
+        if check_credentials(username, password) and is_admin(username):
+            try:
+                req_res = db_sql("SELECT id, requester, target_user, action_type, approvals, denials FROM admin_requests WHERE id = ? AND resolved = 0;", 'reports_alerts', params=[request_id], chat_room=False)
+                if not req_res:
+                    Server.send(str(['Admin Request Vote Result', {'status': 'error', 'message': 'Request not found or already resolved.'}]), room=sid)
+                    return
+                
+                row = req_res[0]
+                req_id, requester, target_user, action_type, approvals_str, denials_str = row
+                
+                approvals = approvals_str.split(',') if approvals_str else []
+                approvals = [x for x in approvals if x]
+                denials = denials_str.split(',') if denials_str else []
+                denials = [x for x in denials if x]
+                
+                if username in approvals or username in denials:
+                    Server.send(str(['Admin Request Vote Result', {'status': 'error', 'message': 'You have already voted on this request.'}]), room=sid)
+                    return
+                
+                if vote == 'approve':
+                    approvals.append(username)
+                else:
+                    denials.append(username)
+                
+                new_approvals_str = ','.join(approvals)
+                new_denials_str = ','.join(denials)
+                
+                db_sql("UPDATE admin_requests SET approvals = ?, denials = ? WHERE id = ?;", 'reports_alerts', params=[new_approvals_str, new_denials_str, request_id], chat_room=False)
+                
+                threshold = 3 if action_type == 'delete' else 2
+                executed_message = None
+                
+                if vote == 'deny':
+                    db_sql("UPDATE admin_requests SET resolved = 1 WHERE id = ?;", 'reports_alerts', params=[request_id], chat_room=False)
+                    executed_message = f"Request to {action_type} {target_user} was denied and cancelled by {username}."
+                
+                elif len(approvals) >= threshold:
+                    db_sql("UPDATE admin_requests SET resolved = 1 WHERE id = ?;", 'reports_alerts', params=[request_id], chat_room=False)
+                    
+                    if action_type == 'freeze':
+                        db_sql("UPDATE accounts SET frozen = 1 WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_user], chat_room=False)
+                        
+                        if target_user in accounts_dict:
+                            del accounts_dict[target_user]
+                        for k in list(accounts_dict.keys()):
+                            if k.lower() == target_user.lower():
+                                del accounts_dict[k]
+                        
+                        target_id = find_account_id_or_password_or_gender(target_user, 'id')
+                        for client_sid, state in list(sid_to_room_state.items()):
+                            if state.get('user_id') == target_id:
+                                Server.send(str(['Account Freeze Status Changed', {'frozen': True}]), room=client_sid)
+                        
+                        executed_message = f"Threshold met. Account {target_user} has been frozen."
+                        
+                    elif action_type == 'unfreeze':
+                        db_sql("UPDATE accounts SET frozen = 0 WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_user], chat_room=False)
+                        
+                        if target_user in accounts_dict:
+                            del accounts_dict[target_user]
+                        for k in list(accounts_dict.keys()):
+                            if k.lower() == target_user.lower():
+                                del accounts_dict[k]
+                        
+                        target_id = find_account_id_or_password_or_gender(target_user, 'id')
+                        for client_sid, state in list(sid_to_room_state.items()):
+                            if state.get('user_id') == target_id:
+                                Server.send(str(['Account Freeze Status Changed', {'frozen': False}]), room=client_sid)
+                                
+                        executed_message = f"Threshold met. Account {target_user} has been unfrozen."
+                        
+                    elif action_type == 'delete':
+                        db_sql("DELETE FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_user], chat_room=False)
+                        
+                        if target_user in accounts_dict:
+                            del accounts_dict[target_user]
+                        for k in list(accounts_dict.keys()):
+                            if k.lower() == target_user.lower():
+                                del accounts_dict[k]
+                                
+                        target_id = find_account_id_or_password_or_gender(target_user, 'id')
+                        for client_sid, state in list(sid_to_room_state.items()):
+                            if state.get('user_id') == target_id:
+                                Server.send(str(['Account Deleted Notification', {}]), room=client_sid)
+                                
+                        executed_message = f"Threshold met. Account {target_user} has been permanently deleted."
+                
+                broadcast_admin_requests()
+                Server.send(str(['Admin Request Vote Result', {'status': 'success', 'message': executed_message}]), room=sid)
+            except Exception as e:
+                print(f"Vote Admin Request Error: {e}")
+                Server.send(str(['Admin Request Vote Result', {'status': 'error', 'message': str(e)}]), room=sid)
 
 
 @Server.on('disconnect')

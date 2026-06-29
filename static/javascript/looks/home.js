@@ -2429,4 +2429,40 @@ document.body.onclick = function () {
       $("#create-room-form").on("submit", submitRoomCreation);
     });
 
+    window.updateInputBarStateForFreeze = function (roomName) {
+      let $frozenMsg = $('#frozen-message-banner');
+      if ($frozenMsg.length === 0) {
+        $frozenMsg = $('<div id="frozen-message-banner" style="display: none; width: 100%; text-align: center; color: #ff3333; font-weight: 700; font-size: 1.1rem; padding: 16px; font-family: var(--font-body), sans-serif; border: 2px solid rgba(255, 51, 51, 0.3); background: rgba(255, 51, 51, 0.08); border-radius: 8px; text-transform: uppercase;">YOUR ACCOUNT IS FROZEN, MESSAGE ADMIN TO GET IT FIXED</div>');
+        $('#chat-panel-inputbar').prepend($frozenMsg);
+      }
+
+      if (window.IS_FROZEN) {
+        let isDmWithAdmin = false;
+        let currentUsername = typeof username !== 'undefined' ? username : (localStorage.getItem('username') || '');
+        if (roomName && roomName.includes('.$@-@&.')) {
+          let parts = roomName.split('.$@-@&.');
+          let otherUser = parts[0] === currentUsername ? parts[1] : parts[0];
+          if (otherUser && otherUser.toLowerCase() === 'admin') {
+            isDmWithAdmin = true;
+          }
+        }
+
+        if (isDmWithAdmin) {
+          $frozenMsg.hide();
+          $('#chat-input-box').show();
+          $('#send-btn').show();
+          $('#gif-btn').hide(); // Disable GIF sending
+        } else {
+          $('#chat-input-box').hide();
+          $('#send-btn').hide();
+          $frozenMsg.show();
+        }
+      } else {
+        $frozenMsg.hide();
+        $('#chat-input-box').show();
+        $('#send-btn').show();
+        $('#gif-btn').show();
+      }
+    };
+
   })(); // End IIFE
