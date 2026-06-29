@@ -1007,6 +1007,10 @@
             }
         };
 
+        // Hide search bar by default (only shown on 'search' tab)
+        const searchContainer = document.querySelector('.search-container');
+        if (searchContainer) searchContainer.style.display = 'none';
+
         // --- Menu Items Event Listeners ---
         menuItems.forEach(item => {
             item.addEventListener('click', (e) => {
@@ -1016,6 +1020,11 @@
                 item.classList.add('active');
 
                 const target = item.getAttribute('data-target');
+
+                // Show search bar only on the 'search' tab
+                if (searchContainer) {
+                    searchContainer.style.display = target === 'search' ? '' : 'none';
+                }
 
                 // Clear the alert for this sub-tab immediately
                 AdminNetwork.emitClearUnseenAction(target);

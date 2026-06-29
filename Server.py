@@ -549,13 +549,18 @@ def inject_admin_status():
     username = session.get('username')
     is_admin_user = False
     has_unseen_actions = False
+    pl_block_media = False
     if username:
         is_admin_user = is_admin(username)
         if is_admin_user:
             res = db_sql("SELECT sub_tabs FROM unseen_admin_actions WHERE LOWER(username) = LOWER(?);", 'accounts', params=[username], chat_room=False)
             if res and res[0][0]:
                 has_unseen_actions = True
-    return dict(is_admin_user=is_admin_user, has_unseen_actions=has_unseen_actions)
+        # Check parental media block
+        pl_res = db_sql("SELECT pl_block_media FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+        if pl_res and pl_res[0] and bool(pl_res[0][0]):
+            pl_block_media = True
+    return dict(is_admin_user=is_admin_user, has_unseen_actions=has_unseen_actions, pl_block_media=pl_block_media)
 
 
 
@@ -956,6 +961,31 @@ def is_in_curfew(username):
         print(f"Error checking curfew for {username}: {e}")
         return False
 
+def get_restricted_users(username):
+    """Returns a list of usernames that this user is restricted from DMing.
+    Returns empty list if DM lock is disabled or no restrictions set."""
+    try:
+        row = db_sql("SELECT pl_dm_lock, pl_restricted_users FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+        if not row or not row[0]:
+            return []
+        pl_dm_lock = bool(row[0][0])
+        if not pl_dm_lock:
+            return []
+        restricted_str = row[0][1]
+        if not restricted_str or restricted_str.strip() == '':
+            return []
+        return [u.strip().lower() for u in restricted_str.split(',') if u.strip()]
+    except Exception as e:
+        print(f"Error getting restricted users for {username}: {e}")
+        return []
+
+def is_dm_restricted(user_a, user_b):
+    """Check if a DM between user_a and user_b is blocked by either side's parental locks.
+    Returns True if either user has the other in their restricted list."""
+    if not user_a or not user_b:
+        return False
+    return user_b.lower() in get_restricted_users(user_a) or user_a.lower() in get_restricted_users(user_b)
+
 @app.before_request
 def check_curfew_redirect():
     username = session.get('username')
@@ -969,7 +999,13 @@ def check_curfew_redirect():
 
 @app.route('/go_to_bed/')
 def go_to_bed():
-    return render_template('go_to_bed.html')
+    username = session.get('username')
+    if not username:
+        return redirect('/')
+    locks = db_sql("SELECT pl_curfew_offline, pl_curfew_online FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+    curfew_start = locks[0][0]
+    curfew_end = locks[0][1]
+    return render_template('go_to_bed.html', curfew_start=curfew_start, curfew_end=curfew_end)
 
 
 @app.route('/<smth>/')
@@ -1494,6 +1530,12 @@ def Recv(message, sid):
                     print(f"[SECURITY WARNING] Frozen user {username} blocked from sending message to {room}")
                     return
 
+            # Parental lock: block media uploads if pl_block_media is enabled
+            if upload and upload.strip():
+                pl_block = db_sql("SELECT pl_block_media FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+                if pl_block and pl_block[0] and bool(pl_block[0][0]):
+                    upload = ''  # Silently strip the upload
+
             if setting == 'room':
                 
                 if check_room_access(room, username):
@@ -1511,8 +1553,13 @@ def Recv(message, sid):
                 if check_dm_access(room, username):
                     actual_user_dm_username = room.split('.$@-@&.')[1] if room.split('.$@-@&.')[0] == username else room.split('.$@-@&.')[0]
 
+                    # Parental lock: block DMs between restricted users (bidirectional)
+                    if is_dm_restricted(username, actual_user_dm_username):
+                        print(f"[PARENTAL LOCK] DM blocked between {username} and {actual_user_dm_username}")
+                        return
+
                     if actual_user_dm_username.lower() == 'admin' and username.lower() != 'admin':
-                        alert_text = f"ADMIN MESSAGE: {username} sent {user_message}"
+                        alert_text = f"ADMIN MESSAGE: {username} sent ({user_message})"
                         db_sql("INSERT INTO alerts (text, resolved, seen) VALUES (?, 0, 0);", 'reports_alerts', params=[alert_text], chat_room=False)
 
                     username_id = find_account_id_or_password_or_gender(username, 'id')
@@ -1548,6 +1595,11 @@ def Recv(message, sid):
         if check_credentials(username, password):
             if find_account_id_or_password_or_gender(username, 'frozen'):
                 print(f"[SECURITY WARNING] Frozen user {username} blocked from uploading image.")
+                return
+            # Parental lock: block image uploads if pl_block_media is enabled
+            pl_block = db_sql("SELECT pl_block_media FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+            if pl_block and pl_block[0] and bool(pl_block[0][0]):
+                print(f"[PARENTAL LOCK] Image upload blocked for {username}")
                 return
             # 1. Process Image
             try:
@@ -1857,6 +1909,9 @@ def Recv(message, sid):
                     dm_info_row = db_sql("""SELECT username, first_name, last_name, id FROM accounts WHERE id = ?;""", 'accounts', params=[actual_dm_id], chat_room=False)
                     if dm_info_row:
                         dm_info = dm_info_row[0]
+                        dm_username = dm_info[0]
+                        if is_dm_restricted(username, dm_username):
+                            continue
                         target_id = f"{min(int(user_id), int(dm_info[3]))}-{max(int(user_id), int(dm_info[3]))}"
                         last_read_entry = db_sql("""SELECT last_viewed FROM last_read WHERE user_id = ? AND target_id = ? AND is_dm = 1;""", 'last_read', params=[user_id, target_id], chat_room=False)
                         
@@ -2147,6 +2202,10 @@ def Recv(message, sid):
         user = data['user']
 
         if check_credentials(username, password):
+            # Parental lock: block DM creation between restricted users
+            if is_dm_restricted(username, user):
+                print(f"[PARENTAL LOCK] DM creation blocked between {username} and {user}")
+                return
             username_id = find_account_id_or_password_or_gender(username, 'id')
             user_id = find_account_id_or_password_or_gender(user, 'id')
 

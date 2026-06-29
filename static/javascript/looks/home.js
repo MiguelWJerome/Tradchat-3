@@ -899,7 +899,7 @@ document.body.onclick = function () {
         }
 
         // --- Handle Images for Grouped Messages ---
-        if (data['upload'] && data['upload'].trim() !== '') {
+        if (!window.PL_BLOCK_MEDIA && data['upload'] && data['upload'].trim() !== '') {
           let imageGroup = $("<div>").css({ "display": "flex", "flex-wrap": "wrap", "gap": "8px", "margin-top": "8px" });
           let uploadItems = data['upload'].split('|');
           uploadItems.forEach(item => {
@@ -1134,7 +1134,7 @@ document.body.onclick = function () {
         }
 
         // --- Handle Images for New Message Groups ---
-        if (data['upload'] && data['upload'].trim() !== '') {
+        if (!window.PL_BLOCK_MEDIA && data['upload'] && data['upload'].trim() !== '') {
           let imageGroup = $("<div>").css({ "display": "flex", "flex-wrap": "wrap", "gap": "8px", "margin-top": "8px" });
           if (myself) imageGroup.css("justify-content", "flex-end");
 

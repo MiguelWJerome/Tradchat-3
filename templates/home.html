@@ -368,6 +368,7 @@
   let SPECIAL_REPLY_LIMIT = Math.ceil(FETCH_LIMIT / 2);
   let OVERHEAD_LOADER_DELAY = 400;
   window.IS_FROZEN = "{{ 'true' if frozen else 'false' }}" === 'true';
+  window.PL_BLOCK_MEDIA = "{{ 'true' if pl_block_media else 'false' }}" === 'true';
 </script>
 <script src="/static/javascript/tradchat.js" defer></script>
 <script src="/static/javascript/socketio.js" defer></script>
