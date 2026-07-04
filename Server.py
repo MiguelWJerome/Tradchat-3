@@ -979,12 +979,59 @@ def get_restricted_users(username):
         print(f"Error getting restricted users for {username}: {e}")
         return []
 
+def get_user_age_from_dob(dob_str):
+    if not dob_str:
+        return 18
+    for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y'):
+        try:
+            birth_date = datetime.datetime.strptime(dob_str, fmt)
+            today = datetime.datetime.today()
+            return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+        except ValueError:
+            continue
+    try:
+        parts = re.split(r'[-/]', dob_str.strip())
+        if len(parts) == 3:
+            year = None
+            for p in parts:
+                if len(p) == 4 and p.isdigit():
+                    year = int(p)
+                    break
+            if year:
+                today = datetime.datetime.today()
+                return today.year - year
+    except:
+        pass
+    return 18
+
 def is_dm_restricted(user_a, user_b):
     """Check if a DM between user_a and user_b is blocked by either side's parental locks.
-    Returns True if either user has the other in their restricted list."""
+    Returns True if either user has the other in their restricted list, or if age segregation is violated."""
     if not user_a or not user_b:
         return False
-    return user_b.lower() in get_restricted_users(user_a) or user_a.lower() in get_restricted_users(user_b)
+    
+    # 1. Custom restricted list check
+    if user_b.lower() in get_restricted_users(user_a) or user_a.lower() in get_restricted_users(user_b):
+        return True
+        
+    # 2. Age segregation check
+    try:
+        info_a = db_sql("SELECT dob, pl_age_segregation FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[user_a], chat_room=False)
+        info_b = db_sql("SELECT dob, pl_age_segregation FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[user_b], chat_room=False)
+        
+        if info_a and info_b:
+            age_a = get_user_age_from_dob(info_a[0][0])
+            seg_a = bool(info_a[0][1])
+            
+            age_b = get_user_age_from_dob(info_b[0][0])
+            seg_b = bool(info_b[0][1])
+            
+            if (seg_a or seg_b) and ((age_a < 13 and age_b >= 13) or (age_a >= 13 and age_b < 13)):
+                return True
+    except Exception as e:
+        print(f"Error in is_dm_restricted age check: {e}")
+        
+    return False
 
 @app.before_request
 def check_curfew_redirect():
@@ -2984,20 +3031,56 @@ def Recv(message, sid):
 
         if check_credentials(username, password):
             try:
+                is_curr_admin = is_admin(username)
                 clean_query = remove_go_spaces(query.lower())
                 
+                limit_val = 50 if is_curr_admin else 200
                 if clean_query:
                     results = db_sql(
-                        "SELECT username, first_name, last_name FROM accounts WHERE LOWER(username) LIKE ? OR LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? LIMIT 50;",
+                        f"SELECT username, first_name, last_name, dob, pl_age_segregation FROM accounts WHERE LOWER(username) LIKE ? OR LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? LIMIT {limit_val};",
                         'accounts', params=[f'%{clean_query}%', f'%{clean_query}%', f'%{clean_query}%'], chat_room=False
                     )
                 else:
                     results = db_sql(
-                        "SELECT username, first_name, last_name FROM accounts LIMIT 50;",
+                        f"SELECT username, first_name, last_name, dob, pl_age_segregation FROM accounts LIMIT {limit_val};",
                         'accounts', chat_room=False
                     )
 
-                user_list = [{'username': row[0], 'first_name': row[1], 'last_name': row[2], 'profile_picture': f'/static/profile-pictures/{row[0]}.png'} for row in results]
+                if is_curr_admin:
+                    user_list = [{
+                        'username': row[0],
+                        'first_name': row[1],
+                        'last_name': row[2],
+                        'profile_picture': f'/static/profile-pictures/{row[0]}.png'
+                    } for row in results]
+                else:
+                    curr_info = db_sql("SELECT dob, pl_age_segregation FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+                    curr_age = 18
+                    curr_segregation = False
+                    if curr_info:
+                        curr_age = get_user_age_from_dob(curr_info[0][0])
+                        curr_segregation = bool(curr_info[0][1])
+
+                    user_list = []
+                    for row in results:
+                        other_username = row[0]
+                        if other_username.lower() == username.lower():
+                            continue
+                        
+                        other_age = get_user_age_from_dob(row[3])
+                        other_segregation = bool(row[4])
+
+                        if (curr_segregation or other_segregation) and ((curr_age < 13 and other_age >= 13) or (curr_age >= 13 and other_age < 13)):
+                            continue
+
+                        user_list.append({
+                            'username': other_username,
+                            'first_name': row[1],
+                            'last_name': row[2],
+                            'profile_picture': f'/static/profile-pictures/{other_username}.png'
+                        })
+                    user_list = user_list[:50]
+
                 Server.send(str(['Search Usernames Results', {'status': 'success', 'results': user_list}]), room=sid)
             except Exception as e:
                 print(f"Search Usernames Error: {e}")

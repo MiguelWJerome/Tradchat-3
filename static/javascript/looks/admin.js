@@ -649,7 +649,10 @@
                          <!-- Add GIFs Tab -->
                          <div id="add-tab" class="tab-content active">
                              <div class="gif-search-box" style="display: flex; gap: 12px; margin-bottom: 24px; align-items: center;">
-                                 <input type="text" id="gif-search-input" placeholder="Search GIPHY to add new GIFs...">
+                                 <div class="keyword-search-box" style="display: flex; align-items: center; gap: 12px; flex: 1; margin-bottom: 0;">
+                                     <i class="fa-solid fa-search"></i>
+                                     <input type="text" id="gif-search-input" placeholder="Search GIPHY to add new GIFs...">
+                                 </div>
                                  <select id="gif-rating-select">
                                      <option value="g" selected>G</option>
                                      <option value="pg">PG</option>

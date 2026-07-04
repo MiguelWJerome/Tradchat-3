@@ -245,12 +245,12 @@ The admins can publish news articles, events, and ads here
 
 ################## CHECKLIST ################## !important
 
-Admin Page
+
+Friends Page and Members Page (you have two tabs inside of the page)
+Make Friends System
 Post-system
 Parental Controls
 Make Profile
-Make Friends System
-Friends Page and Members Page (you have two tabs inside of the page)
 News Page
 Policy Page
 Revamp Welcome Page
@@ -259,6 +259,7 @@ Finishing Settings Page
 Set up event system
 get video calls working
 get gif database full
+finish reports and publish on the admin page
 Admin page is tested
 MAKE IT ALL PHONE AND MOBILE COMPATIBLE
 
