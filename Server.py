@@ -572,6 +572,18 @@ last_read_lock = Lock()
 gif_whitelist_lock = Lock()
 reports_alerts_lock = Lock()
 
+theme_colors = {}
+themes_dir = 'static/themes'
+if os.path.exists(themes_dir):
+    for t in os.listdir(themes_dir):
+        colors_file = os.path.join(themes_dir, t, 'colors.txt')
+        if os.path.exists(colors_file):
+            try:
+                with open(colors_file, 'r') as f:
+                    theme_colors[t] = ast.literal_eval(f.read())
+            except Exception as e:
+                print(f"Error loading theme colors for {t}: {e}")
+
 if not os.path.exists("reportsAndAlerts.db"):
     ra_db = sqlite3.connect("reportsAndAlerts.db")
     ra_cursor = ra_db.cursor()
@@ -659,7 +671,10 @@ try:
             'pl_curfew_offline': "TEXT DEFAULT '10:00 PM'",
             'pl_curfew_online': "TEXT DEFAULT '6:00 AM'",
             'pl_block_games': 'BOOLEAN DEFAULT 0',
-            'pl_age_segregation': 'BOOLEAN DEFAULT 1'
+            'pl_age_segregation': 'BOOLEAN DEFAULT 1',
+            'friends': "TEXT DEFAULT ''",
+            'country': "TEXT DEFAULT 'United States'",
+            'last_seen': "TEXT DEFAULT 'Never'"
         }
         for col, definition in new_cols.items():
             if col not in columns:
@@ -1130,8 +1145,11 @@ def home():
             
             def update_loc(u, ip_addr):
                 loc = get_location_data(ip_addr)
+                now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 if loc['city'] or loc['state']: # Only update if we got valid data
-                    db_sql("UPDATE accounts SET location = ?, latitude = ?, longitude = ?, city = ?, state = ? WHERE username = ?;", 'accounts', params=[f"{loc['city']}, {loc['state']}", loc['latitude'], loc['longitude'], loc['city'], loc['state'], u], chat_room=False)
+                    db_sql("UPDATE accounts SET location = ?, latitude = ?, longitude = ?, city = ?, state = ?, country = ?, last_seen = ? WHERE username = ?;", 'accounts', params=[f"{loc['city']}, {loc['state']}", loc['latitude'], loc['longitude'], loc['city'], loc['state'], loc['country'], now_str, u], chat_room=False)
+                else:
+                    db_sql("UPDATE accounts SET last_seen = ? WHERE username = ?;", 'accounts', params=[now_str, u], chat_room=False)
             
             Thread(target=update_loc, args=(username, ip)).start()
 
@@ -1183,6 +1201,8 @@ def settings():
         password = session['password']
 
         if check_credentials(username, password):
+            now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            db_sql("UPDATE accounts SET last_seen = ? WHERE username = ?;", 'accounts', params=[now_str, username], chat_room=False)
             theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
 
             colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
@@ -1219,6 +1239,39 @@ def settings():
             )
         else:
             raise KeyError('Why do people try to hack accounts?')
+
+    except (KeyError, SyntaxError, ValueError):
+        return redirect('/')
+
+@app.route('/members/')
+def members():
+    try:
+        username = session['username']
+        password = session['password']
+
+        if check_credentials(username, password):
+            theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+
+            colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
+            colors = ast.literal_eval(colorsFile.read())
+            colorsFile.close()
+
+            # Record presence
+            now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            db_sql("UPDATE accounts SET last_seen = ? WHERE username = ?;", 'accounts', params=[now_str, username], chat_room=False)
+
+            return render_template(
+                'members.html',
+                theme=theme,
+                color_dark=colors['color_dark'],
+                color_medium=colors['color_medium'],
+                color_light=colors['color_light'],
+                username=username,
+                password=password,
+                active_page='members'
+            )
+        else:
+            raise KeyError('Authentication failed')
 
     except (KeyError, SyntaxError, ValueError):
         return redirect('/')
@@ -2297,7 +2350,8 @@ def Recv(message, sid):
         loc = get_location_data(ip)
         
         # Username available - create account
-        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms, location, show_location, latitude, longitude, city, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2', f"{loc['city']}, {loc['state']}", 1, loc['latitude'], loc['longitude'], loc['city'], loc['state']], chat_room=False)
+        now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms, location, show_location, latitude, longitude, city, state, country, friends, last_seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2', f"{loc['city']}, {loc['state']}", 1, loc['latitude'], loc['longitude'], loc['city'], loc['state'], loc['country'], '', now_str], chat_room=False)
 
         # Get new user ID and add to Server/Admin dms
         new_id = str(find_account_id_or_password_or_gender(username, 'id'))
@@ -3085,6 +3139,186 @@ def Recv(message, sid):
             except Exception as e:
                 print(f"Search Usernames Error: {e}")
                 Server.send(str(['Search Usernames Results', {'status': 'error', 'message': 'Internal search error'}]), room=sid)
+
+    elif msg[0] == 'Get Members':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        tab = data.get('tab', 'all')
+        search_query = data.get('search_query', '')
+        filters = data.get('filters', {})
+
+        if check_credentials(username, password):
+            try:
+                # Fetch current user info
+                curr_info = db_sql("SELECT id, dob, pl_age_segregation, friends FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+                if not curr_info:
+                    Server.send(str(['Get Members Results', {'status': 'error', 'message': 'User not found'}]), room=sid)
+                    return
+                curr_id = curr_info[0][0]
+                curr_dob = curr_info[0][1]
+                curr_segregation = bool(curr_info[0][2])
+                curr_friends = split(curr_info[0][3])
+                curr_age = get_user_age_from_dob(curr_dob)
+
+                # Fetch members
+                results = db_sql("SELECT id, username, first_name, last_name, dob, location, show_location, city, state, country, gender, last_seen, theme FROM accounts WHERE id != ? AND username != 'Server';", 'accounts', params=[curr_id], chat_room=False)
+
+                member_list = []
+                for row in results:
+                    m_id, m_username, m_first_name, m_last_name, m_dob, m_location, m_show_location, m_city, m_state, m_country, m_gender, m_last_seen, m_theme = row
+                    
+                    # Friend check
+                    is_friend = str(m_id) in curr_friends
+                    
+                    # Filter by tab == 'friends'
+                    if tab == 'friends' and not is_friend:
+                        continue
+                        
+                    # Age segregation filter (only if curr_segregation is active for viewing user)
+                    m_age = get_user_age_from_dob(m_dob)
+                    if curr_segregation:
+                        if (curr_age < 13 and m_age >= 13) or (curr_age >= 13 and m_age < 13):
+                            continue
+                            
+                    # Filter by search_query
+                    if search_query:
+                        sq_clean = remove_go_spaces(search_query.lower())
+                        if (sq_clean not in remove_go_spaces(m_username.lower()) and 
+                            sq_clean not in remove_go_spaces(m_first_name.lower()) and 
+                            sq_clean not in remove_go_spaces(m_last_name.lower())):
+                            continue
+                            
+                    # Filter by filters dict
+                    if filters:
+                        # Age filter
+                        f_min_age = filters.get('min_age')
+                        f_max_age = filters.get('max_age')
+                        if f_min_age is not None and f_min_age != '':
+                            try:
+                                if m_age < int(f_min_age):
+                                    continue
+                            except ValueError:
+                                pass
+                        if f_max_age is not None and f_max_age != '':
+                            try:
+                                if m_age > int(f_max_age):
+                                    continue
+                            except ValueError:
+                                pass
+                                
+                        # Gender filter
+                        f_gender = filters.get('gender')
+                        if f_gender:
+                            if isinstance(f_gender, list):
+                                if m_gender not in f_gender:
+                                    continue
+                            elif isinstance(f_gender, str) and f_gender != '':
+                                if m_gender != f_gender:
+                                    continue
+                                    
+                        # Location filter
+                        f_loc = filters.get('location')
+                        if f_loc:
+                            f_loc_clean = remove_go_spaces(f_loc.lower())
+                            if not m_show_location:
+                                continue
+                            if (f_loc_clean not in remove_go_spaces(m_location.lower()) and 
+                                f_loc_clean not in remove_go_spaces(m_city.lower()) and 
+                                f_loc_clean not in remove_go_spaces(m_state.lower()) and 
+                                f_loc_clean not in remove_go_spaces(m_country.lower())):
+                                continue
+
+                    # Resolve user's theme color (their theme color main)
+                    m_theme_config = theme_colors.get(m_theme, {})
+                    color_main = m_theme_config.get('color_medium', '#C47A6B')
+
+                    member_list.append({
+                        'id': m_id,
+                        'username': m_username,
+                        'first_name': m_first_name,
+                        'last_name': m_last_name,
+                        'age': m_age,
+                        'location': m_location if m_show_location else '',
+                        'show_location': bool(m_show_location),
+                        'city': m_city if m_show_location else '',
+                        'state': m_state if m_show_location else '',
+                        'country': m_country if m_show_location else '',
+                        'gender': m_gender,
+                        'last_seen': m_last_seen if m_last_seen else 'Never',
+                        'is_friend': is_friend,
+                        'color_main': color_main
+                    })
+                
+                # Sort results based on user selection
+                sort_by = data.get('sort_by', 'last_name')
+                if sort_by == 'first_name':
+                    member_list.sort(key=lambda x: x['first_name'].lower())
+                elif sort_by == 'username':
+                    member_list.sort(key=lambda x: x['username'].lower())
+                else:  # Default / last_name
+                    member_list.sort(key=lambda x: x['last_name'].lower())
+
+                # Limit results
+                member_list = member_list[:200]
+                Server.send(str(['Get Members Results', {'status': 'success', 'results': member_list}]), room=sid)
+            except Exception as e:
+                print(f"Get Members Error: {e}")
+                Server.send(str(['Get Members Results', {'status': 'error', 'message': 'Internal search error'}]), room=sid)
+
+    elif msg[0] == 'Add Friend':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        friend_username = data.get('friend_username')
+        friend_id = data.get('friend_id')
+
+        if check_credentials(username, password):
+            try:
+                if friend_id is None and friend_username:
+                    friend_id = find_account_id_or_password_or_gender(friend_username, 'id')
+                
+                if friend_id:
+                    curr_info = db_sql("SELECT id, friends FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+                    if curr_info:
+                        curr_id = curr_info[0][0]
+                        friends_list = split(curr_info[0][1])
+                        
+                        if str(friend_id) not in friends_list:
+                            friends_list.append(str(friend_id))
+                            db_sql("UPDATE accounts SET friends = ? WHERE id = ?;", 'accounts', params=[join(friends_list), curr_id], chat_room=False)
+                        
+                        Server.send(str(['Add Friend Result', {'status': 'success', 'friend_id': friend_id, 'friend_username': friend_username}]), room=sid)
+            except Exception as e:
+                print(f"Add Friend Error: {e}")
+                Server.send(str(['Add Friend Result', {'status': 'error', 'message': str(e)}]), room=sid)
+
+    elif msg[0] == 'Remove Friend':
+        data = msg[1]
+        username = data['username']
+        password = data['password']
+        friend_username = data.get('friend_username')
+        friend_id = data.get('friend_id')
+
+        if check_credentials(username, password):
+            try:
+                if friend_id is None and friend_username:
+                    friend_id = find_account_id_or_password_or_gender(friend_username, 'id')
+                
+                if friend_id:
+                    curr_info = db_sql("SELECT id, friends FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+                    if curr_info:
+                        curr_id = curr_info[0][0]
+                        friends_list = split(curr_info[0][1])
+                        
+                        if str(friend_id) in friends_list:
+                            friends_list.remove(str(friend_id))
+                            db_sql("UPDATE accounts SET friends = ? WHERE id = ?;", 'accounts', params=[join(friends_list), curr_id], chat_room=False)
+                        
+                        Server.send(str(['Remove Friend Result', {'status': 'success', 'friend_id': friend_id, 'friend_username': friend_username}]), room=sid)
+            except Exception as e:
+                print(f"Remove Friend Error: {e}")
+                Server.send(str(['Remove Friend Result', {'status': 'error', 'message': str(e)}]), room=sid)
 
     elif msg[0] == 'Admin Get User Conversations':
         data = msg[1]

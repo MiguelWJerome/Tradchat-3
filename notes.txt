@@ -246,11 +246,9 @@ The admins can publish news articles, events, and ads here
 ################## CHECKLIST ################## !important
 
 
-Friends Page and Members Page (you have two tabs inside of the page)
-Make Friends System
 Post-system
-Parental Controls
 Make Profile
+have it so when you clik a picture on the memebers page or homepage it brings them to their profile page
 News Page
 Policy Page
 Revamp Welcome Page
@@ -261,6 +259,7 @@ get video calls working
 get gif database full
 finish reports and publish on the admin page
 Admin page is tested
+make sure the last of the parental controls work (for like games, or dm-locks, and cutting off the age gap limit)
 MAKE IT ALL PHONE AND MOBILE COMPATIBLE
 
 

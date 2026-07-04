@@ -1,0 +1,136 @@
+{% extends "tradchat.html" %}
+
+{% block title %}TradChat — Members{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/css/members.css" />
+{% endblock %}
+
+{% block content %}
+<main class="members-main">
+  <!-- Sticky Sub-header Toolbar -->
+  <div class="members-toolbar">
+    <div class="toolbar-left">
+      <button class="toolbar-btn btn-soft" id="filter-toggle-btn" aria-label="Toggle Filter Options">
+        <i class="fa-solid fa-sliders"></i>
+        <span>Filter</span>
+      </button>
+    </div>
+    
+    <div class="toolbar-center">
+      <div class="members-tabs">
+        <button class="tab-btn active" id="tab-all-members">All Members</button>
+        <button class="tab-btn" id="tab-friends">Friends</button>
+      </div>
+    </div>
+    
+    <div class="toolbar-right">
+      <div class="members-search-wrap">
+        <input type="text" id="members-search-input" placeholder="Search..." aria-label="Search members" />
+        <button class="search-icon-btn" id="members-search-btn" aria-label="Run Search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible Filter Drawer -->
+  <div class="filter-drawer" id="filter-drawer">
+    <div class="filter-drawer-content">
+      <div class="filter-grid">
+        <!-- Age Filter Group -->
+        <div class="filter-group">
+          <label class="filter-label">Age Range</label>
+          <div class="filter-inputs">
+            <input type="number" id="filter-age-min" placeholder="Min" min="0" max="120" />
+            <span class="range-divider">to</span>
+            <input type="number" id="filter-age-max" placeholder="Max" min="0" max="120" />
+          </div>
+        </div>
+        
+        <!-- Gender Filter Group -->
+        <div class="filter-group">
+          <label class="filter-label">Gender</label>
+          <div class="filter-checkboxes">
+            <label class="checkbox-label">
+              <input type="checkbox" id="filter-gender-boys" value="male" checked />
+              <span class="checkbox-custom"></span>
+              <span>Boys</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="filter-gender-girls" value="female" checked />
+              <span class="checkbox-custom"></span>
+              <span>Girls</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="filter-gender-bots" value="chatbot" checked />
+              <span class="checkbox-custom"></span>
+              <span>Chatbots</span>
+            </label>
+          </div>
+        </div>
+        
+        <!-- Location Filter Group -->
+        <div class="filter-group">
+          <label class="filter-label">Location</label>
+          <input type="text" id="filter-location" placeholder="City, State or Country..." />
+        </div>
+        
+        <!-- Sort Filter Group -->
+        <div class="filter-group">
+          <label class="filter-label">Sort By</label>
+          <div class="filter-checkboxes">
+            <label class="checkbox-label">
+              <input type="radio" name="filter-sort" value="last_name" checked />
+              <span class="radio-custom"></span>
+              <span>Last Name</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="radio" name="filter-sort" value="first_name" />
+              <span class="radio-custom"></span>
+              <span>First Name</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="radio" name="filter-sort" value="username" />
+              <span class="radio-custom"></span>
+              <span>Username</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Drawer Actions Row -->
+      <div class="filter-actions">
+        <button class="btn-soft" id="filter-clear-btn">Clear All</button>
+        <button class="btn-soft active" id="filter-apply-btn">Apply Filters</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cards Grid Container -->
+  <div class="members-grid-container">
+    <div class="members-grid" id="members-grid">
+      <!-- Loading indicator initially -->
+      <div class="members-status-msg">
+        <i class="fa-solid fa-circle-notch fa-spin status-icon"></i>
+        <span>Loading members...</span>
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/javascript/jquery.js"></script>
+<script src="/static/javascript/socketio.js"></script>
+<script src="/static/javascript/tradchat.js"></script>
+<script>
+  // Inject session credentials for Socket.IO authentication
+  window.USER_CREDENTIALS = {
+    username: {{ username | tojson }},
+    password: {{ password | tojson }}
+  };
+</script>
+<script src="/static/javascript/looks/members.js" defer></script>
+<script src="/static/javascript/network/members.js" defer></script>
+{% endblock %}

@@ -125,7 +125,7 @@
       <!-- Center: Navigation options -->
       <div class="navbar-nav" id="navbarNav">
         <button class="nav-item {% if active_page == 'home' %}active{% endif %}" data-page="mainroom" onclick="window.location.href='/home/'">Home</button>
-        <button class="nav-item" data-page="members">Members</button>
+        <button class="nav-item {% if active_page == 'members' %}active{% endif %}" data-page="members" onclick="window.location.href='/members/'">Members</button>
         <button class="nav-item" data-page="games">Games</button>
         <button class="nav-item" data-page="events">Events</button>
         <button class="nav-item" data-page="news">News</button>
@@ -156,7 +156,7 @@
         <div class="dropdown-section">
           <h3>Navigation</h3>
           <button class="dropdown-item {% if active_page == 'home' %}active{% endif %}" data-page="mainroom" onclick="window.location.href='/home/'">Home</button>
-          <button class="dropdown-item" data-page="members">Members</button>
+          <button class="dropdown-item {% if active_page == 'members' %}active{% endif %}" data-page="members" onclick="window.location.href='/members/'">Members</button>
           <button class="dropdown-item" data-page="games">Games</button>
           <button class="dropdown-item" data-page="events">Events</button>
           <button class="dropdown-item" data-page="news">News</button>
