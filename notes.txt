@@ -270,3 +270,15 @@ POST RELEEASE:
 Set up the guild system
 set up trophies and awards
 think about having the parents control parental locks with a code
+
+
+CRITIC
+THIS IS THE START OF YOUC CONVERSATIONS - for new chats
+- that also shows when the subthread was made
+
+promote people past a stage when you're choosing room roles
+
+when you click an image it pop up it becomes big, not open a new link
+
+
+have option for solid color theme color - seamus
