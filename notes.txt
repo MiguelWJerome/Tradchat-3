@@ -246,6 +246,7 @@ The admins can publish news articles, events, and ads here
 ################## CHECKLIST ################## !important
 
 
+GET IPAPI TO AT LEAST RECORD THE LOCATION BEFORE JULIANNE RELEASES THE PROFILE WIREFRAME (or after could work lol, I just want to remmeber to do it tommorow 8/24/2026 then i can delete this comment then lol)
 Post-system
 Make Profile page
 have a report button for each post

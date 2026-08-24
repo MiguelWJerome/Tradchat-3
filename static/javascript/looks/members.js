@@ -109,17 +109,30 @@ window.renderMembers = function (members) {
 
     // Build the detail row markup. Hide location fields completely if show_location is false
     let locationMarkup = '';
-    if (member.show_location && member.location) {
-      locationMarkup = `
-        <div class="detail-row" title="Location">
-          <i class="fa-solid fa-earth-americas"></i>
-          <span class="detail-value">${member.country || 'United States'}</span>
-        </div>
-        <div class="detail-row" title="State/Province">
-          <i class="fa-solid fa-map-pin"></i>
-          <span class="detail-value">${member.state || member.location}</span>
-        </div>
-      `;
+    if (member.show_location) {
+      let locVal = '';
+      if (member.city && member.state) {
+        locVal = `${member.city}, ${member.state}`;
+      } else {
+        locVal = member.city || member.state || member.location || '';
+      }
+      
+      if (locVal || member.country) {
+        locationMarkup = `
+          <div class="detail-row" title="Location">
+            <i class="fa-solid fa-earth-americas"></i>
+            <span class="detail-value">${member.country || 'United States'}</span>
+          </div>
+        `;
+        if (locVal) {
+          locationMarkup += `
+            <div class="detail-row" title="City/State">
+              <i class="fa-solid fa-map-pin"></i>
+              <span class="detail-value">${locVal}</span>
+            </div>
+          `;
+        }
+      }
     }
 
     // Build friend star badge markup if they are a friend

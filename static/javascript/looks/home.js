@@ -775,8 +775,9 @@ document.body.onclick = function () {
           var firstUser = $firstMsg.attr("data-user");
           var timeDiffMs = firstTimestamp - currentTimestamp;
 
-          // Check if the first message bubble is deleted
-          var firstBubbleIsDeleted = $firstMsg.find(".message__bubble").first().find(".message__text").text() === "(message has been deleted)";
+          // Check if the first message bubble is deleted or blocked
+          var firstBubbleText = $firstMsg.find(".message__bubble").first().find(".message__text").text();
+          var firstBubbleIsDeleted = firstBubbleText === "(message has been deleted)" || firstBubbleText.includes("blocked by your age-segregation");
 
           // Grouping logic: Not deleted, same user, same date, and the existing message is NEWER (timeDiff >= 0)
           isSameUser = !isDeleted && !firstBubbleIsDeleted &&
@@ -815,8 +816,9 @@ document.body.onclick = function () {
         var lastUser = $lastMsg.attr("data-user");
         var timeDiffMs = currentTimestamp - lastTimestamp;
 
-        // Check if the last message bubble is deleted
-        var lastBubbleIsDeleted = $lastMsg.find(".message__bubble").last().find(".message__text").text() === "(message has been deleted)";
+        // Check if the last message bubble is deleted or blocked
+        var lastBubbleText = $lastMsg.find(".message__bubble").last().find(".message__text").text();
+        var lastBubbleIsDeleted = lastBubbleText === "(message has been deleted)" || lastBubbleText.includes("blocked by your age-segregation");
 
         isSameUser = !isDeleted && !lastBubbleIsDeleted && (lastUser === (myself ? "You" : username)) && (lastDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs);
         $targetMsgGroup = $lastMsg;
@@ -899,7 +901,7 @@ document.body.onclick = function () {
         if (hasText || isDeleted || (hasUpload && window.PL_BLOCK_MEDIA)) {
           var textContent = message;
           if (isDeleted) {
-            textContent = "(message has been deleted)";
+            textContent = (message && message.includes("blocked")) ? message : "(message has been deleted)";
           } else if (!hasText && hasUpload && window.PL_BLOCK_MEDIA) {
             textContent = "(this media has been restricted by your parental settings)";
           }
@@ -1182,7 +1184,7 @@ document.body.onclick = function () {
         if (hasText || isDeleted || (hasUpload && window.PL_BLOCK_MEDIA)) {
           var textContent = message;
           if (isDeleted) {
-            textContent = "(message has been deleted)";
+            textContent = (message && message.includes("blocked")) ? message : "(message has been deleted)";
           } else if (!hasText && hasUpload && window.PL_BLOCK_MEDIA) {
             textContent = "(this media has been restricted by your parental settings)";
           }

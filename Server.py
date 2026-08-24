@@ -170,14 +170,22 @@ def fetch_room_messages(room_name, limit, offset, underhead, username=None):
         if t[7]: # t[7] is 'deleted'
             message['message'] = "(message has been deleted)"
             message['upload'] = ""
+            t_deleted = t[7]
         else:
-            message['message'] = t[2]
-            message['upload'] = t[5]
+            is_viewing_admin = is_admin(username)
+            if username and is_dm_restricted(username, message['username']) and not is_viewing_admin:
+                message['message'] = "(this message was blocked by your age-segregation restriction)"
+                message['upload'] = ""
+                t_deleted = 1
+            else:
+                message['message'] = t[2]
+                message['upload'] = t[5]
+                t_deleted = t[7]
             
         message['timestamp'] = t[3]
         message['reply_id'] = t[4]
         message['reactions'] = get_reactions_with_usernames(t[6])
-        message['deleted'] = t[7]
+        message['deleted'] = t_deleted
         messages.append(message)
 
     if not (offset == -1 and username and lastTimeStamp is not False):
@@ -242,19 +250,27 @@ def fetch_dm_messages(dm_string, username, limit, offset, underhead):
         # Soft-delete masking: If deleted, hide content and upload
         msg_text = message[2]
         upload_data = message[5]
+        m_deleted = message[7]
+        msg_sender = find_username_from_id(message[1])
         if message[7]: # message[7] is 'deleted'
             msg_text = "(message has been deleted)"
             upload_data = ""
+        else:
+            is_viewing_admin = is_admin(username)
+            if username and is_dm_restricted(username, msg_sender) and not is_viewing_admin:
+                msg_text = "(this message was blocked by your age-segregation restriction)"
+                upload_data = ""
+                m_deleted = 1
 
         messages.append({
             'id': message[0],
-            'username': find_username_from_id(message[1]),
+            'username': msg_sender,
             'message': msg_text,
             'timestamp': message[3],
             'reply_id': message[4],
             'upload': upload_data,
             'reactions': get_reactions_with_usernames(message[6]),
-            'deleted': message[7]
+            'deleted': m_deleted
         })
 
     if not (offset == -1 and lastTimeStamp is not False):
@@ -651,7 +667,8 @@ if not os.path.exists("accounts.db"):
             pl_curfew_offline TEXT NOT NULL DEFAULT '4:30 AM',
             pl_curfew_online TEXT NOT NULL DEFAULT '4:30 AM',
             pl_block_games BOOLEAN NOT NULL DEFAULT 0,
-            pl_age_segregation BOOLEAN NOT NULL DEFAULT 1
+            pl_age_segregation BOOLEAN NOT NULL DEFAULT 1,
+            last_login_date TEXT NOT NULL DEFAULT ''
         );
     ''')
     accounts_db.close()
@@ -663,7 +680,6 @@ try:
         cursor = conn.cursor()
         columns = [info[1] for info in cursor.execute("PRAGMA table_info(accounts);").fetchall()]
         new_cols = {
-            'location': 'TEXT DEFAULT ""',
             'show_location': 'BOOLEAN DEFAULT 1',
             'latitude': 'REAL DEFAULT 0.0',
             'longitude': 'REAL DEFAULT 0.0',
@@ -682,12 +698,23 @@ try:
             'pl_age_segregation': 'BOOLEAN DEFAULT 1',
             'friends': "TEXT DEFAULT ''",
             'country': "TEXT DEFAULT 'United States'",
-            'last_seen': "TEXT DEFAULT 'Never'"
+            'last_seen': "TEXT DEFAULT 'Never'",
+            'last_login_date': "TEXT DEFAULT ''"
         }
         for col, definition in new_cols.items():
             if col not in columns:
                 cursor.execute(f"ALTER TABLE accounts ADD COLUMN {col} {definition};")
         conn.commit()
+
+        # Migration: Drop the redundant 'location' column if it exists
+        if 'location' in columns:
+            try:
+                cursor.execute("ALTER TABLE accounts DROP COLUMN location;")
+                conn.commit()
+                print("Dropped redundant 'location' column from accounts.db")
+            except Exception as drop_err:
+                print(f"Error dropping location column (could be older SQLite version): {drop_err}")
+
         conn.close()
 except Exception as e:
     print(f"Migration error: {e}")
@@ -914,6 +941,69 @@ def get_location_data(ip):
     except Exception as e:
         print(f"Error fetching location: {e}")
     return {'city': '', 'state': '', 'latitude': 0.0, 'longitude': 0.0, 'country': ''}
+
+def format_last_seen(last_seen_str):
+    if not last_seen_str or last_seen_str == 'Never':
+        return 'Never'
+    try:
+        dt = datetime.datetime.strptime(last_seen_str, '%Y-%m-%d %H:%M:%S')
+        hour = dt.hour
+        minute = dt.minute
+        ampm = "pm" if hour >= 12 else "am"
+        display_hour = hour % 12
+        if display_hour == 0:
+            display_hour = 12
+        
+        date_part = dt.strftime('%b %d, %Y')
+        import time
+        is_dst = time.localtime().tm_isdst > 0
+        full_name = time.tzname[1] if (is_dst and len(time.tzname) > 1) else time.tzname[0]
+        tz_str = "".join([c for c in full_name if c.isupper()])
+        if len(tz_str) < 2:
+            tz_str = "EDT" if is_dst else "EST"
+        
+        return f"{date_part}, {display_hour}:{minute:02d}{ampm} {tz_str}"
+    except Exception as e:
+        return last_seen_str
+
+def update_presence(username, req):
+    # Fetch client IP from request environment or remote address
+    ip = req.environ.get('HTTP_X_FORWARDED_FOR', req.remote_addr)
+    if ip and ',' in str(ip):
+        ip = ip.split(',')[0].strip()
+        
+    def update_loc_and_presence(u, ip_addr):
+        try:
+            now = datetime.datetime.now()
+            today_str = now.strftime('%Y-%m-%d')
+            now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Fetch last_login_date to see if it is the first login/page load of the day
+            row = db_sql("SELECT last_login_date FROM accounts WHERE username = ?;", 'accounts', params=[u], chat_room=False)
+            last_login_date = row[0][0] if row else ''
+            
+            if last_login_date != today_str:
+                # First visit of the day - update location
+                loc = get_location_data(ip_addr)
+                if loc['city'] or loc['state']:
+                    db_sql("UPDATE accounts SET latitude = ?, longitude = ?, city = ?, state = ?, country = ?, last_seen = ?, last_login_date = ? WHERE username = ?;", 
+                           'accounts', params=[loc['latitude'], loc['longitude'], loc['city'], loc['state'], loc['country'], now_str, today_str, u], chat_room=False)
+                    # Clear memory cache
+                    if u in accounts_dict:
+                        del accounts_dict[u]
+                    for k in list(accounts_dict.keys()):
+                        if k.lower() == u.lower():
+                            del accounts_dict[k]
+                else:
+                    db_sql("UPDATE accounts SET last_seen = ?, last_login_date = ? WHERE username = ?;", 
+                           'accounts', params=[now_str, today_str, u], chat_room=False)
+            else:
+                # Already updated location today, just update last_seen timestamp
+                db_sql("UPDATE accounts SET last_seen = ? WHERE username = ?;", 'accounts', params=[now_str, u], chat_room=False)
+        except Exception as e:
+            print(f"Error in update_loc_and_presence for {u}: {e}")
+            
+    Thread(target=update_loc_and_presence, args=(username, ip)).start()
 
 def post_server_message(room, text):
     """Fakes a message from the Server account to a specific room."""
@@ -1160,19 +1250,8 @@ def home():
             if room_param:
                 if check_room_access(room_param, username):
                     db_sql("UPDATE accounts SET room = ? WHERE username = ?;", 'accounts', params=[room_param, username], chat_room=False)
-            # Update location data in the background
-            ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
-            if ',' in str(ip): ip = ip.split(',')[0].strip() # Handle proxy lists
-            
-            def update_loc(u, ip_addr):
-                loc = get_location_data(ip_addr)
-                now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                if loc['city'] or loc['state']: # Only update if we got valid data
-                    db_sql("UPDATE accounts SET location = ?, latitude = ?, longitude = ?, city = ?, state = ?, country = ?, last_seen = ? WHERE username = ?;", 'accounts', params=[f"{loc['city']}, {loc['state']}", loc['latitude'], loc['longitude'], loc['city'], loc['state'], loc['country'], now_str, u], chat_room=False)
-                else:
-                    db_sql("UPDATE accounts SET last_seen = ? WHERE username = ?;", 'accounts', params=[now_str, u], chat_room=False)
-            
-            Thread(target=update_loc, args=(username, ip)).start()
+            # Update last_seen and conditional location data in the background
+            update_presence(username, request)
 
             theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
 
@@ -1222,23 +1301,29 @@ def settings():
         password = session['password']
 
         if check_credentials(username, password):
-            now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            db_sql("UPDATE accounts SET last_seen = ? WHERE username = ?;", 'accounts', params=[now_str, username], chat_room=False)
+            # Record presence
+            update_presence(username, request)
             theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
 
             colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
             colors = ast.literal_eval(colorsFile.read())
             colorsFile.close()
             
-            account_info = db_sql("SELECT first_name, last_name, location, show_location, city, state, email, dob FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+            account_info = db_sql("SELECT first_name, last_name, show_location, city, state, email, dob, country FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
             first_name = account_info[0][0] if account_info else ''
             last_name = account_info[0][1] if account_info else ''
-            location = account_info[0][2] if account_info else ''
-            show_location = account_info[0][3] if account_info else 1
-            city = account_info[0][4] if account_info else ''
-            state = account_info[0][5] if account_info else ''
-            email = account_info[0][6] if account_info else ''
-            dob = account_info[0][7] if account_info else ''
+            show_location = account_info[0][2] if account_info else 1
+            city = account_info[0][3] if account_info else ''
+            state = account_info[0][4] if account_info else ''
+            email = account_info[0][5] if account_info else ''
+            dob = account_info[0][6] if account_info else ''
+            country = account_info[0][7] if account_info else 'United States'
+
+            # Construct location string dynamically
+            loc_parts = []
+            if city: loc_parts.append(city)
+            if state: loc_parts.append(state)
+            location = ", ".join(loc_parts) if loc_parts else country
 
             return render_template(
                 'settings.html',
@@ -1278,8 +1363,7 @@ def members():
             colorsFile.close()
 
             # Record presence
-            now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            db_sql("UPDATE accounts SET last_seen = ? WHERE username = ?;", 'accounts', params=[now_str, username], chat_room=False)
+            update_presence(username, request)
 
             return render_template(
                 'members.html',
@@ -1832,7 +1916,14 @@ def Recv(message, sid):
 
                     message_id = db_sql("""INSERT INTO messages (user_id, message, timestamp, reply_id, upload, reactions, deleted) VALUES (?, ?, ?, ?, ?, ?, ?);""", room, params=[user_id, user_message, gmt_timestamp, reply_index, upload, "", 0], chat_room=True)
                     if not upload or upload.startswith('http'):
-                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0, 'upload': upload}]), room=room)
+                        for client_sid, state in list(sid_to_room_state.items()):
+                            if state.get('room') == room:
+                                client_username = find_username_from_id(state['user_id'])
+                                if client_username:
+                                    if is_dm_restricted(client_username, username) and not is_admin(client_username):
+                                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': "(this message was blocked by your age-segregation restriction)", 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 1, 'upload': ''}]), room=client_sid)
+                                    else:
+                                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0, 'upload': upload}]), room=client_sid)
                 else:
                     print(f"[ERROR] User {username} does not have access to room {room}")
             
@@ -1980,7 +2071,19 @@ def Recv(message, sid):
                                 'deleted': msg_data[5],
                                 'upload': new_upload
                             }
-                            Server.send(str(['Message', broadcast_data]), room=room_name)
+                            sender_username = broadcast_data['username']
+                            for client_sid, state in list(sid_to_room_state.items()):
+                                if state.get('room') == room_name:
+                                    client_username = find_username_from_id(state['user_id'])
+                                    if client_username:
+                                        if is_dm_restricted(client_username, sender_username) and not is_admin(client_username):
+                                            masked_broadcast = broadcast_data.copy()
+                                            masked_broadcast['message'] = "(this message was blocked by your age-segregation restriction)"
+                                            masked_broadcast['upload'] = ""
+                                            masked_broadcast['deleted'] = 1
+                                            Server.send(str(['Message', masked_broadcast]), room=client_sid)
+                                        else:
+                                            Server.send(str(['Message', broadcast_data]), room=client_sid)
                     else:
                         pass # still pending
                 else:
@@ -2538,8 +2641,10 @@ def Recv(message, sid):
         loc = get_location_data(ip)
         
         # Username available - create account
-        now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms, location, show_location, latitude, longitude, city, state, country, friends, last_seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2', f"{loc['city']}, {loc['state']}", 1, loc['latitude'], loc['longitude'], loc['city'], loc['state'], loc['country'], '', now_str], chat_room=False)
+        now = datetime.datetime.now()
+        now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+        today_str = now.strftime('%Y-%m-%d')
+        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms, show_location, latitude, longitude, city, state, country, friends, last_seen, last_login_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2', 1, loc['latitude'], loc['longitude'], loc['city'], loc['state'], loc['country'], '', now_str, today_str], chat_room=False)
 
         # Get new user ID and add to Server/Admin dms
         new_id = str(find_account_id_or_password_or_gender(username, 'id'))
@@ -2569,7 +2674,7 @@ def Recv(message, sid):
             # Check for ANY existing room with this name (even deleted ones)
             query = db_sql("""SELECT * FROM rooms WHERE LOWER(room_name) = ?;""", 'rooms', params=[roomname.lower()], chat_room=False)
             if query:
-                Server.send(str(['Create Room Results', 'Someone already chose this room name, please choose another.']), room=sid)
+                Server.send(str(['Create Room Results', 'Room Already Exists']), room=sid)
                 return
             
             else:
@@ -2626,8 +2731,22 @@ def Recv(message, sid):
                     Server.send(str(['Update Profile Result', {'status': 'error', 'message': 'Username already exists'}]), room=sid)
                     return
             
+            # Parse new_location into city, state, country
+            city_parsed = ''
+            state_parsed = ''
+            country_parsed = 'United States'
+            if new_location:
+                parts = [p.strip() for p in new_location.split(',')]
+                if len(parts) >= 2:
+                    city_parsed = parts[0]
+                    state_parsed = parts[1]
+                    if len(parts) >= 3:
+                        country_parsed = parts[2]
+                else:
+                    city_parsed = parts[0]
+
             # Update database
-            db_sql("""UPDATE accounts SET username = ?, password = ?, first_name = ?, last_name = ?, location = ?, show_location = ?, email = ? WHERE id = ?;""", 'accounts', params=[new_username, new_password, new_first_name, new_last_name, new_location, new_show_location, new_email, user_id], chat_room=False)
+            db_sql("""UPDATE accounts SET username = ?, password = ?, first_name = ?, last_name = ?, show_location = ?, email = ?, city = ?, state = ?, country = ? WHERE id = ?;""", 'accounts', params=[new_username, new_password, new_first_name, new_last_name, new_show_location, new_email, city_parsed, state_parsed, country_parsed, user_id], chat_room=False)
             
             username_changed = (new_username != old_username)
             if username_changed:
@@ -2743,15 +2862,17 @@ def Recv(message, sid):
                 elif my_id in managers_list: my_role = 'Manager'
                 elif my_id in curators_list: my_role = 'Curator'
                 
-                members_data = []
-                # Fetch usernames and names for each id
+                is_curr_admin = is_admin(username)
                 def append_users(id_list, role_name):
                     for uid in id_list:
                         if not uid.strip(): continue
                         u_info = db_sql("SELECT username, first_name, last_name FROM accounts WHERE id = ?;", 'accounts', params=[uid], chat_room=False)
                         if u_info:
+                            other_user = u_info[0][0]
+                            if is_dm_restricted(username, other_user) and not is_curr_admin:
+                                continue
                             members_data.append({
-                                'username': u_info[0][0],
+                                'username': other_user,
                                 'firstName': u_info[0][1],
                                 'lastName': u_info[0][2],
                                 'role': role_name
@@ -3279,12 +3400,12 @@ def Recv(message, sid):
                 limit_val = 50 if is_curr_admin else 200
                 if clean_query:
                     results = db_sql(
-                        f"SELECT username, first_name, last_name, dob, pl_age_segregation FROM accounts WHERE LOWER(username) LIKE ? OR LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? LIMIT {limit_val};",
+                        f"SELECT username, first_name, last_name, dob, pl_age_segregation, pl_dm_lock, pl_restricted_users FROM accounts WHERE LOWER(username) LIKE ? OR LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? LIMIT {limit_val};",
                         'accounts', params=[f'%{clean_query}%', f'%{clean_query}%', f'%{clean_query}%'], chat_room=False
                     )
                 else:
                     results = db_sql(
-                        f"SELECT username, first_name, last_name, dob, pl_age_segregation FROM accounts LIMIT {limit_val};",
+                        f"SELECT username, first_name, last_name, dob, pl_age_segregation, pl_dm_lock, pl_restricted_users FROM accounts LIMIT {limit_val};",
                         'accounts', chat_room=False
                     )
 
@@ -3296,12 +3417,18 @@ def Recv(message, sid):
                         'profile_picture': f'/static/profile-pictures/{row[0]}.png'
                     } for row in results]
                 else:
-                    curr_info = db_sql("SELECT dob, pl_age_segregation FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+                    curr_info = db_sql("SELECT dob, pl_age_segregation, pl_dm_lock, pl_restricted_users FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
                     curr_age = 18
                     curr_segregation = False
+                    curr_restricted_users = []
                     if curr_info:
                         curr_age = get_user_age_from_dob(curr_info[0][0])
                         curr_segregation = bool(curr_info[0][1])
+                        curr_dm_lock = bool(curr_info[0][2])
+                        if curr_dm_lock:
+                            curr_restricted_str = curr_info[0][3]
+                            if curr_restricted_str and curr_restricted_str.strip():
+                                curr_restricted_users = [u.strip().lower() for u in curr_restricted_str.split(',') if u.strip()]
 
                     user_list = []
                     for row in results:
@@ -3311,7 +3438,18 @@ def Recv(message, sid):
                         
                         other_age = get_user_age_from_dob(row[3])
                         other_segregation = bool(row[4])
+                        other_dm_lock = bool(row[5])
+                        other_restricted_list = []
+                        if other_dm_lock:
+                            other_restricted_str = row[6]
+                            if other_restricted_str and other_restricted_str.strip():
+                                other_restricted_list = [u.strip().lower() for u in other_restricted_str.split(',') if u.strip()]
 
+                        # 1. Custom restricted list check
+                        if other_username.lower() in curr_restricted_users or username.lower() in other_restricted_list:
+                            continue
+
+                        # 2. Age segregation check
                         if (curr_segregation or other_segregation) and ((curr_age < 13 and other_age >= 13) or (curr_age >= 13 and other_age < 13)):
                             continue
 
@@ -3338,8 +3476,9 @@ def Recv(message, sid):
 
         if check_credentials(username, password):
             try:
+                is_curr_admin = is_admin(username)
                 # Fetch current user info
-                curr_info = db_sql("SELECT id, dob, pl_age_segregation, friends FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+                curr_info = db_sql("SELECT id, dob, pl_age_segregation, friends, pl_dm_lock, pl_restricted_users FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
                 if not curr_info:
                     Server.send(str(['Get Members Results', {'status': 'error', 'message': 'User not found'}]), room=sid)
                     return
@@ -3348,13 +3487,25 @@ def Recv(message, sid):
                 curr_segregation = bool(curr_info[0][2])
                 curr_friends = split(curr_info[0][3])
                 curr_age = get_user_age_from_dob(curr_dob)
+                curr_dm_lock = bool(curr_info[0][4])
+                curr_restricted_users = []
+                if curr_dm_lock:
+                    curr_restricted_str = curr_info[0][5]
+                    if curr_restricted_str and curr_restricted_str.strip():
+                        curr_restricted_users = [u.strip().lower() for u in curr_restricted_str.split(',') if u.strip()]
 
                 # Fetch members (including current user)
-                results = db_sql("SELECT id, username, first_name, last_name, dob, location, show_location, city, state, country, gender, last_seen, theme FROM accounts WHERE username != 'Server';", 'accounts', chat_room=False)
+                results = db_sql("SELECT id, username, first_name, last_name, dob, show_location, city, state, country, gender, last_seen, theme, pl_age_segregation, pl_dm_lock, pl_restricted_users FROM accounts WHERE username != 'Server';", 'accounts', chat_room=False)
 
                 member_list = []
                 for row in results:
-                    m_id, m_username, m_first_name, m_last_name, m_dob, m_location, m_show_location, m_city, m_state, m_country, m_gender, m_last_seen, m_theme = row
+                    m_id, m_username, m_first_name, m_last_name, m_dob, m_show_location, m_city, m_state, m_country, m_gender, m_last_seen, m_theme, m_segregation, m_dm_lock, m_restricted_str = row
+
+                    # Construct m_location dynamically
+                    loc_parts = []
+                    if m_city: loc_parts.append(m_city)
+                    if m_state: loc_parts.append(m_state)
+                    m_location = ", ".join(loc_parts) if loc_parts else m_country
                     
                     # Friend check
                     is_friend = str(m_id) in curr_friends
@@ -3363,10 +3514,19 @@ def Recv(message, sid):
                     if tab == 'friends' and not is_friend:
                         continue
                         
-                    # Age segregation filter (only if curr_segregation is active for viewing user)
-                    m_age = get_user_age_from_dob(m_dob)
-                    if curr_segregation:
-                        if (curr_age < 13 and m_age >= 13) or (curr_age >= 13 and m_age < 13):
+                    # Custom restricted list check & Age segregation filter (bypassed for admins)
+                    if not is_curr_admin:
+                        m_restricted_list = []
+                        if m_dm_lock:
+                            if m_restricted_str and m_restricted_str.strip():
+                                m_restricted_list = [u.strip().lower() for u in m_restricted_str.split(',') if u.strip()]
+
+                        if m_username.lower() in curr_restricted_users or username.lower() in m_restricted_list:
+                            continue
+
+                        m_age = get_user_age_from_dob(m_dob)
+                        m_segregation = bool(m_segregation)
+                        if (curr_segregation or m_segregation) and ((curr_age < 13 and m_age >= 13) or (curr_age >= 13 and m_age < 13)):
                             continue
                             
                     # Filter by search_query
@@ -3433,7 +3593,7 @@ def Recv(message, sid):
                         'state': m_state if m_show_location else '',
                         'country': m_country if m_show_location else '',
                         'gender': m_gender,
-                        'last_seen': m_last_seen if m_last_seen else 'Never',
+                        'last_seen': format_last_seen(m_last_seen),
                         'is_friend': is_friend,
                         'color_main': color_main
                     })
