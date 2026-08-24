@@ -1,0 +1,181 @@
+{% extends "tradchat.html" %}
+
+{% block title %}TradChat — File Report{% endblock %}
+
+{% block styles %}
+<style>
+  .report-main {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 80px);
+    padding: 20px;
+  }
+
+  .report-card {
+    background: rgba(255, 255, 255, 0.95);
+    border: 3px solid var(--color-dark);
+    border-radius: 12px;
+    box-shadow: 6px 6px 0 var(--color-dark);
+    width: 100%;
+    max-width: 600px;
+    padding: 30px;
+    box-sizing: border-box;
+  }
+
+  .report-header {
+    border-bottom: 2px solid var(--color-dark);
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .report-title {
+    font-family: var(--font-display);
+    font-size: 2.2rem;
+    color: var(--color-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .report-description {
+    font-size: 0.95rem;
+    color: #444;
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+
+  .report-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .form-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--color-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .report-textarea {
+    width: 100%;
+    height: 180px;
+    border: 2px solid var(--color-dark);
+    border-radius: 6px;
+    padding: 12px;
+    box-sizing: border-box;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    resize: vertical;
+    outline: none;
+    transition: box-shadow 0.2s ease;
+    background: #fafaf8;
+  }
+
+  .report-textarea:focus {
+    box-shadow: 0 0 0 3px rgba(126, 8, 8, 0.15);
+    background: #fff;
+  }
+
+  .submit-report-btn {
+    align-self: center;
+    margin-top: 10px;
+    min-width: 150px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="report-main">
+  <div class="report-card">
+    <div class="report-header">
+      <h1 class="report-title">File a Report</h1>
+    </div>
+    <p class="report-description">
+      Please describe the issue or report below. Please include any relevant details, names, or contexts. An administrator will review it as soon as possible.
+    </p>
+    <div class="report-form">
+      <div class="form-group">
+        <label for="report-text" class="form-label">Report Details</label>
+        <textarea id="report-text" class="report-textarea" placeholder="Please type your report here..."></textarea>
+      </div>
+      <button id="submit-report-btn" class="btn-soft submit-report-btn">Submit Report</button>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/javascript/tradchat.js" defer></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const submitBtn = document.getElementById('submit-report-btn');
+    const textarea = document.getElementById('report-text');
+
+    if (submitBtn && textarea) {
+      submitBtn.addEventListener('click', () => {
+        const text = textarea.value.trim();
+        if (!text) {
+          if (typeof Alert === 'function') {
+            Alert('Please enter a description for your report before submitting.');
+          } else {
+            alert('Please enter a description for your report before submitting.');
+          }
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+
+        fetch('/report/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ text: text })
+        })
+        .then(res => res.json())
+        .then(data => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Report';
+
+          if (data.status === 'success') {
+            textarea.value = '';
+            if (typeof Alert === 'function') {
+              Alert('Thank you! Your report has been submitted to the administration team.', () => {
+                window.location.href = '/home/';
+              });
+            } else {
+              alert('Thank you! Your report has been submitted to the administration team.');
+              window.location.href = '/home/';
+            }
+          } else {
+            if (typeof Alert === 'function') {
+              Alert('Failed to submit report: ' + data.message);
+            } else {
+              alert('Failed to submit report: ' + data.message);
+            }
+          }
+        })
+        .catch(err => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Report';
+          if (typeof Alert === 'function') {
+            Alert('Failed to communicate with the server.');
+          } else {
+            alert('Failed to communicate with the server.');
+          }
+        });
+      });
+    }
+  });
+</script>
+{% endblock %}

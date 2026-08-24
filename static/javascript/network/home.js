@@ -95,12 +95,16 @@ function recv(message) {
                 window.myRole = data['myRole'] || 'Member';
                 change_banner_picture(data['emoji'], false);
                 document.querySelector('.room-title').textContent = data['room'].toUpperCase();
+                const reportBtn = document.getElementById('report-room-btn');
+                if (reportBtn) reportBtn.style.display = 'flex';
             } else {
                 window.myRole = 'Member';
                 change_banner_picture(data['profile_picture'], true);
                 let dmParts = data['room'].split('.$@-@&.');
                 let actualUserDmUsername = dmParts[0] === username ? dmParts[1] : dmParts[0];
                 document.querySelector('.room-title').textContent = actualUserDmUsername.toUpperCase();
+                const reportBtn = document.getElementById('report-room-btn');
+                if (reportBtn) reportBtn.style.display = 'none';
             }
             if (typeof window.updateInputBarStateForFreeze === 'function') {
                 window.updateInputBarStateForFreeze(data['room']);
@@ -113,6 +117,19 @@ function recv(message) {
             if (data['at_bottom'] === false && !data['underhead'] && !data['overhead']) {
                 if (window.__unread_marker_element) {
                     window.__unread_marker_element.scrollIntoView({ behavior: 'auto', block: 'center' });
+                }
+            }
+
+            // Check for deep-linked message and highlight it
+            if (!data['overhead'] && !data['underhead']) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const msgParam = urlParams.get('msg');
+                if (msgParam) {
+                    setTimeout(() => {
+                        if (typeof window.scrollToMessageAndHighlight === 'function') {
+                            window.scrollToMessageAndHighlight(parseInt(msgParam));
+                        }
+                    }, 400);
                 }
             }
 
@@ -289,7 +306,28 @@ function recv(message) {
                 const $deletedGroup = $('<div>').addClass('message').addClass(isOwn ? 'own' : '');
                 const $deletedContent = $('<div>').addClass('message__content');
                 
+                // Remove any image groups inside or adjacent to the bubble
+                $bubble.find('.chat-image-group').remove();
+                $bubble.next('.chat-image-group').remove();
+                $bubble.prev('.chat-image-group').remove();
+
+                // Restore bubble styling in case it was an image-only bubble (which removed it)
+                $bubble.css({
+                    "background": "",
+                    "border": "",
+                    "border-color": "",
+                    "box-shadow": "",
+                    "padding": ""
+                });
+
                 let $text = $bubble.find('.message__text');
+                if ($text.length === 0) {
+                    $text = $('<div>').addClass('message__text');
+                    if (!isOwn) {
+                        $text.css({ "color": "black" });
+                    }
+                    $bubble.append($text);
+                }
                 $text.text("(message has been deleted)").css({"font-style": "italic", "color": "#777"});
                 $bubble.find('.message-actions').remove();
                 $bubble.next('.message__reactions').remove(); 
@@ -801,3 +839,59 @@ $(document).ready(function() {
         $(this).val('');
     });
 });
+
+window.reportActiveRoom = function() {
+    if (!ROOM || ROOM.includes('.$@-@&.')) return;
+    Confirm(`Are you sure you want to report the room "${ROOM}" to administrators?`, function(agreed) {
+        if (agreed) {
+            fetch('/report/room/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ room_name: ROOM })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    Alert('Thank you. The room has been reported to the administrators.');
+                } else {
+                    Alert('Failed to submit report: ' + data.message);
+                }
+            })
+            .catch(err => {
+                Alert('Failed to communicate with the server.');
+            });
+        }
+    });
+};
+
+window.reportMessageContent = function(index, sender, text) {
+    Confirm(`Are you sure you want to report this message by ${sender}?`, function(agreed) {
+        if (agreed) {
+            fetch('/report/message/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    room_name: ROOM,
+                    message_index: parseInt(index),
+                    sender: sender,
+                    text: text
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    Alert('Thank you. The message has been reported to the administrators.');
+                } else {
+                    Alert('Failed to submit report: ' + data.message);
+                }
+            })
+            .catch(err => {
+                Alert('Failed to communicate with the server.');
+            });
+        }
+    });
+};

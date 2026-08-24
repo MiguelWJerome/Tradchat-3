@@ -97,10 +97,12 @@
       --------------------------------------------------------------- -->
   <section class="chat-panel" aria-label="Chat room">
 
-    <!-- Room header — the arrow-chevron label shown in wireframe -->
     <div class="chat-panel__header" id="chat-panel-header" style="cursor: pointer; transition: transform 0.2s ease;">
       <div class="convo-item__avatar" id="banner-picture"></div>
       <h2 class="room-title"></h2>
+      <button class="report-room-btn" id="report-room-btn" title="Report Room" onclick="event.stopPropagation(); if (typeof window.reportActiveRoom === 'function') window.reportActiveRoom();" style="display: none;">
+        <i class="fa-solid fa-flag"></i> <span>Report Room</span>
+      </button>
     </div>
 
     <!-- Room Details View (hidden by default, takes full remaining panel height) -->

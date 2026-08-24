@@ -139,6 +139,136 @@
                 });
         };
 
+        const updateReportsBadgeDot = (unseenCount) => {
+            const dot = document.querySelector('[data-target="reports"] .badge-dot');
+            if (dot) {
+                dot.style.display = unseenCount > 0 ? 'inline-block' : 'none';
+            }
+        };
+
+        const loadReports = () => {
+            contentPane.innerHTML = `
+                <div class="tab-view active">
+                    <div class="alerts-loading">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Loading reports...
+                    </div>
+                </div>
+            `;
+            AdminNetwork.fetchReports()
+                .then(data => {
+                    if (data.status === 'success') {
+                        updateReportsBadgeDot(data.unseen_count);
+                        renderReportsList(data.reports);
+                    } else {
+                        contentPane.innerHTML = `
+                            <div class="tab-view active">
+                                <div class="error-view">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                    <h3>Error Loading Reports</h3>
+                                    <p>${data.message || 'Unknown error occurred.'}</p>
+                                </div>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(err => {
+                    contentPane.innerHTML = `
+                        <div class="tab-view active">
+                            <div class="error-view">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                <h3>Error Loading Reports</h3>
+                                <p>Failed to communicate with the server.</p>
+                            </div>
+                        </div>
+                    `;
+                });
+        };
+
+        const renderReportsList = (reports) => {
+            if (reports.length === 0) {
+                contentPane.innerHTML = `
+                    <div class="tab-view active">
+                        <div class="placeholder-view">
+                            <i class="fa-solid fa-bell-slash"></i>
+                            <h3>All Clear</h3>
+                            <p>No user reports at this time.</p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            let reportsHtml = reports.map(report => {
+                const isRead = report.seen === 1 || report.seen === true;
+                const readClass = isRead ? 'read' : '';
+                const buttonLabel = isRead ? 'Mark as Unread' : 'Mark as Read';
+                return `
+                    <div class="alert-box ${readClass}" id="report-box-${report.id}">
+                        <div class="alert-content-wrapper">
+                            <div class="alert-icon-container">
+                                <i class="fa-solid fa-circle-exclamation warning-icon"></i>
+                            </div>
+                            <div class="alert-text">
+                                <strong>Reporter:</strong> ${report.reporter}<br/>
+                                <div style="margin-top: 5px; white-space: pre-wrap;">${report.text}</div>
+                            </div>
+                        </div>
+                        <div class="alert-actions">
+                            <button class="btn-soft alert-btn mark-read-btn" onclick="markReportAsRead(${report.id})">${buttonLabel}</button>
+                            <button class="btn-soft alert-btn resolve-btn" onclick="resolveReport(${report.id})">Resolve</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            contentPane.innerHTML = `
+                <div class="tab-view active">
+                    <div class="alerts-header">
+                        <h3>User Reports</h3>
+                        <span class="alerts-count">${reports.length} Active</span>
+                    </div>
+                    <div class="alerts-list">
+                        ${reportsHtml}
+                    </div>
+                </div>
+            `;
+        };
+
+        window.markReportAsRead = (reportId) => {
+            AdminNetwork.markReportAsRead(reportId)
+                .then(data => {
+                    if (data.status === 'success') {
+                        updateReportsBadgeDot(data.unseen_count);
+                        loadReports();
+                    } else {
+                        alert('Failed to mark report as read: ' + data.message);
+                    }
+                });
+        };
+
+        window.resolveReport = (reportId) => {
+            const box = document.getElementById(`report-box-${reportId}`);
+            if (box) {
+                box.classList.add('resolving');
+            }
+            AdminNetwork.resolveReport(reportId)
+                .then(data => {
+                    if (data.status === 'success') {
+                        updateReportsBadgeDot(data.unseen_count);
+                        setTimeout(() => {
+                            loadReports();
+                        }, 300);
+                    } else {
+                        if (box) box.classList.remove('resolving');
+                        alert('Failed to resolve report: ' + data.message);
+                    }
+                })
+                .catch(err => {
+                    if (box) box.classList.remove('resolving');
+                    alert('Failed to connect to the server');
+                });
+        };
+
         const loadActionZone = () => {
             contentPane.innerHTML = `
                 <div class="tab-view active">
@@ -210,7 +340,7 @@
                                     </div>
                                     <div class="card-body">
                                         <div class="az-input-action-grp">
-                                            <input type="text" id="redirect-url" value="https://tradchat.com/maintenance" class="az-input" placeholder="Redirect URL...">
+                                            <input type="text" id="redirect-url" value="/home/" class="az-input" placeholder="Redirect URL...">
                                             <button class="btn-icon" onclick="reloadUserRedirect()" title="Reset default redirect URL">
                                                 <i class="fa-solid fa-rotate-left"></i>
                                             </button>
@@ -292,6 +422,10 @@
                 alert('Please enter a message text before dispatching.');
                 return;
             }
+            const command = `Alert(${JSON.stringify(msg)});`;
+            if (typeof AdminNetwork !== 'undefined' && typeof AdminNetwork.emitDispatchCommand === 'function') {
+                AdminNetwork.emitDispatchCommand(user, command);
+            }
             alert(`Message dispatched to ${user}: "${msg}"`);
             document.getElementById('popup-message-text').value = '';
         };
@@ -307,9 +441,11 @@
             const actionType = isCurrentlyFrozen ? 'unfreeze' : 'freeze';
 
             const confirmMsg = `Are you sure you want to propose to ${actionType} account ${user}? This requires 2 admins to approve.`;
-            if (confirm(confirmMsg)) {
-                AdminNetwork.emitCreateAdminRequest(user, actionType);
-            }
+            Confirm(confirmMsg, function (agreed) {
+                if (agreed) {
+                    AdminNetwork.emitCreateAdminRequest(user, actionType);
+                }
+            });
         };
 
         window.redirectUser = () => {
@@ -318,16 +454,35 @@
                 alert('Please select a target user first.');
                 return;
             }
-            const url = document.getElementById('redirect-url').value.trim();
-            if (!url) {
+            let rawUrl = document.getElementById('redirect-url').value.trim();
+            if (!rawUrl) {
                 alert('Please enter a target redirect URL.');
                 return;
             }
-            alert(`Redirect command issued for ${user} to: ${url}`);
+
+            let formattedUrl = rawUrl;
+            if (!/^https?:\/\//i.test(formattedUrl)) {
+                if (formattedUrl.includes('.') && !formattedUrl.startsWith('/')) {
+                    formattedUrl = 'https://' + formattedUrl;
+                } else {
+                    if (!formattedUrl.startsWith('/')) {
+                        formattedUrl = '/' + formattedUrl;
+                    }
+                    if (!formattedUrl.endsWith('/')) {
+                        formattedUrl = formattedUrl + '/';
+                    }
+                }
+            }
+
+            const command = `window.location.assign(${JSON.stringify(formattedUrl)});`;
+            if (typeof AdminNetwork !== 'undefined' && typeof AdminNetwork.emitDispatchCommand === 'function') {
+                AdminNetwork.emitDispatchCommand(user, command);
+            }
+            alert(`Redirect command issued for ${user} to: ${formattedUrl}`);
         };
 
         window.reloadUserRedirect = () => {
-            document.getElementById('redirect-url').value = 'https://tradchat.com/maintenance';
+            document.getElementById('redirect-url').value = '/home/';
         };
 
         window.purgeAccount = () => {
@@ -336,10 +491,11 @@
                 alert('Please select a target user first.');
                 return;
             }
-            const confirmPurge = confirm(`WARNING: Are you absolutely sure you want to permanently delete account ${user}? This requires 3 admins to approve.`);
-            if (confirmPurge) {
-                AdminNetwork.emitCreateAdminRequest(user, 'delete');
-            }
+            Confirm(`WARNING: Are you absolutely sure you want to permanently delete account ${user}? This requires 3 admins to approve.`, function (agreed) {
+                if (agreed) {
+                    AdminNetwork.emitCreateAdminRequest(user, 'delete');
+                }
+            });
         };
 
         window.voteAdminAction = (id, vote) => {
@@ -1376,6 +1532,11 @@
                     return;
                 }
 
+                if (target === 'reports') {
+                    loadReports();
+                    return;
+                }
+
                 if (target === 'action-zone') {
                     loadActionZone();
                     return;
@@ -1642,8 +1803,11 @@
     }
 
     function confirmDeleteGif(giphyId) {
-        if (!confirm(`Are you sure you want to delete GIF ${giphyId} from the whitelist?`)) return;
-        AdminNetwork.emitDeleteGif(giphyId);
+        Confirm(`Are you sure you want to delete GIF ${giphyId} from the whitelist?`, function (agreed) {
+            if (agreed) {
+                AdminNetwork.emitDeleteGif(giphyId);
+            }
+        });
     }
 
     function openKeywordModal(giphyId, gifUrl) {

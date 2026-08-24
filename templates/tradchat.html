@@ -130,6 +130,7 @@
         <button class="nav-item" data-page="events">Events</button>
         <button class="nav-item" data-page="news">News</button>
         <button class="nav-item" data-page="policy">Policy</button>
+        <button class="nav-item {% if active_page == 'report' %}active{% endif %}" onclick="window.location.href='/report/'">Report</button>
         <a href="/logout/" class="nav-item logout-btn">Logout</a>
         {% if is_admin_user %}
         <a href="/admin/" class="nav-item admin-nav-btn {% if active_page == 'admin' %}active{% endif %}" style="position: relative;">
@@ -161,6 +162,7 @@
           <button class="dropdown-item" data-page="events">Events</button>
           <button class="dropdown-item" data-page="news">News</button>
           <button class="dropdown-item" data-page="policy">Policy</button>
+          <button class="dropdown-item {% if active_page == 'report' %}active{% endif %}" onclick="window.location.href='/report/'">Report</button>
           <a href="/logout/" class="dropdown-item logout-dropdown-btn">Logout</a>
           {% if is_admin_user %}
           <a href="/admin/" class="dropdown-item admin-dropdown-btn {% if active_page == 'admin' %}active{% endif %}" style="position: relative;">

@@ -474,11 +474,11 @@
   justify-content: flex-start;
   gap: 12px;
   padding: 18px 40px 18px 20px;
-  width: 50%;
+  width: 75%;
   
   /* Notched inward shape */
   background: var(--color-medium);
-  clip-path: polygon(0% 0%, 100% 0%, 90% 50%, 100% 100%, 0% 100%);
+  clip-path: polygon(0% 0%, 100% 0%, calc(100% - 40px) 50%, 100% 100%, 0% 100%);
   border-radius: 12px 0 0 12px;
   
   margin-bottom: 15px;
@@ -2064,4 +2064,31 @@
   border: 1px solid rgba(0,0,0,0.1);
   object-fit: cover;
   box-shadow: 2px 2px 0 var(--color-dark);
+}
+
+/* Report Room Button styles */
+.report-room-btn {
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid var(--color-dark);
+  border-radius: 4px;
+  color: var(--color-dark);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-left: auto;
+  margin-right: 40px; /* Pull it away from the chevron notch */
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.report-room-btn:hover {
+  background: var(--color-dark);
+  color: var(--color-light);
+  transform: scale(1.02);
 }

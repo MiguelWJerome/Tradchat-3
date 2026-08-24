@@ -247,7 +247,9 @@ The admins can publish news articles, events, and ads here
 
 
 Post-system
-Make Profile
+Make Profile page
+have a report button for each post
+and have the report button in the profile page work
 have it so when you clik a picture on the memebers page or homepage it brings them to their profile page
 News Page
 Policy Page
@@ -257,7 +259,7 @@ Finishing Settings Page
 Set up event system
 get video calls working
 get gif database full
-finish reports and publish on the admin page
+finish publish on the admin page
 Admin page is tested
 make sure the last of the parental controls work (for like games, or dm-locks, and cutting off the age gap limit)
 MAKE IT ALL PHONE AND MOBILE COMPATIBLE
@@ -277,8 +279,6 @@ THIS IS THE START OF YOUC CONVERSATIONS - for new chats
 - that also shows when the subthread was made
 
 promote people past a stage when you're choosing room roles
-
-when you click an image it pop up it becomes big, not open a new link
 
 
 have option for solid color theme color - seamus

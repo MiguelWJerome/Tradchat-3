@@ -20,12 +20,34 @@
         return fetch(`/admin/alerts/resolve/${alertId}/`, { method: 'POST' }).then(res => res.json());
     }
 
+    function fetchReports() {
+        return fetch('/admin/reports/').then(res => res.json());
+    }
+
+    function markReportAsRead(reportId) {
+        return fetch(`/admin/reports/seen/${reportId}/`, { method: 'POST' }).then(res => res.json());
+    }
+
+    // Resolve report via POST
+    function resolveReport(reportId) {
+        return fetch(`/admin/reports/resolve/${reportId}/`, { method: 'POST' }).then(res => res.json());
+    }
+
     // --- Socket Emitters ---
     function emitGetTargetAdminData(targetUser) {
         cl.send(JSON.stringify(['Get Target Admin Data', {
             username: localStorage.getItem('username') || sessionStorage.getItem('username'),
             password: localStorage.getItem('password') || sessionStorage.getItem('password'),
             target_user: targetUser
+        }]));
+    }
+
+    function emitDispatchCommand(targetUser, command) {
+        cl.send(JSON.stringify(['Dispatch Command', {
+            username: localStorage.getItem('username') || sessionStorage.getItem('username'),
+            password: localStorage.getItem('password') || sessionStorage.getItem('password'),
+            target_user: targetUser,
+            command: command
         }]));
     }
 
@@ -170,7 +192,11 @@
         fetchAlerts,
         markAlertAsRead,
         resolveAlert,
+        fetchReports,
+        markReportAsRead,
+        resolveReport,
         emitGetTargetAdminData,
+        emitDispatchCommand,
         emitGetAdminRequests,
         emitCreateAdminRequest,
         emitVoteAdminRequest,

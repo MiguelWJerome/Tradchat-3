@@ -268,14 +268,16 @@ document.body.onclick = function () {
 
       // Wire DELETE button
       $('#delete-room-btn').off('click').on('click', function () {
-        if (confirm("Are you sure you want to PERMANENTLY DELETE this room and all its messages? This cannot be undone.")) {
-          const confirmation = prompt(`To confirm, please type the room name exactly: ${ROOM}`);
-          if (confirmation === ROOM && typeof callbacks.onDeleteRoom === 'function') {
-            callbacks.onDeleteRoom();
-          } else if (confirmation !== null) {
-            alert("Room name did not match. Deletion cancelled.");
+        Confirm("Are you sure you want to PERMANENTLY DELETE this room and all its messages? This cannot be undone.", function (agreed) {
+          if (agreed) {
+            const confirmation = prompt(`To confirm, please type the room name exactly: ${ROOM}`);
+            if (confirmation === ROOM && typeof callbacks.onDeleteRoom === 'function') {
+              callbacks.onDeleteRoom();
+            } else if (confirmation !== null) {
+              alert("Room name did not match. Deletion cancelled.");
+            }
           }
-        }
+        });
       });
 
       membersList.forEach((member) => {
@@ -426,9 +428,11 @@ document.body.onclick = function () {
                 .html('<i class="fa-solid fa-user-minus" style="font-size: 18px; width: 22px; text-align: center;"></i><span>Remove</span>')
                 .hover(function () { $(this).css('background', '#fef2f2'); }, function () { $(this).css('background', 'white'); });
               $btn.on('click', function () {
-                if (confirm('Are you sure you want to remove ' + member.username + '?')) {
-                  if (typeof callbacks.onRemove === 'function') callbacks.onRemove(member.username);
-                }
+                Confirm('Are you sure you want to remove ' + member.username + '?', function (agreed) {
+                  if (agreed) {
+                    if (typeof callbacks.onRemove === 'function') callbacks.onRemove(member.username);
+                  }
+                });
                 $menu.remove();
               });
               $menu.append($btn);
@@ -875,21 +879,44 @@ document.body.onclick = function () {
           actionsHtml += '<div class="action-item unread-btn" title="Mark Unread">💬</div>' +
             '<div class="action-divider"></div>';
 
+          if (!myself) {
+            actionsHtml += '<div class="action-item report-btn" title="Report">🚩</div>' +
+              '<div class="action-divider"></div>';
+          }
+
           actionsHtml += '<div class="action-item reply-btn" title="Reply">↩️</div>';
           $actions.html(actionsHtml);
           $newBubble.append($actions);
         }
 
-        var $newText = $("<div>").addClass("message__text").text(isDeleted ? "(message has been deleted)" : message);
-        if (isDeleted) $newText.css("font-style", "italic").css("color", "#777");
+        const hasText = message && message.trim() !== '';
+        const hasUpload = data['upload'] && data['upload'].trim() !== '';
 
-        // If this is a reply, add reply indicator before the text
-        if (replyIndex !== -1) {
-          var $replyIndicator = createReplyIndicator(replyIndex, currentIdx);
-          $newText.prepend($replyIndicator);
+        if (!hasText && hasUpload && !window.PL_BLOCK_MEDIA) {
+          $newBubble.css({ "background": "transparent", "border-color": "transparent", "box-shadow": "none" });
         }
 
-        $newBubble.append($newText);
+        if (hasText || isDeleted || (hasUpload && window.PL_BLOCK_MEDIA)) {
+          var textContent = message;
+          if (isDeleted) {
+            textContent = "(message has been deleted)";
+          } else if (!hasText && hasUpload && window.PL_BLOCK_MEDIA) {
+            textContent = "(this media has been restricted by your parental settings)";
+          }
+
+          var $newText = $("<div>").addClass("message__text").text(textContent);
+          if (isDeleted || (!hasText && hasUpload && window.PL_BLOCK_MEDIA)) {
+            $newText.css("font-style", "italic").css("color", "#777");
+          }
+
+          // If this is a reply, add reply indicator before the text
+          if (replyIndex !== -1) {
+            var $replyIndicator = createReplyIndicator(replyIndex, currentIdx);
+            $newText.prepend($replyIndicator);
+          }
+
+          $newBubble.append($newText);
+        }
 
         if (overhead) {
           // Prepend bubble to the existing group's content (before the first bubble)
@@ -899,24 +926,46 @@ document.body.onclick = function () {
         }
 
         // --- Handle Images for Grouped Messages ---
-        if (!window.PL_BLOCK_MEDIA && data['upload'] && data['upload'].trim() !== '') {
-          let imageGroup = $("<div>").css({ "display": "flex", "flex-wrap": "wrap", "gap": "8px", "margin-top": "8px" });
-          let uploadItems = data['upload'].split('|');
-          uploadItems.forEach(item => {
-            if (item.startsWith('/static/uploads/')) {
-              let $img = $("<img>").attr("src", item).addClass("chat-upload-img").on('click', function () { window.open(item, '_blank'); });
-              imageGroup.append($img);
-            } else if (item.includes('giphy.com') || item.includes('giphy_id:')) {
-              // GIPHY GIF Rendering (URL reconstructed from giphy_id)
-              let $gif = $("<img>").attr("src", item).addClass("chat-upload-gif");
-              imageGroup.append($gif);
+        if (hasUpload) {
+          if (window.PL_BLOCK_MEDIA) {
+            if (hasText) {
+              let $warning = $("<div>")
+                .css({ "font-style": "italic", "color": "#777", "margin-top": "8px", "font-size": "0.95rem" })
+                .text("(this media has been restricted by your parental settings)");
+              if (overhead) {
+                $newBubble.after($warning);
+              } else {
+                $targetMsgGroup.find(".message__content").append($warning);
+              }
             }
-          });
-          if (imageGroup.children().length > 0) {
-            if (overhead) {
-              $newBubble.after(imageGroup);
-            } else {
-              $targetMsgGroup.find(".message__content").append(imageGroup);
+          } else {
+            let imageGroup = $("<div>").addClass("chat-image-group").css({ "display": "flex", "flex-wrap": "wrap", "gap": "8px", "margin-top": "8px" });
+            let uploadItems = data['upload'].split('|');
+            uploadItems.forEach(item => {
+              if (item.startsWith('/static/uploads/')) {
+                let $img = $("<img>").attr("src", item).addClass("chat-upload-img").on('click', function () {
+                  if (typeof window.openImageModal === 'function') {
+                    window.openImageModal(item);
+                  } else {
+                    window.open(item, '_blank');
+                  }
+                });
+                imageGroup.append($img);
+              } else if (item.includes('giphy.com') || item.includes('giphy_id:')) {
+                let $gif = $("<img>").attr("src", item).addClass("chat-upload-gif");
+                imageGroup.append($gif);
+              }
+            });
+            if (imageGroup.children().length > 0) {
+              if (!hasText) {
+                $newBubble.append(imageGroup);
+              } else {
+                if (overhead) {
+                  $newBubble.after(imageGroup);
+                } else {
+                  $targetMsgGroup.find(".message__content").append(imageGroup);
+                }
+              }
             }
           }
         }
@@ -928,13 +977,26 @@ document.body.onclick = function () {
           showReplyPreview(index);
         });
 
+        // Add report button click handler
+        $newBubble.find('.report-btn').on('click', function (e) {
+          e.stopPropagation();
+          const index = $(this).closest('.message__bubble').attr('aria-index');
+          const sender = $(this).closest('.message__bubble').attr('aria-username');
+          const text = $(this).closest('.message__bubble').attr('data-message-text');
+          if (typeof window.reportMessageContent === 'function') {
+            window.reportMessageContent(index, sender, text);
+          }
+        });
+
         // Add delete button click handler
         $newBubble.find('.delete-btn').on('click', function (e) {
           e.stopPropagation();
           const index = $(this).closest('.message__bubble').attr('aria-index');
-          if (confirm("Delete this message?")) {
-            broadcast_delete_message(index);
-          }
+          Confirm("Delete this message?", function (agreed) {
+            if (agreed) {
+              broadcast_delete_message(index);
+            }
+          });
         });
 
         // Add reaction button click handler
@@ -1099,27 +1161,45 @@ document.body.onclick = function () {
           actionsHtml += '<div class="action-item unread-btn" title="Mark Unread">💬</div>' +
             '<div class="action-divider"></div>';
 
+          if (!myself) {
+            actionsHtml += '<div class="action-item report-btn" title="Report">🚩</div>' +
+              '<div class="action-divider"></div>';
+          }
+
           actionsHtml += '<div class="action-item reply-btn" title="Reply">↩️</div>';
 
           $actions.html(actionsHtml);
           $bubble.append($actions);
         }
 
-        // If this is a reply, add reply indicator
-        if (replyIndex !== -1) {
-          var $replyIndicator = createReplyIndicator(replyIndex, currentIdx);
-          $bubble.append($replyIndicator);
+        const hasText = message && message.trim() !== '';
+        const hasUpload = data['upload'] && data['upload'].trim() !== '';
+
+        if (!hasText && hasUpload && !window.PL_BLOCK_MEDIA) {
+          $bubble.css({ "background": "transparent", "border-color": "transparent", "box-shadow": "none" });
         }
 
-        var $text = $("<div>").addClass("message__text").css({ "color": "black" }).text(isDeleted ? "(message has been deleted)" : message); // Always black text
-        if (isDeleted) $text.css("font-style", "italic").css("color", "#777");
+        if (hasText || isDeleted || (hasUpload && window.PL_BLOCK_MEDIA)) {
+          var textContent = message;
+          if (isDeleted) {
+            textContent = "(message has been deleted)";
+          } else if (!hasText && hasUpload && window.PL_BLOCK_MEDIA) {
+            textContent = "(this media has been restricted by your parental settings)";
+          }
 
-        // Style bubble background based on sender
-        if (!myself) {
-          $bubble.css({ "background": "white", "border": "1px solid black" }); // White background for others
+          var $text = $("<div>").addClass("message__text").css({ "color": "black" }).text(textContent);
+          if (isDeleted || (!hasText && hasUpload && window.PL_BLOCK_MEDIA)) {
+            $text.css("font-style", "italic").css("color", "#777");
+          }
+
+          // Style bubble background based on sender
+          if (!myself) {
+            $bubble.css({ "background": "white", "border": "1px solid black" }); // White background for others
+          }
+
+          $bubble.append($text);
         }
 
-        $bubble.append($text);
         $content.append($nameWrapper, $bubble);
         if (!isDeleted) {
           $msg.append($avatar, $content);
@@ -1134,23 +1214,42 @@ document.body.onclick = function () {
         }
 
         // --- Handle Images for New Message Groups ---
-        if (!window.PL_BLOCK_MEDIA && data['upload'] && data['upload'].trim() !== '') {
-          let imageGroup = $("<div>").css({ "display": "flex", "flex-wrap": "wrap", "gap": "8px", "margin-top": "8px" });
-          if (myself) imageGroup.css("justify-content", "flex-end");
-
-          let uploadItems = data['upload'].split('|');
-          uploadItems.forEach(item => {
-            if (item.startsWith('/static/uploads/')) {
-              let $img = $("<img>").attr("src", item).addClass("chat-upload-img").on('click', function () { window.open(item, '_blank'); });
-              imageGroup.append($img);
-            } else if (item.includes('giphy.com') || item.includes('giphy_id:')) {
-              // GIPHY GIF Rendering (URL reconstructed from giphy_id)
-              let $gif = $("<img>").attr("src", item).addClass("chat-upload-gif");
-              imageGroup.append($gif);
+        if (hasUpload) {
+          if (window.PL_BLOCK_MEDIA) {
+            if (hasText) {
+              let $warning = $("<div>")
+                .css({ "font-style": "italic", "color": "#777", "margin-top": "8px", "font-size": "0.95rem" })
+                .text("(this media has been restricted by your parental settings)");
+              if (myself) $warning.css("text-align", "right");
+              $content.append($warning);
             }
-          });
-          if (imageGroup.children().length > 0) {
-            $content.append(imageGroup);
+          } else {
+            let imageGroup = $("<div>").addClass("chat-image-group").css({ "display": "flex", "flex-wrap": "wrap", "gap": "8px", "margin-top": "8px" });
+            if (myself) imageGroup.css("justify-content", "flex-end");
+
+            let uploadItems = data['upload'].split('|');
+            uploadItems.forEach(item => {
+              if (item.startsWith('/static/uploads/')) {
+                let $img = $("<img>").attr("src", item).addClass("chat-upload-img").on('click', function () {
+                  if (typeof window.openImageModal === 'function') {
+                    window.openImageModal(item);
+                  } else {
+                    window.open(item, '_blank');
+                  }
+                });
+                imageGroup.append($img);
+              } else if (item.includes('giphy.com') || item.includes('giphy_id:')) {
+                let $gif = $("<img>").attr("src", item).addClass("chat-upload-gif");
+                imageGroup.append($gif);
+              }
+            });
+            if (imageGroup.children().length > 0) {
+              if (!hasText) {
+                $bubble.append(imageGroup);
+              } else {
+                $content.append(imageGroup);
+              }
+            }
           }
         }
 
@@ -1161,13 +1260,26 @@ document.body.onclick = function () {
           showReplyPreview(index);
         });
 
+        // Add report button click handler
+        $bubble.find('.report-btn').on('click', function (e) {
+          e.stopPropagation();
+          const index = $(this).closest('.message__bubble').attr('aria-index');
+          const sender = $(this).closest('.message__bubble').attr('aria-username');
+          const text = $(this).closest('.message__bubble').attr('data-message-text');
+          if (typeof window.reportMessageContent === 'function') {
+            window.reportMessageContent(index, sender, text);
+          }
+        });
+
         // Add delete button click handler
         $bubble.find('.delete-btn').on('click', function (e) {
           e.stopPropagation();
           const index = $(this).closest('.message__bubble').attr('aria-index');
-          if (confirm("Delete this message?")) {
-            broadcast_delete_message(index);
-          }
+          Confirm("Delete this message?", function (agreed) {
+            if (agreed) {
+              broadcast_delete_message(index);
+            }
+          });
         });
 
         // Add reaction button click handler
@@ -1456,6 +1568,7 @@ document.body.onclick = function () {
       // Smooth scroll to the bubble
       $targetBubble[0].scrollIntoView({ behavior: "smooth", block: "center" });
     }
+    window.scrollToMessageAndHighlight = scrollToMessageAndHighlight;
 
     /**
      * showReplyPreview(index)

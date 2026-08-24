@@ -54,8 +54,8 @@ def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
             lock = gif_whitelist_lock
             db_path = 'gif_whitelist.db'
         elif db_string == "reports_alerts":
-            lock = reports_alerts_lock
-            db_path = 'reportsAndAlerts.db'
+            lock = admin_lock
+            db_path = 'admin.db'
     
     # Alert hook with recursion guard
     if not hasattr(db_sql, '_in_alert_check'):
@@ -570,7 +570,7 @@ boys_dm_lock = Lock()
 girls_dm_lock = Lock()
 last_read_lock = Lock()
 gif_whitelist_lock = Lock()
-reports_alerts_lock = Lock()
+admin_lock = Lock()
 
 theme_colors = {}
 themes_dir = 'static/themes'
@@ -584,8 +584,16 @@ if os.path.exists(themes_dir):
             except Exception as e:
                 print(f"Error loading theme colors for {t}: {e}")
 
-if not os.path.exists("reportsAndAlerts.db"):
-    ra_db = sqlite3.connect("reportsAndAlerts.db")
+# Rename legacy database file to admin.db if it exists
+if os.path.exists("reportsAndAlerts.db") and not os.path.exists("admin.db"):
+    try:
+        os.rename("reportsAndAlerts.db", "admin.db")
+        print("Renamed legacy reportsAndAlerts.db database to admin.db")
+    except Exception as e:
+        print(f"Error renaming reportsAndAlerts.db: {e}")
+
+if not os.path.exists("admin.db"):
+    ra_db = sqlite3.connect("admin.db")
     ra_cursor = ra_db.cursor()
     ra_cursor.execute('''
         CREATE TABLE alerts (
@@ -701,10 +709,10 @@ try:
 except Exception as e:
     print(f"Unseen admin actions table creation error: {e}")
 
-# Migration: Add admin_requests table to reportsAndAlerts.db if it doesn't exist
+# Migration: Add admin_requests and reports tables to admin.db if they don't exist
 try:
-    with reports_alerts_lock:
-        conn = sqlite3.connect('reportsAndAlerts.db')
+    with admin_lock:
+        conn = sqlite3.connect('admin.db')
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS admin_requests (
@@ -717,10 +725,19 @@ try:
                 resolved BOOLEAN NOT NULL DEFAULT 0
             );
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                reporter TEXT NOT NULL,
+                text TEXT NOT NULL,
+                resolved BOOLEAN NOT NULL DEFAULT 0,
+                seen BOOLEAN NOT NULL DEFAULT 0
+            );
+        ''')
         conn.commit()
         conn.close()
 except Exception as e:
-    print(f"Admin requests migration error: {e}")
+    print(f"Admin requests or reports migration error: {e}")
 
 
 # Ensure last_read table exists in dedicated database
@@ -1139,6 +1156,10 @@ def home():
         password = session['password']
 
         if check_credentials(username, password):
+            room_param = request.args.get('room')
+            if room_param:
+                if check_room_access(room_param, username):
+                    db_sql("UPDATE accounts SET room = ? WHERE username = ?;", 'accounts', params=[room_param, username], chat_room=False)
             # Update location data in the background
             ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
             if ',' in str(ip): ip = ip.split(',')[0].strip() # Handle proxy lists
@@ -1434,6 +1455,173 @@ def mark_alert_resolved(alert_id):
         db_sql("UPDATE alerts SET resolved = 1 WHERE id = ?;", 'reports_alerts', params=[alert_id])
         
         unseen = db_sql("SELECT COUNT(*) FROM alerts WHERE seen = 0 AND resolved = 0;", 'reports_alerts')
+        unseen_count = unseen[0][0] if unseen else 0
+        
+        return {"status": "success", "unseen_count": unseen_count}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/report/room/', methods=['POST'])
+def report_room():
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+        
+        data = request.get_json()
+        room_name = data.get('room_name')
+        if not room_name:
+            return {"status": "error", "message": "Room name is required"}, 400
+            
+        alert_text = f"this person {username} has reported the room <a href='/home/?room={room_name}'>#{room_name}</a>"
+        db_sql("INSERT INTO alerts (text, resolved, seen) VALUES (?, 0, 0);", 'reports_alerts', params=[alert_text])
+        
+        return {"status": "success", "message": "Room reported successfully"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/report/message/', methods=['POST'])
+def report_message():
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+        
+        data = request.get_json()
+        room_name = data.get('room_name')
+        msg_index = data.get('message_index')
+        sender = data.get('sender')
+        text = data.get('text')
+        
+        if not room_name or msg_index is None:
+            return {"status": "error", "message": "Room name and message index are required"}, 400
+            
+        preview = (text[:30] + '...') if text and len(text) > 30 else (text or '[Attachment/Media]')
+        alert_text = f"User {username} reported a message by {sender} in <a href='/home/?room={room_name}&msg={msg_index}'>#{room_name}</a>: \"{preview}\""
+        db_sql("INSERT INTO alerts (text, resolved, seen) VALUES (?, 0, 0);", 'reports_alerts', params=[alert_text])
+        
+        return {"status": "success", "message": "Message reported successfully"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/report/', methods=['GET', 'POST'])
+def report_page():
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return redirect('/')
+            
+        theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+        colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
+        colors = ast.literal_eval(colorsFile.read())
+        colorsFile.close()
+        
+        has_unseen_actions = False
+        if is_admin(username):
+            res = db_sql("SELECT sub_tabs FROM unseen_admin_actions WHERE LOWER(username) = LOWER(?);", 'accounts', params=[username], chat_room=False)
+            sub_tabs = res[0][0] if res else ''
+            unseen_sub_tabs_list = sub_tabs.split('$$') if sub_tabs else []
+            has_unseen_actions = len([t for t in unseen_sub_tabs_list if t]) > 0
+        
+        if request.method == 'POST':
+            data = request.get_json() or request.form
+            report_text = data.get('text')
+            if not report_text or not report_text.strip():
+                return {"status": "error", "message": "Report description cannot be empty"}, 400
+            
+            db_sql("INSERT INTO reports (reporter, text, resolved, seen) VALUES (?, ?, 0, 0);", 'reports_alerts', params=[username, report_text])
+            add_unseen_admin_action('reports')
+            
+            return {"status": "success", "message": "Report submitted successfully"}
+            
+        return render_template(
+            'report.html',
+            theme=theme,
+            color_dark=colors['color_dark'],
+            color_medium=colors['color_medium'],
+            color_light=colors['color_light'],
+            active_page='report',
+            is_admin_user=is_admin(username),
+            has_unseen_actions=has_unseen_actions
+        )
+    except Exception as e:
+        print(f"Error loading report page: {e}")
+        return redirect('/')
+
+
+@app.route('/admin/reports/', methods=['GET'])
+def get_admin_reports():
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+            
+        if not is_admin(username):
+            return {"status": "error", "message": "Unauthorized"}, 403
+            
+        rows = db_sql("SELECT id, reporter, text, resolved, seen FROM reports WHERE resolved = 0 ORDER BY seen ASC, id DESC;", 'reports_alerts')
+        reports_list = []
+        for r in rows:
+            reports_list.append({
+                "id": r[0],
+                "reporter": r[1],
+                "text": r[2],
+                "resolved": r[3],
+                "seen": r[4]
+            })
+            
+        unseen = db_sql("SELECT COUNT(*) FROM reports WHERE seen = 0 AND resolved = 0;", 'reports_alerts')
+        unseen_count = unseen[0][0] if unseen else 0
+        
+        return {"status": "success", "reports": reports_list, "unseen_count": unseen_count}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/admin/reports/seen/<int:report_id>/', methods=['POST'])
+def mark_report_seen(report_id):
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+            
+        if not is_admin(username):
+            return {"status": "error", "message": "Unauthorized"}, 403
+            
+        current = db_sql("SELECT seen FROM reports WHERE id = ?;", 'reports_alerts', params=[report_id])
+        new_seen = 0 if (current and current[0][0] == 1) else 1
+        db_sql("UPDATE reports SET seen = ? WHERE id = ?;", 'reports_alerts', params=[new_seen, report_id])
+        
+        unseen = db_sql("SELECT COUNT(*) FROM reports WHERE seen = 0 AND resolved = 0;", 'reports_alerts')
+        unseen_count = unseen[0][0] if unseen else 0
+        
+        return {"status": "success", "unseen_count": unseen_count}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/admin/reports/resolve/<int:report_id>/', methods=['POST'])
+def mark_report_resolved(report_id):
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+            
+        if not is_admin(username):
+            return {"status": "error", "message": "Unauthorized"}, 403
+            
+        db_sql("UPDATE reports SET resolved = 1 WHERE id = ?;", 'reports_alerts', params=[report_id])
+        
+        unseen = db_sql("SELECT COUNT(*) FROM reports WHERE seen = 0 AND resolved = 0;", 'reports_alerts')
         unseen_count = unseen[0][0] if unseen else 0
         
         return {"status": "success", "unseen_count": unseen_count}
@@ -3161,8 +3349,8 @@ def Recv(message, sid):
                 curr_friends = split(curr_info[0][3])
                 curr_age = get_user_age_from_dob(curr_dob)
 
-                # Fetch members
-                results = db_sql("SELECT id, username, first_name, last_name, dob, location, show_location, city, state, country, gender, last_seen, theme FROM accounts WHERE id != ? AND username != 'Server';", 'accounts', params=[curr_id], chat_room=False)
+                # Fetch members (including current user)
+                results = db_sql("SELECT id, username, first_name, last_name, dob, location, show_location, city, state, country, gender, last_seen, theme FROM accounts WHERE username != 'Server';", 'accounts', chat_room=False)
 
                 member_list = []
                 for row in results:
@@ -3657,6 +3845,30 @@ def Recv(message, sid):
             except Exception as e:
                 print(f"Update Parental Locks Error: {e}")
                 Server.send(str(['Update Parental Locks Result', {'status': 'error', 'message': str(e)}]), room=sid)
+
+    elif msg[0] == 'Dispatch Command':
+        data = msg[1]
+        username = data.get('username')
+        password = data.get('password')
+        target_user = data.get('target_user')
+        command = data.get('command')
+        
+        if check_credentials(username, password) and is_admin(username):
+            try:
+                user_res = db_sql("SELECT username FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_user], chat_room=False)
+                if user_res:
+                    canonical_username = user_res[0][0]
+                    target_id = find_account_id_or_password_or_gender(canonical_username, 'id')
+                    dispatched_count = 0
+                    for client_sid, state in list(sid_to_room_state.items()):
+                        if state.get('user_id') == target_id:
+                            Server.send(str(['Command', command]), room=client_sid)
+                            dispatched_count += 1
+                    print(f"Dispatch Command: Dispatched to user={canonical_username} (SIDs count={dispatched_count}): {command}")
+                else:
+                    print(f"Dispatch Command Error: Target user {target_user} not found")
+            except Exception as e:
+                print(f"Dispatch Command Error: {e}")
 
     elif msg[0] == 'Clear Unseen Action':
         data = msg[1]

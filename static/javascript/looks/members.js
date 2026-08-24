@@ -128,13 +128,19 @@ window.renderMembers = function (members) {
       : '';
 
     // Build Friend button
-    let buttonClass = 'member-action-btn';
     let buttonHtml = '';
-    if (isFriend) {
-      buttonClass += ' is-friend';
-      buttonHtml = `<i class="fa-solid fa-user-check"></i> <span>Friends</span>`;
+    const isSelf = window.USER_CREDENTIALS && window.USER_CREDENTIALS.username && (member.username.toLowerCase() === window.USER_CREDENTIALS.username.toLowerCase());
+
+    if (isSelf) {
+      buttonHtml = `<span class="member-you-badge" style="display: block; text-align: center; padding: 6px 12px; font-size: 0.95rem; font-weight: 600; color: #777; background: rgba(0,0,0,0.05); border-radius: 20px;">You</span>`;
     } else {
-      buttonHtml = `<i class="fa-solid fa-user-plus"></i> <span>Add Friend</span>`;
+      let buttonClass = 'member-action-btn';
+      if (isFriend) {
+        buttonClass += ' is-friend';
+        buttonHtml = `<button class="${buttonClass}" data-id="${member.id}" data-username="${member.username}"><i class="fa-solid fa-user-check"></i> <span>Friends</span></button>`;
+      } else {
+        buttonHtml = `<button class="${buttonClass}" data-id="${member.id}" data-username="${member.username}"><i class="fa-solid fa-user-plus"></i> <span>Add Friend</span></button>`;
+      }
     }
 
     // Create avatar initials placeholder in case image load fails
@@ -181,10 +187,8 @@ window.renderMembers = function (members) {
             </div>
           </div>
 
-          <!-- Add / Remove Friend Action Button -->
-          <button class="${buttonClass}" data-id="${member.id}" data-username="${member.username}">
-            ${buttonHtml}
-          </button>
+          <!-- Add / Remove Friend Action Button or You Badge -->
+          ${buttonHtml}
         </div>
       </div>
     `;
