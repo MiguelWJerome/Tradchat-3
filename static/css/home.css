@@ -563,6 +563,7 @@
   border: 2px solid black;
   /* Always black outline */
   object-fit: cover;
+  cursor: pointer;
 }
 
 /* Bubble wrapping text only (name is outside) */

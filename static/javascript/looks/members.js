@@ -9,6 +9,14 @@ $(document).ready(function () {
     $('#filter-drawer').toggleClass('open');
   });
 
+  // Handle click on member avatars to navigate to profile page
+  $(document).on('click', '.member-avatar-wrap', function () {
+    const user = $(this).attr('data-username');
+    if (user) {
+      window.location.href = `/profile/${encodeURIComponent(user)}/`;
+    }
+  });
+
   // Handle active states for Friends / All tabs
   $('.tab-btn').click(function () {
     if ($(this).hasClass('active')) return;
@@ -165,7 +173,7 @@ window.renderMembers = function (members) {
         <div class="member-card-banner" style="background-color: ${colorMain}"></div>
         
         <!-- Avatar Section with optional gold star badge -->
-        <div class="member-avatar-wrap">
+        <div class="member-avatar-wrap" data-username="${member.username}">
           <img src="/static/profile-pictures/${member.username}.png" 
                class="member-avatar" 
                alt="${member.first_name}'s avatar"

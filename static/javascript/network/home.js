@@ -240,6 +240,7 @@ function recv(message) {
     else if (msg[0] === 'Create DM Results') {
         if (msg[1] === 'DM Already Exists') Alert('DM already exists with this user!');
         else if (msg[1] === 'DM Created') Alert('DM created successfully!', function() { location.reload(); });
+        else Alert(msg[1]);
     }
     else if (msg[0] === 'Get Room Members Results') {
         const data = msg[1];

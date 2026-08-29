@@ -394,6 +394,7 @@ body {
   font-weight: 700;
   flex-shrink: 0;
   border: 1.5px solid var(--color-dark);
+  cursor: pointer;
 }
 
 /* Bubble wrapping text only (name is outside) */

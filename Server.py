@@ -704,6 +704,9 @@ try:
         for col, definition in new_cols.items():
             if col not in columns:
                 cursor.execute(f"ALTER TABLE accounts ADD COLUMN {col} {definition};")
+        
+        # Default unset or 0.0 coordinates to the Vatican
+        cursor.execute("UPDATE accounts SET latitude = 41.9029, longitude = 12.4534 WHERE (latitude = 0.0 AND longitude = 0.0) OR latitude IS NULL OR longitude IS NULL;")
         conn.commit()
 
         # Migration: Drop the redundant 'location' column if it exists
@@ -1347,6 +1350,174 @@ def settings():
             raise KeyError('Why do people try to hack accounts?')
 
     except (KeyError, SyntaxError, ValueError):
+        return redirect('/')
+
+COUNTRY_TO_EMOJI = {
+    'united states': '🇺🇸',
+    'usa': '🇺🇸',
+    'us': '🇺🇸',
+    'canada': '🇨🇦',
+    'united kingdom': '🇬🇧',
+    'uk': '🇬🇧',
+    'germany': '🇩🇪',
+    'france': '🇫🇷',
+    'australia': '🇦🇺',
+    'india': '🇮🇳',
+    'china': '🇨🇳',
+    'japan': '🇯🇵',
+    'brazil': '🇧🇷',
+    'mexico': '🇲🇽',
+    'italy': '🇮🇹',
+    'spain': '🇪🇸',
+    'russia': '🇷🇺',
+}
+
+@app.route('/profile/')
+@app.route('/profile/<target_username>/')
+def profile(target_username=None):
+    try:
+        username = session['username']
+        password = session['password']
+
+        if check_credentials(username, password):
+            # Record presence
+            update_presence(username, request)
+            
+            # Default target to logged in user if not specified
+            if not target_username:
+                target_username = username
+                
+            # Check target username exists
+            target_info = db_sql("SELECT first_name, last_name, dob, gender, country, last_seen, theme, id, latitude, longitude FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_username.lower()], chat_room=False)
+            if not target_info:
+                # If target user not found, fall back to current user's profile
+                return redirect('/profile/')
+
+            first_name = target_info[0][0]
+            last_name = target_info[0][1]
+            dob_str = target_info[0][2]
+            gender = target_info[0][3]
+            country = target_info[0][4]
+            last_seen_raw = target_info[0][5]
+            profile_theme = target_info[0][6]
+            target_id = target_info[0][7]
+            latitude = target_info[0][8]
+            longitude = target_info[0][9]
+            
+            if (latitude is None or longitude is None) or (latitude == 0.0 and longitude == 0.0):
+                latitude = 41.9029
+                longitude = 12.4534
+            
+            # Re-fetch target_username to match exact capitalization from database
+            target_username_db = db_sql("SELECT username FROM accounts WHERE id = ?;", 'accounts', params=[target_id], chat_room=False)[0][0]
+
+            # Calculate Age
+            age = get_user_age_from_dob(dob_str)
+            
+            # Format Birthday: dob_str is 'YYYY-MM-DD', convert to 'MM/DD/YYYY'
+            birthday = 'Unknown'
+            if dob_str:
+                for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y'):
+                    try:
+                        parsed_date = datetime.datetime.strptime(dob_str, fmt)
+                        birthday = parsed_date.strftime('%m/%d/%Y')
+                        break
+                    except ValueError:
+                        continue
+
+            # Format Last Seen
+            last_seen = 'Never'
+            if last_seen_raw and last_seen_raw != 'Never':
+                try:
+                    parsed_seen = datetime.datetime.strptime(last_seen_raw, '%Y-%m-%d %H:%M:%S')
+                    last_seen = parsed_seen.strftime('%m/%d/%Y')
+                except ValueError:
+                    last_seen = last_seen_raw
+
+            # Determine if target user is currently friends with logged in user
+            curr_friends_str = db_sql("SELECT friends FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+            curr_friends = split(curr_friends_str)
+            is_friend = str(target_id) in curr_friends
+
+            # Fetch mutual friends
+            mutuals = []
+            if target_username_db.lower() != username.lower():
+                target_friends_str = db_sql("SELECT friends FROM accounts WHERE id = ?;", 'accounts', params=[target_id], chat_room=False)[0][0]
+                target_friends = split(target_friends_str)
+                
+                # Intersection of friend IDs
+                mutual_ids = list(set(curr_friends) & set(target_friends))
+                for m_id in mutual_ids:
+                    if m_id.strip():
+                        m_info = db_sql("SELECT username, first_name, last_name, gender FROM accounts WHERE id = ?;", 'accounts', params=[m_id], chat_room=False)
+                        if m_info:
+                            mutuals.append({
+                                'username': m_info[0][0],
+                                'first_name': m_info[0][1],
+                                'last_name': m_info[0][2],
+                                'gender': m_info[0][3]
+                            })
+            else:
+                # If viewing own profile, show actual friends
+                for m_id in curr_friends:
+                    if m_id.strip():
+                        m_info = db_sql("SELECT username, first_name, last_name, gender FROM accounts WHERE id = ?;", 'accounts', params=[m_id], chat_room=False)
+                        if m_info:
+                            mutuals.append({
+                                'username': m_info[0][0],
+                                'first_name': m_info[0][1],
+                                'last_name': m_info[0][2],
+                                'gender': m_info[0][3]
+                            })
+
+            # If still no mutuals/friends, pull up to 4 other real users from the database as mock/suggested mutuals
+            if not mutuals:
+                fallback_users = db_sql("SELECT username, first_name, last_name, gender FROM accounts WHERE LOWER(username) != LOWER(?) AND LOWER(username) != LOWER(?) AND username != 'Server' LIMIT 4;", 'accounts', params=[username, target_username_db], chat_room=False)
+                for row in fallback_users:
+                    mutuals.append({
+                        'username': row[0],
+                        'first_name': row[1],
+                        'last_name': row[2],
+                        'gender': row[3]
+                    })
+
+            # Get country flag emoji
+            flag_emoji = COUNTRY_TO_EMOJI.get(country.lower())
+
+            # Fetch the logged-in user's theme for colors (so base page looks consistent for viewing user)
+            theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+            colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
+            colors = ast.literal_eval(colorsFile.read())
+            colorsFile.close()
+
+            return render_template(
+                'profile.html',
+                theme=theme,
+                color_dark=colors['color_dark'],
+                color_medium=colors['color_medium'],
+                color_light=colors['color_light'],
+                username=username,
+                password=password,
+                profile_username=target_username_db,
+                first_name=first_name,
+                last_name=last_name,
+                gender=gender,
+                country=country,
+                flag_emoji=flag_emoji,
+                age=age,
+                birthday=birthday,
+                last_seen=last_seen,
+                is_friend=is_friend,
+                mutuals=mutuals,
+                latitude=latitude,
+                longitude=longitude,
+                active_page='profile'
+            )
+        else:
+            raise KeyError('Why do people try to hack accounts?')
+
+    except (KeyError, SyntaxError, ValueError) as e:
+        print(f"Error in profile route: {e}")
         return redirect('/')
 
 @app.route('/members/')
@@ -2593,10 +2764,38 @@ def Recv(message, sid):
         user = data['user']
 
         if check_credentials(username, password):
-            # Parental lock: block DM creation between restricted users
-            if is_dm_restricted(username, user):
-                print(f"[PARENTAL LOCK] DM creation blocked between {username} and {user}")
-                return
+            # Parental lock check (bypassed for admin users)
+            if not is_admin(username):
+                # 1. Custom restricted list checks
+                a_restricted = get_restricted_users(username)
+                b_restricted = get_restricted_users(user)
+                if user.lower() in a_restricted:
+                    Server.send(str(['Create DM Results', f"DM creation blocked between {username} and {user} by {username}'s parents."]), room=sid)
+                    return
+                if username.lower() in b_restricted:
+                    Server.send(str(['Create DM Results', f"DM creation blocked between {username} and {user} by {user}'s parents."]), room=sid)
+                    return
+
+                # 2. Age segregation check
+                info_a = db_sql("SELECT dob, pl_age_segregation FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[username], chat_room=False)
+                info_b = db_sql("SELECT dob, pl_age_segregation FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[user], chat_room=False)
+                if info_a and info_b:
+                    age_a = get_user_age_from_dob(info_a[0][0])
+                    seg_a = bool(info_a[0][1])
+                    age_b = get_user_age_from_dob(info_b[0][0])
+                    seg_b = bool(info_b[0][1])
+                    
+                    if (seg_a or seg_b) and ((age_a < 13 and age_b >= 13) or (age_a >= 13 and age_b < 13)):
+                        if seg_a and seg_b:
+                            Server.send(str(['Create DM Results', f"DM creation blocked between {username} and {user} by both users' parents."]), room=sid)
+                            return
+                        elif seg_a:
+                            Server.send(str(['Create DM Results', f"DM creation blocked between {username} and {user} by {username}'s parents."]), room=sid)
+                            return
+                        elif seg_b:
+                            Server.send(str(['Create DM Results', f"DM creation blocked between {username} and {user} by {user}'s parents."]), room=sid)
+                            return
+
             username_id = find_account_id_or_password_or_gender(username, 'id')
             user_id = find_account_id_or_password_or_gender(user, 'id')
 
@@ -2863,6 +3062,7 @@ def Recv(message, sid):
                 elif my_id in curators_list: my_role = 'Curator'
                 
                 is_curr_admin = is_admin(username)
+                members_data = []
                 def append_users(id_list, role_name):
                     for uid in id_list:
                         if not uid.strip(): continue
@@ -3507,6 +3707,9 @@ def Recv(message, sid):
                     if m_state: loc_parts.append(m_state)
                     m_location = ", ".join(loc_parts) if loc_parts else m_country
                     
+                    # Calculate age (needed for filters and return payload)
+                    m_age = get_user_age_from_dob(m_dob)
+
                     # Friend check
                     is_friend = str(m_id) in curr_friends
                     
@@ -3524,7 +3727,6 @@ def Recv(message, sid):
                         if m_username.lower() in curr_restricted_users or username.lower() in m_restricted_list:
                             continue
 
-                        m_age = get_user_age_from_dob(m_dob)
                         m_segregation = bool(m_segregation)
                         if (curr_segregation or m_segregation) and ((curr_age < 13 and m_age >= 13) or (curr_age >= 13 and m_age < 13)):
                             continue

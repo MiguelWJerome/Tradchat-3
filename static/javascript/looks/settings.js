@@ -16,6 +16,16 @@ document.addEventListener('DOMContentLoaded', () => {
       tab.classList.add('active');
       pane.classList.add('active');
 
+      // Hide or show the edit profile lock button
+      const editProfileBtn = document.getElementById('edit-profile-btn');
+      if (editProfileBtn) {
+        if (tabName === 'profile') {
+          editProfileBtn.style.display = 'flex';
+        } else {
+          editProfileBtn.style.display = 'none';
+        }
+      }
+
       // Update URL without reload
       if (updateUrl) {
         window.history.replaceState({ tab: tabName }, '', `?tab=${tabName}`);
@@ -32,10 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle initial tab from URL
   const urlParams = new URLSearchParams(window.location.search);
-  const initialTab = urlParams.get('tab');
-  if (initialTab) {
-    switchTab(initialTab, false);
-  }
+  const initialTab = urlParams.get('tab') || 'profile';
+  switchTab(initialTab, false);
 
   // Profile Edit Logic
   const lockBtn = document.getElementById('edit-profile-btn');

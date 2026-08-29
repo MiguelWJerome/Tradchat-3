@@ -124,6 +124,14 @@ document.body.onclick = function () {
       $sidebarList = $("#sidebar-list");
       $messageContainer = $("#message-container");
       $chatFeed = $("#chat-feed");
+
+      // Handle message avatar clicks to redirect to profile pages
+      $(document).on('click', '.message__avatar', function() {
+        var user = $(this).attr('data-username');
+        if (user) {
+          window.location.href = "/profile/" + encodeURIComponent(user) + "/";
+        }
+      });
     });
 
     // Track the currently selected room ID (string)
@@ -1107,7 +1115,9 @@ document.body.onclick = function () {
         var $msg = $("<div>").addClass("message").attr("data-user", myself ? "You" : username).attr("data-date", fullDateStr).attr("data-timestamp", msgDate.getTime());
         if (myself) $msg.addClass("own");
 
-        var $avatar = $("<img>").addClass("message__avatar").attr("src", "/static/profile-pictures/" + username + ".png")
+        var $avatar = $("<img>").addClass("message__avatar")
+          .attr("src", "/static/profile-pictures/" + username + ".png")
+          .attr("data-username", username)
           .css({ "border": "2px solid black" })  // Always black outline
           .on("error", function () { $(this).attr("src", "/static/graphics/defaultMale.png"); });
 

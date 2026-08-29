@@ -1,0 +1,290 @@
+{% extends "tradchat.html" %}
+
+{% block title %}TradChat — {{ profile_username }}'s Profile{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/css/profile.css" />
+{% endblock %}
+
+{% block content %}
+{% set default_avatar = 'defaultGirl.png' if gender == 'female' else 'defaultMale.png' %}
+<main class="profile-main">
+  <!-- Left Side: Profile Sidebar -->
+  <div class="profile-sidebar">
+    <div class="profile-name">{{ first_name }} {{ last_name }}</div>
+    
+    <div class="avatar-navigation-wrapper">
+      <button class="nav-arrow prev" aria-label="Previous image">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <div class="profile-avatar-circle">
+        <img src="/static/profile-pictures/{{ profile_username }}.png" 
+             alt="{{ first_name }}'s Profile Picture"
+             class="profile-avatar-img" 
+             onerror="this.src='/static/graphics/{{ default_avatar }}';" />
+      </div>
+      <button class="nav-arrow next" aria-label="Next image">
+        <i class="fa-solid fa-chevron-right"></i>
+      </button>
+    </div>
+    
+    <div class="profile-username-label">
+      Username: <span class="profile-username-val">{{ profile_username }}</span>
+    </div>
+    
+    <div class="profile-actions-stack">
+      <button class="profile-side-btn">Posts</button>
+      <button class="profile-side-btn" id="profile-map-btn">Map</button>
+      <button class="profile-side-btn">Message</button>
+      {% if profile_username != username %}
+      <button class="profile-side-btn" id="profile-report-btn">Report</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Right Side: Details Pane -->
+  <div class="profile-content">
+    
+    <!-- Top Row of Cards -->
+    <div class="profile-details-grid">
+      <!-- Gender Card -->
+      <div class="profile-card center-align">
+        <div class="card-big-icon">
+          {% if gender == 'female' %}
+          <i class="fa-solid fa-venus" style="color: #E066FF;"></i>
+          {% else %}
+          <i class="fa-solid fa-mars" style="color: #4A90E2;"></i>
+          {% endif %}
+        </div>
+        <div class="card-big-text">{{ gender.capitalize() }}</div>
+      </div>
+      
+      <!-- Country Card -->
+      <div class="profile-card center-align">
+        <div class="card-big-icon">
+          {% if flag_emoji %}
+          <span class="country-flag-emoji">{{ flag_emoji }}</span>
+          {% else %}
+          <i class="fa-solid fa-flag" style="color: #C0392B;"></i>
+          {% endif %}
+        </div>
+        <div class="card-big-text">
+          {% if country == 'United States' %}USA{% else %}{{ country }}{% endif %}
+        </div>
+      </div>
+      
+      <!-- Trophies Card -->
+      <div class="profile-card trophies-card">
+        <div class="profile-card-title">Trophies</div>
+        <div style="display: flex; align-items: center; justify-content: center; flex: 1; font-style: italic; color: #777;">
+          coming soon...
+        </div>
+      </div>
+    </div>
+
+    <!-- Middle Grid: Age/Birthday and Mutuals -->
+    <div class="profile-middle-grid">
+      <!-- Age Card -->
+      <div class="profile-card age-card center-align">
+        <div class="card-big-icon">
+          <i class="fa-solid fa-calendar-days"></i>
+        </div>
+        <div class="age-details">
+          <div class="birthday-label">Age</div>
+          <div class="age-number">{{ age }}</div>
+          <div class="birthday-label">Birthday</div>
+          <div class="birthday-date">{{ birthday }}</div>
+        </div>
+      </div>
+      
+      <!-- Mutuals Card -->
+      <div class="profile-card mutuals-card">
+        <div>
+          <div class="profile-card-title">Mutuals</div>
+          <div class="mutuals-list">
+            {% for m in mutuals %}
+            <div class="mutual-avatar" title="{{ m.first_name }} {{ m.last_name }} ({{ m.username }})" onclick="window.location.href='/profile/{{ m.username }}/'">
+              <img src="/static/profile-pictures/{{ m.username }}.png" class="mutual-avatar-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+              <img src="/static/graphics/default{% if m.gender == 'female' %}Female{% else %}Male{% endif %}.png" class="mutual-avatar-img" style="display: none;" alt="default avatar" />
+            </div>
+            {% else %}
+            <!-- Mock profiles to match wireframe when no mutuals exist -->
+            <div class="mutual-avatar" title="Julianne O'Connor"><img src="/static/graphics/defaultFemale.png" class="mutual-avatar-img"></div>
+            <div class="mutual-avatar" title="Paul McGill"><img src="/static/graphics/defaultMale.png" class="mutual-avatar-img"></div>
+            <div class="mutual-avatar" title="Benjamin Eberhardt"><img src="/static/graphics/defaultMale.png" class="mutual-avatar-img"></div>
+            <div class="mutual-avatar" title="Genevieve Eagan"><img src="/static/graphics/defaultFemale.png" class="mutual-avatar-img"></div>
+            {% endfor %}
+          </div>
+        </div>
+        
+        <button class="see-more-btn">See More</button>
+      </div>
+    </div>
+
+    <!-- Bottom Row: Last Visit & Action Button -->
+    <div class="profile-footer-row">
+      <!-- Last Visit Card -->
+      <div class="profile-card last-visit-card">
+        <div class="profile-card-title">Last visit</div>
+        <div class="last-visit-date">{{ last_seen }}</div>
+      </div>
+      
+      <!-- Friend Action Button -->
+      <div class="profile-action-btn-wrap">
+        {% if profile_username != username %}
+          {% if is_friend %}
+          <button class="btn-soft friend-toggle-btn" id="friend-btn">Unfriend</button>
+          {% else %}
+          <button class="btn-soft friend-toggle-btn" id="friend-btn">Add Friend</button>
+          {% endif %}
+        {% else %}
+          <div class="friend-toggle-btn-placeholder" style="min-width: 160px; height: 1px;"></div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Map Modal -->
+<div id="map-modal" class="map-modal-overlay" style="display: none;">
+  <div class="map-modal-card">
+    <button class="map-modal-close-btn" id="close-map-modal-btn">&times;</button>
+    <div class="map-modal-title">Location Map</div>
+    <div class="map-modal-body">
+      <a href="https://maps.google.com/?q={{ latitude }},{{ longitude }}" target="_blank" title="Click to open in Google Maps">
+        <div class="map-modal-iframe-wrap">
+          <iframe width="100%" height="100%" frameborder="0" style="border:0; pointer-events: none;" 
+                  src="https://maps.google.com/maps?q={{ latitude }},{{ longitude }}&z=7&output=embed" 
+                  allowfullscreen></iframe>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Report Modal -->
+<div id="report-modal" class="report-modal-overlay" style="display: none;">
+  <div class="report-modal-card">
+    <button class="report-modal-close-btn" id="close-report-modal-btn">&times;</button>
+    <div class="report-modal-title">Report User</div>
+    <div class="report-modal-body" style="display: flex; flex-direction: column; gap: 15px;">
+      <p style="margin: 0; font-size: 0.95rem; color: #555;">
+        Please describe why you are reporting <strong>{{ profile_username }}</strong>:
+      </p>
+      <textarea id="report-reason-input" class="report-modal-textarea" placeholder="Type report details here..."></textarea>
+      <button class="btn-soft report-submit-btn" id="submit-report-btn">Submit Report</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Map Modal Trigger
+    const mapBtn = document.getElementById('profile-map-btn');
+    const mapModal = document.getElementById('map-modal');
+    const closeMapBtn = document.getElementById('close-map-modal-btn');
+
+    if (mapBtn && mapModal && closeMapBtn) {
+      mapBtn.addEventListener('click', function () {
+        mapModal.style.display = 'flex';
+      });
+
+      closeMapBtn.addEventListener('click', function () {
+        mapModal.style.display = 'none';
+      });
+
+      mapModal.addEventListener('click', function (e) {
+        if (e.target === mapModal) {
+          mapModal.style.display = 'none';
+        }
+      });
+    }
+
+    // Report Modal Trigger
+    const reportBtn = document.getElementById('profile-report-btn');
+    const reportModal = document.getElementById('report-modal');
+    const closeReportBtn = document.getElementById('close-report-modal-btn');
+    const submitReportBtn = document.getElementById('submit-report-btn');
+    const reportReasonInput = document.getElementById('report-reason-input');
+
+    if (reportBtn && reportModal && closeReportBtn && submitReportBtn && reportReasonInput) {
+      reportBtn.addEventListener('click', function () {
+        reportReasonInput.value = '';
+        reportModal.style.display = 'flex';
+      });
+
+      closeReportBtn.addEventListener('click', function () {
+        reportModal.style.display = 'none';
+      });
+
+      reportModal.addEventListener('click', function (e) {
+        if (e.target === reportModal) {
+          reportModal.style.display = 'none';
+        }
+      });
+
+      submitReportBtn.addEventListener('click', function () {
+        const reason = reportReasonInput.value.trim();
+        if (!reason) {
+          if (typeof Alert === 'function') {
+            Alert('Please enter a description for your report.');
+          } else {
+            alert('Please enter a description for your report.');
+          }
+          return;
+        }
+
+        submitReportBtn.disabled = true;
+        submitReportBtn.textContent = 'Submitting...';
+
+        const reporter = "{{ username }}";
+        const target = "{{ profile_username }}";
+        const formattedText = `account ${reporter} has reported account ${target} with the following text attached: "${reason}"`;
+
+        fetch('/report/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ text: formattedText })
+        })
+        .then(res => res.json())
+        .then(data => {
+          submitReportBtn.disabled = false;
+          submitReportBtn.textContent = 'Submit Report';
+          if (data.status === 'success') {
+            reportModal.style.display = 'none';
+            if (typeof Alert === 'function') {
+              Alert('Thank you! Your report has been submitted to the administration team.');
+            } else {
+              alert('Thank you! Your report has been submitted to the administration team.');
+            }
+          } else {
+            if (typeof Alert === 'function') {
+              Alert('Failed to submit report: ' + data.message);
+            } else {
+              alert('Failed to submit report: ' + data.message);
+            }
+          }
+        })
+        .catch(err => {
+          submitReportBtn.disabled = false;
+          submitReportBtn.textContent = 'Submit Report';
+          if (typeof Alert === 'function') {
+            Alert('Failed to submit report: ' + err);
+          } else {
+            alert('Failed to submit report: ' + err);
+          }
+        });
+      });
+    }
+  });
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/javascript/tradchat.js" defer></script>
+<script src="/static/javascript/socketio.js" defer></script>
+<script src="/static/javascript/jQuery.js" defer></script>
+{% endblock %}

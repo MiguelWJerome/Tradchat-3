@@ -364,6 +364,7 @@
   height: 90px;
   margin: -45px auto 10px auto;
   z-index: 2;
+  cursor: pointer;
 }
 
 .member-avatar {
