@@ -1,3 +1,16 @@
+===============================================================================
+📌 DEVELOPER SCRATCHPAD & FEATURE BACKLOG (INTERNAL TEAM USE)
+===============================================================================
+NOTICE FOR EMPLOYERS & CODE REVIEWERS:
+This file is an unorganized raw scratchpad containing internal brainstorming 
+notes, rapid feature checklists, UI backlog items, and architectural ideas 
+used by the development team during active development. 
+
+Because this repository serves as both an active workspace and a portfolio 
+showcase, these internal notes are preserved here for ongoing development. 
+Please refer to README.md for the official system documentation and architecture.
+===============================================================================
+
 HUGE DISCLAIMER:
 
 REMOVE DB MODIFIER BEFORE LAUNCHING THE APP
