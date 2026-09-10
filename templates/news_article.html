@@ -1,0 +1,90 @@
+{% extends "tradchat.html" %}
+
+{% block title %}TradChat News - {{ article.title }}{% endblock %}
+
+{% block styles %}
+<style>
+  .article-page-container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 20px 80px 20px;
+  }
+
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--color-medium);
+    color: var(--color-dark);
+    border: 2px solid var(--color-dark);
+    border-radius: 24px;
+    padding: 8px 18px;
+    font-weight: 700;
+    font-size: 0.88rem;
+    text-decoration: none;
+    margin-bottom: 24px;
+    transition: all 0.2s ease;
+  }
+
+  .back-btn:hover {
+    background: var(--color-dark);
+    color: var(--color-light);
+    transform: translateX(-3px);
+  }
+
+  .article-hero-card {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid var(--color-dark);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+  }
+
+  .article-hero-cover {
+    width: 100%;
+    max-height: 380px;
+    object-fit: cover;
+    border-bottom: 2px solid var(--color-dark);
+  }
+
+  .article-body-wrapper {
+    padding: 36px;
+    font-size: 1rem;
+    line-height: 1.7;
+    color: #2c3e50;
+  }
+
+  .article-body-wrapper h1, 
+  .article-body-wrapper h2, 
+  .article-body-wrapper h3 {
+    color: var(--color-dark);
+    margin-top: 20px;
+    margin-bottom: 14px;
+  }
+
+  .article-body-wrapper p {
+    margin-bottom: 16px;
+  }
+
+  .article-body-wrapper ul, 
+  .article-body-wrapper ol {
+    margin-left: 28px;
+    margin-bottom: 18px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="article-page-container">
+  <a href="/news/" class="back-btn">
+    <i class="fa-solid fa-arrow-left"></i> Back to News
+  </a>
+
+  <div class="article-hero-card">
+    <img src="{{ article.cover }}" alt="{{ article.title }}" class="article-hero-cover">
+    <div class="article-body-wrapper">
+      {{ article.body|safe }}
+    </div>
+  </div>
+</div>
+{% endblock %}

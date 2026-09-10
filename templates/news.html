@@ -1,0 +1,404 @@
+{% extends "tradchat.html" %}
+
+{% block title %}TradChat - News{% endblock %}
+
+{% block styles %}
+<style>
+  .news-container {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 30px 20px 60px 20px;
+  }
+
+  /* Header Section */
+  .news-header {
+    text-align: center;
+    margin-bottom: 35px;
+    position: relative;
+  }
+
+  .news-header-title {
+    font-family: var(--font-display, 'Bebas Neue', sans-serif);
+    font-size: 2.8rem;
+    letter-spacing: 2px;
+    color: var(--color-dark);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    text-shadow: 1px 1px 0px rgba(255,255,255,0.6);
+  }
+
+  .news-header-sub {
+    font-size: 1rem;
+    color: var(--color-dark);
+    opacity: 0.85;
+    font-weight: 500;
+  }
+
+  /* 3x3 Grid Layout */
+  .news-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+  }
+
+  /* Responsive Grid Breakpoints */
+  @media (max-width: 992px) {
+    .news-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .news-grid {
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    .news-header-title {
+      font-size: 2.2rem;
+    }
+  }
+
+  /* News Card Styling - TradChat 2 Aesthetic */
+  .news-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+    border: 2px solid var(--color-dark);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+    position: relative;
+  }
+
+  .news-card:hover {
+    transform: translateY(-6px) scale(1.015);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.16);
+    border-color: var(--color-dark);
+    background: rgba(255, 255, 255, 0.95);
+  }
+
+  /* Cover Image Box (Top Wireframe Section) */
+  .news-card-image-wrapper {
+    position: relative;
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+    background: var(--color-medium);
+  }
+
+  .news-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.35s ease;
+  }
+
+  .news-card:hover .news-card-image {
+    transform: scale(1.06);
+  }
+
+  /* Middle Wireframe Section (Title & Snippet) */
+  .news-card-content {
+    padding: 18px 20px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .news-card-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--color-dark);
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+
+  .news-card-snippet {
+    font-size: 0.88rem;
+    color: #4a4a4a;
+    line-height: 1.45;
+    flex-grow: 1;
+  }
+
+  /* Bottom Wireframe Section (Read More Button) */
+  .news-card-footer {
+    padding: 14px 20px 18px 20px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    border-top: 1px dashed rgba(0, 0, 0, 0.12);
+  }
+
+  .btn-read-more {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-medium);
+    color: var(--color-dark);
+    border: 2px solid var(--color-dark);
+    border-radius: 24px;
+    padding: 8px 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    user-select: none;
+  }
+
+  .btn-read-more:hover {
+    background: var(--color-dark);
+    color: var(--color-light);
+    transform: scale(1.06);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  }
+
+  .btn-read-more i {
+    margin-left: 6px;
+    font-size: 0.8rem;
+    transition: transform 0.2s ease;
+  }
+
+  .btn-read-more:hover i {
+    transform: translateX(3px);
+  }
+
+  /* Article Modal Dialog */
+  .news-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(5px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+  }
+
+  .news-modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .news-modal-container {
+    background: #ffffff;
+    border: 2px solid var(--color-dark);
+    border-radius: 16px;
+    max-width: 800px;
+    width: 100%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    transform: scale(0.92);
+    transition: transform 0.25s ease;
+    overflow: hidden;
+  }
+
+  .news-modal-overlay.active .news-modal-container {
+    transform: scale(1);
+  }
+
+  .news-modal-header {
+    padding: 16px 24px;
+    background: var(--color-medium);
+    border-bottom: 2px solid var(--color-dark);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .news-modal-header-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-dark);
+    margin: 0;
+  }
+
+  .news-modal-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--color-dark);
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 50%;
+    transition: background 0.15s ease;
+  }
+
+  .news-modal-close-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  .news-modal-body {
+    padding: 28px;
+    overflow-y: auto;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: #2c3e50;
+  }
+
+  .news-modal-body h1, .news-modal-body h2, .news-modal-body h3 {
+    color: var(--color-dark);
+    margin-top: 18px;
+    margin-bottom: 12px;
+  }
+
+  .news-modal-body ul, .news-modal-body ol {
+    margin-left: 24px;
+    margin-bottom: 16px;
+  }
+
+  .news-modal-body p {
+    margin-bottom: 14px;
+  }
+
+  .news-modal-footer {
+    padding: 14px 24px;
+    background: #f8f9fa;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .news-modal-permalink {
+    font-size: 0.82rem;
+    color: #64748b;
+    text-decoration: none;
+  }
+
+  .news-modal-permalink:hover {
+    color: var(--color-dark);
+    text-decoration: underline;
+  }
+
+  /* Hidden Article Data Storage */
+  .article-data {
+    display: none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="news-container">
+  <!-- Header -->
+  <div class="news-header">
+    <h1 class="news-header-title">TradChat News</h1>
+    <p class="news-header-sub">Stay updated with official platform announcements, guides, and community news</p>
+  </div>
+
+  <!-- 3x3 Grid of News Articles -->
+  <div class="news-grid">
+    {% for article in articles %}
+    <div class="news-card" id="card-{{ loop.index }}">
+      <!-- Top Image Section -->
+      <div class="news-card-image-wrapper">
+        <img class="news-card-image" src="{{ article.cover }}" alt="{{ article.title }}" loading="lazy">
+      </div>
+
+      <!-- Middle Title & Snippet Section -->
+      <div class="news-card-content">
+        <h2 class="news-card-title">{{ article.title }}</h2>
+        <p class="news-card-snippet">{{ article.snippet }}</p>
+      </div>
+
+      <!-- Bottom Read More Section -->
+      <div class="news-card-footer">
+        <button class="btn-read-more" onclick="openArticleModal('{{ article.slug }}')">
+          Read More <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+
+      <!-- Hidden Raw HTML Body for Modal Parsing -->
+      <div class="article-data" id="data-{{ article.slug }}" data-title="{{ article.title }}">
+        {{ article.body|safe }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Modal Popup for Article View -->
+<div class="news-modal-overlay" id="articleModalOverlay" onclick="handleOverlayClick(event)">
+  <div class="news-modal-container">
+    <div class="news-modal-header">
+      <h2 class="news-modal-header-title" id="modalTitle">Article Details</h2>
+      <button class="news-modal-close-btn" onclick="closeArticleModal()">&times;</button>
+    </div>
+    <div class="news-modal-body" id="modalBody">
+      <!-- Article Content Loaded Here -->
+    </div>
+    <div class="news-modal-footer">
+      <a href="#" class="news-modal-permalink" id="modalPermalink" target="_blank">Direct Link <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+      <button class="btn-read-more" onclick="closeArticleModal()">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function openArticleModal(slug) {
+    const dataElem = document.getElementById('data-' + slug);
+    if (!dataElem) return;
+
+    const title = dataElem.getAttribute('data-title');
+    const contentHtml = dataElem.innerHTML;
+
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalBody').innerHTML = contentHtml;
+    
+    const permalink = '/news/' + slug + '/';
+    document.getElementById('modalPermalink').href = permalink;
+
+    const overlay = document.getElementById('articleModalOverlay');
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    // Update URL without full reload for smooth navigation history
+    window.history.pushState({ slug: slug }, title, permalink);
+  }
+
+  function closeArticleModal() {
+    const overlay = document.getElementById('articleModalOverlay');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+    window.history.pushState({}, 'TradChat News', '/news/');
+  }
+
+  function handleOverlayClick(event) {
+    if (event.target.id === 'articleModalOverlay') {
+      closeArticleModal();
+    }
+  }
+
+  // Handle ESC key to close modal
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closeArticleModal();
+    }
+  });
+
+  // Auto-open modal if URL specifies an article slug
+  const selectedArticleSlug = "{{ selected_article.slug if selected_article else '' }}";
+  if (selectedArticleSlug) {
+    document.addEventListener('DOMContentLoaded', function() {
+      openArticleModal(selectedArticleSlug);
+    });
+  }
+</script>
+{% endblock %}

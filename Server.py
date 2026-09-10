@@ -10,6 +10,7 @@ import datetime
 import os
 import shutil
 import secrets
+
 from threading import Thread, Lock
 import ast
 import base64
@@ -1550,6 +1551,92 @@ def members():
             raise KeyError('Authentication failed')
 
     except (KeyError, SyntaxError, ValueError):
+        return redirect('/')
+
+@app.route('/news/')
+@app.route('/news/<articlename>/')
+def news(articlename=None):
+    try:
+        username = session['username']
+        password = session['password']
+
+        if check_credentials(username, password):
+            theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+
+            colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
+            colors = ast.literal_eval(colorsFile.read())
+            colorsFile.close()
+
+            update_presence(username, request)
+
+            news_dir = 'static/news'
+            articles = []
+            if os.path.exists(news_dir):
+                for folder in os.listdir(news_dir):
+                    folder_path = os.path.join(news_dir, folder)
+                    if os.path.isdir(folder_path):
+                        num_file = os.path.join(folder_path, 'number.txt')
+                        body_file = os.path.join(folder_path, 'bodyInfo.html')
+                        cover_file = f'/static/news/{folder}/cover.png'
+                        
+                        sort_num = 999
+                        if os.path.exists(num_file):
+                            try:
+                                with open(num_file, 'r', encoding='utf-8') as f:
+                                    sort_num = int(f.read().strip())
+                            except Exception:
+                                pass
+
+                        body_content = ""
+                        snippet = ""
+                        if os.path.exists(body_file):
+                            try:
+                                with open(body_file, 'r', encoding='utf-8') as f:
+                                    body_content = f.read()
+                                    snippet_text = re.sub('<[^<]+?>', '', body_content)
+                                    snippet = (snippet_text[:110] + '...') if len(snippet_text) > 110 else snippet_text
+                            except Exception:
+                                pass
+
+                        slug = folder.replace(' ', '-')
+                        articles.append({
+                            'title': folder,
+                            'slug': slug,
+                            'cover': cover_file,
+                            'body': body_content,
+                            'snippet': snippet,
+                            'number': sort_num
+                        })
+
+            articles.sort(key=lambda x: x['number'])
+
+            selected_article = None
+            if articlename:
+                clean_name = articlename.replace('-', ' ').lower()
+                for art in articles:
+                    if art['title'].lower() == clean_name or art['slug'].lower() == articlename.lower():
+                        selected_article = art
+                        break
+
+            is_admin_user = bool(find_account_id_or_password_or_gender(username, 'admin'))
+
+            return render_template(
+                'news.html',
+                theme=theme,
+                color_dark=colors['color_dark'],
+                color_medium=colors['color_medium'],
+                color_light=colors['color_light'],
+                username=username,
+                articles=articles,
+                selected_article=selected_article,
+                active_page='news',
+                is_admin_user=is_admin_user
+            )
+        else:
+            raise KeyError('Authentication failed')
+
+    except (KeyError, SyntaxError, ValueError) as e:
+        print(f"Error in news route: {e}")
         return redirect('/')
 
 

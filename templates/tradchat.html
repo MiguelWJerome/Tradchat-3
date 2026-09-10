@@ -128,7 +128,7 @@
         <button class="nav-item {% if active_page == 'members' %}active{% endif %}" data-page="members" onclick="window.location.href='/members/'">Members</button>
         <button class="nav-item" data-page="games">Games</button>
         <button class="nav-item" data-page="events">Events</button>
-        <button class="nav-item" data-page="news">News</button>
+        <button class="nav-item {% if active_page == 'news' %}active{% endif %}" data-page="news" onclick="window.location.href='/news/'">News</button>
         <button class="nav-item" data-page="policy">Policy</button>
         <button class="nav-item {% if active_page == 'report' %}active{% endif %}" onclick="window.location.href='/report/'">Report</button>
         <a href="/logout/" class="nav-item logout-btn">Logout</a>
@@ -160,7 +160,7 @@
           <button class="dropdown-item {% if active_page == 'members' %}active{% endif %}" data-page="members" onclick="window.location.href='/members/'">Members</button>
           <button class="dropdown-item" data-page="games">Games</button>
           <button class="dropdown-item" data-page="events">Events</button>
-          <button class="dropdown-item" data-page="news">News</button>
+          <button class="dropdown-item {% if active_page == 'news' %}active{% endif %}" data-page="news" onclick="window.location.href='/news/'">News</button>
           <button class="dropdown-item" data-page="policy">Policy</button>
           <button class="dropdown-item {% if active_page == 'report' %}active{% endif %}" onclick="window.location.href='/report/'">Report</button>
           <a href="/logout/" class="dropdown-item logout-dropdown-btn">Logout</a>
