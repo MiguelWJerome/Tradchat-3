@@ -1,35 +1,34 @@
 # TradChat v3 🌐
-> **A Private, Wholesome Real-Time Community Platform with Event-Driven WebSockets, Granular Safety Controls, and Dynamic Theming**
+
+> A real-time community web application built with Flask, Socket.IO, SQLite, and vanilla JavaScript. It supports live messaging, user permissions, moderation tools, parental controls, and customizable themes.
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://python.org)
 [![Flask](https://img.shields.io/badge/Framework-Flask-black.svg?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![Socket.IO](https://img.shields.io/badge/Real--Time-Flask--SocketIO-010101.svg?logo=socket.io&logoColor=white)](https://socket.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
----
-
-## 📖 Project Context & Mission
-
-> [!NOTE]
-> **About this Project & Portfolio Demo:**  
-> **TradChat 3** is a private, real-time social platform built for a traditional Catholic community and circle of friends, featuring built-in safety controls, parental curfew locks, and admin verification.
->
-> While actively used by the community, this repository has been cleaned, seeded with test data, and prepared as a portfolio showcase for employers and hiring managers to evaluate my full-stack Python/Flask, event-driven WebSockets (`Flask-SocketIO`), dynamic CSS theming, and database design.
+TradChat 3 is a full-stack real-time web application built with Python, Flask, Flask-SocketIO, SQLite, and vanilla JavaScript. I designed and maintained features for live messaging, room permissions, moderation, account controls, email notifications, and customizable themes. The project was deployed on Linux/Raspberry Pi and tested with a multi-user community.
 
 ---
 
-## ✨ Key Technical & Safety Features
+## 📖 Project Context
 
-- **⚡ Event-Driven WebSocket Architecture:** Low-latency bi-directional message broadcasting and room state synchronization powered by `Flask-SocketIO`.
-- **🛡️ Granular Safety & Parental Controls:**
-  - **Automated Curfew Engine:** Restricts login access and message transmission during scheduled overnight hours.
-  - **Age Segregation Protocols:** Isolates direct messaging and channel permissions across distinct age tiers.
-  - **Admin Onboarding & Verification:** Gatekept registration pipeline requiring administrative approval.
-  - **Content Moderation:** In-stream keyword detection, reporting workflows, and real-time account freeze/unfreeze controls.
-- **🎨 Dynamic Theming & Design Token Engine:** Hot-swappable client-side themes with custom palettes and background styling (e.g. *High-Mass*, *Umbria*, *Consecration*, *Classic*, *Coding*).
-- **💬 Multi-Tenant Room & DM System:** Dynamic room creation, owner/manager role delegation, and segregated direct messaging threads.
-- **📰 Integrated Community News & Feed:** Built-in article feed for platform announcements, safety updates, and community tournament schedules.
-- **🤖 Roombot Automated Assistant:** Lightweight bot integration for room rules, commands, and navigational shortcuts.
+TradChat 3 is a full-stack real-time community application that I developed and maintained for a private user group. The project includes live messaging, room and direct-message permissions, moderation workflows, account controls, and configurable themes. This repository contains a cleaned version with sample data for local evaluation.
+
+---
+
+## ✨ Key Technical Features
+
+- **⚡ Real-Time Messaging:** Real-time message delivery and room updates using Flask-SocketIO.
+- **🛡️ Safety & Account Controls:**
+  - **Automated Curfew:** Restricts login access and message transmission during scheduled overnight hours.
+  - **Access Controls:** Role- and age-based access controls for rooms and direct messages.
+  - **Admin Verification:** Registration approval workflow requiring administrative review.
+  - **Content Moderation:** In-stream keyword detection, reporting workflows, and account freeze/unfreeze controls.
+- **🎨 Dynamic Theming:** Customizable client-side themes with selectable palettes and background styling.
+- **💬 Rooms & Direct Messages:** Separate rooms and direct-message conversations with configurable permissions.
+- **📰 Community News Feed:** Built-in article feed for platform announcements and community updates.
+- **🤖 Automated Assistant:** Lightweight bot integration for room rules, commands, and shortcuts.
 
 ---
 
@@ -39,19 +38,27 @@
 tradchat3/
 ├── Server.py               # Core application server, WebSocket handlers & API routing
 ├── send email.py           # Asynchronous SMTP notification service
-├── accounts.db             # User authentication, profiles, parental locks & geolocation
-├── admin.db                # Moderation audit logs, system alerts & approval queues
-├── rooms.db                # Public/private room registry & access permissions
-├── mainroom.db             # Primary community lounge message store
-├── last_read.db            # Unread message badges & timestamp tracking
-├── dms/                    # Direct message database pools
-├── rooms/                  # Individual channel message databases
+├── init_clean_db.py        # Database initialization & local test seeder (run locally)
+├── accounts.db             # User authentication, profiles & parental controls (sample data)
+├── admin.db                # Moderation audit logs, system alerts & approval queues (sample data)
+├── rooms.db                # Public/private room registry & access permissions (sample data)
+├── mainroom.db             # Primary community lounge message store (sample data)
+├── last_read.db            # Unread message badges & timestamp tracking (sample data)
+├── gif_whitelist.db        # Whitelisted GIF catalog (sample data)
+├── dms/                    # Direct message database store (sample data)
+│   ├── boys_dm.db
+│   └── girls_dm.db
+├── rooms/                  # Individual channel message databases (sample data)
+│   ├── announcements.db
+│   ├── community-games.db
+│   └── reading-and-study.db
 ├── static/
-│   ├── css/                # Base layouts & master design tokens
-│   ├── javascript/         # Client-side Socket.IO listeners & DOM reconcilers
-│   ├── news/               # Community announcement articles & release guides
+│   ├── css/                # Application stylesheets (admin, home, settings, etc.)
+│   ├── graphics/           # Avatars, maps, and UI graphics
+│   ├── javascript/         # Client-side Socket.IO listeners & DOM controllers
+│   ├── news/               # Community announcement articles
 │   ├── profile-pictures/   # User avatar assets
-│   └── themes/             # Dynamic theme bundles (palettes & background artwork)
+│   └── themes/             # Dynamic theme bundles
 └── templates/              # Jinja2 HTML5 view templates
 ```
 
@@ -92,14 +99,14 @@ python Server.py
 
 ## 👥 Demo Test Accounts (For Local Testing)
 
-When running with sample test data, you can log in with:
+Run init_clean_db.py to create local test accounts. Credentials are printed during setup.
 
-| Account | Username | Role | Password |
-|---|---|---|---|
-| **Administrator** | `Admin` | Platform Admin | `AdminDemo_Pass2026!` |
-| **Community Member 1** | `Alex` | Member (Admin) | `TestPass123!` |
-| **Community Member 2** | `Sam` | Member | `TestPass123!` |
-| **Community Member 3** | `Jordan` | Member | `TestPass123!` |
+| Account | Username | Role |
+|---|---|---|
+| **Administrator** | `Admin` | Administrator |
+| **Community Member 1** | `Alex` | Member (Admin) |
+| **Community Member 2** | `Sam` | Member |
+| **Community Member 3** | `Jordan` | Member |
 
 ---
 
