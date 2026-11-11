@@ -258,38 +258,51 @@ The admins can publish news articles, events, and ads here
 
 ################## CHECKLIST ################## !important
 
-fix profile page... make it look better, colors ect... pop up boxes are too weird looking (due to always using color-light), also the main content whatever of the profiel page goes of the right side... looks pretty bad. and yeah... i also don't like how profile pictures with transparent background get color-light... looks bad should just be white... :(
+
+Major To-Dos:
+
 Post-system
-have a report button for each post
 News Page
 Policy Page
 Revamp Welcome Page
-Make old games from tc2 work
+Set up event system
+get gif database full
+About Us
+In the future group pages in the navbar
+Seriously consider OCI over AWS
+
+
+Minor To-Dos:
+
+Hash Passwords
+fix profile page... make it look better, colors ect... pop up boxes are too weird looking (due to always using color-light), also the main content whatever of the profiel page goes of the right side... looks pretty bad. and yeah... i also don't like how profile pictures with transparent background get color-light... looks bad should just be white... :(
+have a report button for each post
 have ai go through all the "conditional database saftery adds" for example if I said in our chat to make sure all accoutns have this or that feature in it, whereas it should have used a termial command it hardcoded a conditional into the Server.py 🙄
 Finishing Settings Page
-Set up event system
-get video calls working
-get gif database full
 finish publish on the admin page
 Admin page is tested
 make sure the last of the parental controls work (for like games, or dm-locks, and cutting off the age gap limit)
-MAKE IT ALL PHONE AND MOBILE COMPATIBLE
+THIS IS THE START OF YOUC CONVERSATIONS - for new chats- that also shows when the subthread was made
+promote people past a stage when you're choosing room roles
+have option for solid color theme color
+make search gifs say search rooms
+feed to navbar with bell icon
+sedeprivationlist also and take away the popular reference clause
+fix members and themes bugs
+add serifs and colors to home page chat
+standerize sans serif on chat platofrm by default and they can change
 
 
 RELEASE TRADCHAT
 
+
 POST RELEEASE: 
 
+Make old games from tc2 work
+get video calls working
+MAKE IT ALL PHONE AND MOBILE COMPATIBLE
 Set up the guild system
 set up trophies and awards
 think about having the parents control parental locks with a code
-
-
-CRITIC
-THIS IS THE START OF YOUC CONVERSATIONS - for new chats
-- that also shows when the subthread was made
-
-promote people past a stage when you're choosing room roles
-
-
-have option for solid color theme color - seamus
+keep messasges in memory and encypt sql at rest
+Dark Mode
