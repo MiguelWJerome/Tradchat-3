@@ -785,7 +785,7 @@ document.body.onclick = function () {
 
           // Check if the first message bubble is deleted or blocked
           var firstBubbleText = $firstMsg.find(".message__bubble").first().find(".message__text").text();
-          var firstBubbleIsDeleted = firstBubbleText === "(message has been deleted)" || firstBubbleText.includes("blocked by your age-segregation");
+          var firstBubbleIsDeleted = firstBubbleText === "(message has been deleted)" || firstBubbleText.includes("blocked by your parental");
 
           // Grouping logic: Not deleted, same user, same date, and the existing message is NEWER (timeDiff >= 0)
           isSameUser = !isDeleted && !firstBubbleIsDeleted &&
@@ -826,7 +826,7 @@ document.body.onclick = function () {
 
         // Check if the last message bubble is deleted or blocked
         var lastBubbleText = $lastMsg.find(".message__bubble").last().find(".message__text").text();
-        var lastBubbleIsDeleted = lastBubbleText === "(message has been deleted)" || lastBubbleText.includes("blocked by your age-segregation");
+        var lastBubbleIsDeleted = lastBubbleText === "(message has been deleted)" || lastBubbleText.includes("blocked by your parental");
 
         isSameUser = !isDeleted && !lastBubbleIsDeleted && (lastUser === (myself ? "You" : username)) && (lastDateAttr === fullDateStr) && (timeDiffMs < fiveMinutesMs);
         $targetMsgGroup = $lastMsg;
@@ -1773,8 +1773,43 @@ document.body.onclick = function () {
      */
 
     $(document).ready(function () {
+      // Enforce Parental Controls: Restrict Media & Posts (pl_block_media)
+      if (window.PL_BLOCK_MEDIA) {
+        $('#upload-btn').hide();
+        $('#gif-btn').hide();
+        $('#upload-preview-container').hide();
+
+        // Prevent dragging and dropping image files onto the chat area
+        $(window).on('dragover dragenter drop', function (e) {
+          if (e.originalEvent && e.originalEvent.dataTransfer && e.originalEvent.dataTransfer.files.length > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        });
+
+        // Intercept clipboard paste of image files
+        $('#chat-input').on('paste', function (e) {
+          const items = (e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData))?.items;
+          if (items) {
+            for (let i = 0; i < items.length; i++) {
+              if (items[i].type.indexOf('image') !== -1) {
+                e.preventDefault();
+                if (typeof Alert === 'function') {
+                  Alert('Image pasting is restricted by your parental settings.');
+                }
+                return false;
+              }
+            }
+          }
+        });
+      }
+
       // GIF Modal Logic
       $('#gif-btn').on('click', function () {
+        if (window.PL_BLOCK_MEDIA) {
+          if (typeof Alert === 'function') Alert('GIFs are restricted by your parental settings.');
+          return;
+        }
         $('#gif-modal').css('display', 'flex').attr('aria-hidden', 'false');
       });
 

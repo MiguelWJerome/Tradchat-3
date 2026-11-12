@@ -176,7 +176,7 @@ def fetch_room_messages(room_name, limit, offset, underhead, username=None):
         else:
             is_viewing_admin = is_admin(username)
             if username and is_dm_restricted(username, message['username']) and not is_viewing_admin:
-                message['message'] = "(this message was blocked by your age-segregation restriction)"
+                message['message'] = "(this message was blocked by your parental restriction)"
                 message['upload'] = ""
                 t_deleted = 1
             else:
@@ -260,7 +260,7 @@ def fetch_dm_messages(dm_string, username, limit, offset, underhead):
         else:
             is_viewing_admin = is_admin(username)
             if username and is_dm_restricted(username, msg_sender) and not is_viewing_admin:
-                msg_text = "(this message was blocked by your age-segregation restriction)"
+                msg_text = "(this message was blocked by your parental restriction)"
                 upload_data = ""
                 m_deleted = 1
 
@@ -708,7 +708,7 @@ if not os.path.exists("accounts.db"):
             dms TEXT NOT NULL,
             admin BOOLEAN NOT NULL DEFAULT 0,
             frozen BOOLEAN NOT NULL DEFAULT 0,
-            pl_read_dms BOOLEAN NOT NULL DEFAULT 0,
+            pl_read_dms BOOLEAN NOT NULL DEFAULT 1,
             pl_block_media BOOLEAN NOT NULL DEFAULT 0,
             pl_dm_lock BOOLEAN NOT NULL DEFAULT 0,
             pl_restricted_users TEXT NOT NULL DEFAULT '',
@@ -716,7 +716,6 @@ if not os.path.exists("accounts.db"):
             pl_curfew_offline TEXT NOT NULL DEFAULT '4:30 AM',
             pl_curfew_online TEXT NOT NULL DEFAULT '4:30 AM',
             pl_block_games BOOLEAN NOT NULL DEFAULT 0,
-            pl_age_segregation BOOLEAN NOT NULL DEFAULT 1,
             last_login_date TEXT NOT NULL DEFAULT ''
         );
     ''')
@@ -736,7 +735,7 @@ try:
             'state': 'TEXT DEFAULT ""',
             'admin': 'BOOLEAN DEFAULT 0',
             'frozen': 'BOOLEAN DEFAULT 0',
-            'pl_read_dms': 'BOOLEAN DEFAULT 0',
+            'pl_read_dms': 'BOOLEAN DEFAULT 1',
             'pl_block_media': 'BOOLEAN DEFAULT 0',
             'pl_dm_lock': 'BOOLEAN DEFAULT 0',
             'pl_restricted_users': "TEXT DEFAULT ''",
@@ -744,7 +743,6 @@ try:
             'pl_curfew_offline': "TEXT DEFAULT '10:00 PM'",
             'pl_curfew_online': "TEXT DEFAULT '6:00 AM'",
             'pl_block_games': 'BOOLEAN DEFAULT 0',
-            'pl_age_segregation': 'BOOLEAN DEFAULT 1',
             'friends': "TEXT DEFAULT ''",
             'country': "TEXT DEFAULT 'United States'",
             'last_seen': "TEXT DEFAULT 'Never'",
@@ -1181,30 +1179,13 @@ def get_user_age_from_dob(dob_str):
 
 def is_dm_restricted(user_a, user_b):
     """Check if a DM between user_a and user_b is blocked by either side's parental locks.
-    Returns True if either user has the other in their restricted list, or if age segregation is violated."""
+    Returns True if either user has the other in their custom restricted list."""
     if not user_a or not user_b:
         return False
     
-    # 1. Custom restricted list check
+    # Custom restricted list check
     if user_b.lower() in get_restricted_users(user_a) or user_a.lower() in get_restricted_users(user_b):
         return True
-        
-    # 2. Age segregation check
-    try:
-        info_a = db_sql("SELECT dob, pl_age_segregation FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[user_a], chat_room=False)
-        info_b = db_sql("SELECT dob, pl_age_segregation FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[user_b], chat_room=False)
-        
-        if info_a and info_b:
-            age_a = get_user_age_from_dob(info_a[0][0])
-            seg_a = bool(info_a[0][1])
-            
-            age_b = get_user_age_from_dob(info_b[0][0])
-            seg_b = bool(info_b[0][1])
-            
-            if (seg_a or seg_b) and ((age_a < 13 and age_b >= 13) or (age_a >= 13 and age_b < 13)):
-                return True
-    except Exception as e:
-        print(f"Error in is_dm_restricted age check: {e}")
         
     return False
 
@@ -2242,11 +2223,15 @@ def Recv(message, sid):
                     print(f"[SECURITY WARNING] Frozen user {username} blocked from sending message to {room}")
                     return
 
-            # Parental lock: block media uploads if pl_block_media is enabled
-            if upload and upload.strip():
-                pl_block = db_sql("SELECT pl_block_media FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
-                if pl_block and pl_block[0] and bool(pl_block[0][0]):
-                    upload = ''  # Silently strip the upload
+            # Parental lock: block media uploads and GIFs if pl_block_media is enabled
+            pl_block_res = db_sql("SELECT pl_block_media FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+            sender_has_pl_media = bool(pl_block_res[0][0]) if (pl_block_res and pl_block_res[0]) else False
+            if sender_has_pl_media:
+                upload = ''  # Silently strip any upload attachment
+                # Detect and mask media/GIF URLs in the text
+                media_patterns = [r'giphy\.com', r'\.gif(\?|$)', r'\.png(\?|$)', r'\.jpe?g(\?|$)', r'\.webp(\?|$)']
+                if any(re.search(pat, user_message, re.IGNORECASE) for pat in media_patterns):
+                    user_message = "(this media has been restricted by your parental settings)"
 
             if setting == 'room':
                 
@@ -2261,9 +2246,15 @@ def Recv(message, sid):
                                 client_username = find_username_from_id(state['user_id'])
                                 if client_username:
                                     if is_dm_restricted(client_username, username) and not is_admin(client_username):
-                                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': "(this message was blocked by your age-segregation restriction)", 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 1, 'upload': ''}]), room=client_sid)
+                                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': "(this message was blocked by your parental restriction)", 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 1, 'upload': ''}]), room=client_sid)
                                     else:
-                                        Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0, 'upload': upload}]), room=client_sid)
+                                        # Check if receiving client has pl_block_media enabled
+                                        c_pl_row = db_sql("SELECT pl_block_media FROM accounts WHERE username = ?;", 'accounts', params=[client_username], chat_room=False)
+                                        c_has_pl_media = bool(c_pl_row[0][0]) if (c_pl_row and c_pl_row[0]) else False
+                                        if c_has_pl_media and upload:
+                                            Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message if user_message else "(this media has been restricted by your parental settings)", 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0, 'upload': ''}]), room=client_sid)
+                                        else:
+                                            Server.send(str(['Message', {'id': message_id, 'username': username, 'message': user_message, 'timestamp': gmt_timestamp, 'reply_id': int(reply_index), 'reactions': [], 'deleted': 0, 'upload': upload}]), room=client_sid)
                 else:
                     print(f"[ERROR] User {username} does not have access to room {room}")
             
@@ -2418,7 +2409,7 @@ def Recv(message, sid):
                                     if client_username:
                                         if is_dm_restricted(client_username, sender_username) and not is_admin(client_username):
                                             masked_broadcast = broadcast_data.copy()
-                                            masked_broadcast['message'] = "(this message was blocked by your age-segregation restriction)"
+                                            masked_broadcast['message'] = "(this message was blocked by your parental restriction)"
                                             masked_broadcast['upload'] = ""
                                             masked_broadcast['deleted'] = 1
                                             Server.send(str(['Message', masked_broadcast]), room=client_sid)
@@ -2945,26 +2936,6 @@ def Recv(message, sid):
                     Server.send(str(['Create DM Results', f"DM creation blocked between {username} and {user} by {user}'s parents."]), room=sid)
                     return
 
-                # 2. Age segregation check
-                info_a = db_sql("SELECT dob, pl_age_segregation FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[username], chat_room=False)
-                info_b = db_sql("SELECT dob, pl_age_segregation FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[user], chat_room=False)
-                if info_a and info_b:
-                    age_a = get_user_age_from_dob(info_a[0][0])
-                    seg_a = bool(info_a[0][1])
-                    age_b = get_user_age_from_dob(info_b[0][0])
-                    seg_b = bool(info_b[0][1])
-                    
-                    if (seg_a or seg_b) and ((age_a < 13 and age_b >= 13) or (age_a >= 13 and age_b < 13)):
-                        if seg_a and seg_b:
-                            Server.send(str(['Create DM Results', f"DM creation blocked between {username} and {user} by both users' parents."]), room=sid)
-                            return
-                        elif seg_a:
-                            Server.send(str(['Create DM Results', f"DM creation blocked between {username} and {user} by {username}'s parents."]), room=sid)
-                            return
-                        elif seg_b:
-                            Server.send(str(['Create DM Results', f"DM creation blocked between {username} and {user} by {user}'s parents."]), room=sid)
-                            return
-
             username_id = find_account_id_or_password_or_gender(username, 'id')
             user_id = find_account_id_or_password_or_gender(user, 'id')
 
@@ -3012,7 +2983,7 @@ def Recv(message, sid):
         now = datetime.datetime.now()
         now_str = now.strftime('%Y-%m-%d %H:%M:%S')
         today_str = now.strftime('%Y-%m-%d')
-        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms, show_location, latitude, longitude, city, state, country, friends, last_seen, last_login_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2', 1, loc['latitude'], loc['longitude'], loc['city'], loc['state'], loc['country'], '', now_str, today_str], chat_room=False)
+        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms, show_location, latitude, longitude, city, state, country, friends, last_seen, last_login_date, pl_read_dms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2', 1, loc['latitude'], loc['longitude'], loc['city'], loc['state'], loc['country'], '', now_str, today_str], chat_room=False)
 
         # Get new user ID and add to Server/Admin dms
         new_id = str(find_account_id_or_password_or_gender(username, 'id'))
@@ -3770,12 +3741,12 @@ def Recv(message, sid):
                 limit_val = 50 if is_curr_admin else 200
                 if clean_query:
                     results = db_sql(
-                        f"SELECT username, first_name, last_name, dob, pl_age_segregation, pl_dm_lock, pl_restricted_users FROM accounts WHERE LOWER(username) LIKE ? OR LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? LIMIT {limit_val};",
+                        f"SELECT username, first_name, last_name, pl_dm_lock, pl_restricted_users FROM accounts WHERE LOWER(username) LIKE ? OR LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? LIMIT {limit_val};",
                         'accounts', params=[f'%{clean_query}%', f'%{clean_query}%', f'%{clean_query}%'], chat_room=False
                     )
                 else:
                     results = db_sql(
-                        f"SELECT username, first_name, last_name, dob, pl_age_segregation, pl_dm_lock, pl_restricted_users FROM accounts LIMIT {limit_val};",
+                        f"SELECT username, first_name, last_name, pl_dm_lock, pl_restricted_users FROM accounts LIMIT {limit_val};",
                         'accounts', chat_room=False
                     )
 
@@ -3787,16 +3758,12 @@ def Recv(message, sid):
                         'profile_picture': f'/static/profile-pictures/{row[0]}.png'
                     } for row in results]
                 else:
-                    curr_info = db_sql("SELECT dob, pl_age_segregation, pl_dm_lock, pl_restricted_users FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
-                    curr_age = 18
-                    curr_segregation = False
+                    curr_info = db_sql("SELECT pl_dm_lock, pl_restricted_users FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
                     curr_restricted_users = []
                     if curr_info:
-                        curr_age = get_user_age_from_dob(curr_info[0][0])
-                        curr_segregation = bool(curr_info[0][1])
-                        curr_dm_lock = bool(curr_info[0][2])
+                        curr_dm_lock = bool(curr_info[0][0])
                         if curr_dm_lock:
-                            curr_restricted_str = curr_info[0][3]
+                            curr_restricted_str = curr_info[0][1]
                             if curr_restricted_str and curr_restricted_str.strip():
                                 curr_restricted_users = [u.strip().lower() for u in curr_restricted_str.split(',') if u.strip()]
 
@@ -3806,21 +3773,15 @@ def Recv(message, sid):
                         if other_username.lower() == username.lower():
                             continue
                         
-                        other_age = get_user_age_from_dob(row[3])
-                        other_segregation = bool(row[4])
-                        other_dm_lock = bool(row[5])
+                        other_dm_lock = bool(row[3])
                         other_restricted_list = []
                         if other_dm_lock:
-                            other_restricted_str = row[6]
+                            other_restricted_str = row[4]
                             if other_restricted_str and other_restricted_str.strip():
                                 other_restricted_list = [u.strip().lower() for u in other_restricted_str.split(',') if u.strip()]
 
-                        # 1. Custom restricted list check
+                        # Custom restricted list check
                         if other_username.lower() in curr_restricted_users or username.lower() in other_restricted_list:
-                            continue
-
-                        # 2. Age segregation check
-                        if (curr_segregation or other_segregation) and ((curr_age < 13 and other_age >= 13) or (curr_age >= 13 and other_age < 13)):
                             continue
 
                         user_list.append({
@@ -3848,28 +3809,25 @@ def Recv(message, sid):
             try:
                 is_curr_admin = is_admin(username)
                 # Fetch current user info
-                curr_info = db_sql("SELECT id, dob, pl_age_segregation, friends, pl_dm_lock, pl_restricted_users FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+                curr_info = db_sql("SELECT id, friends, pl_dm_lock, pl_restricted_users FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
                 if not curr_info:
                     Server.send(str(['Get Members Results', {'status': 'error', 'message': 'User not found'}]), room=sid)
                     return
                 curr_id = curr_info[0][0]
-                curr_dob = curr_info[0][1]
-                curr_segregation = bool(curr_info[0][2])
-                curr_friends = split(curr_info[0][3])
-                curr_age = get_user_age_from_dob(curr_dob)
-                curr_dm_lock = bool(curr_info[0][4])
+                curr_friends = split(curr_info[0][1])
+                curr_dm_lock = bool(curr_info[0][2])
                 curr_restricted_users = []
                 if curr_dm_lock:
-                    curr_restricted_str = curr_info[0][5]
+                    curr_restricted_str = curr_info[0][3]
                     if curr_restricted_str and curr_restricted_str.strip():
                         curr_restricted_users = [u.strip().lower() for u in curr_restricted_str.split(',') if u.strip()]
 
                 # Fetch members (including current user)
-                results = db_sql("SELECT id, username, first_name, last_name, dob, show_location, city, state, country, gender, last_seen, theme, pl_age_segregation, pl_dm_lock, pl_restricted_users FROM accounts WHERE username != 'Server';", 'accounts', chat_room=False)
+                results = db_sql("SELECT id, username, first_name, last_name, dob, show_location, city, state, country, gender, last_seen, theme, pl_dm_lock, pl_restricted_users FROM accounts WHERE username != 'Server';", 'accounts', chat_room=False)
 
                 member_list = []
                 for row in results:
-                    m_id, m_username, m_first_name, m_last_name, m_dob, m_show_location, m_city, m_state, m_country, m_gender, m_last_seen, m_theme, m_segregation, m_dm_lock, m_restricted_str = row
+                    m_id, m_username, m_first_name, m_last_name, m_dob, m_show_location, m_city, m_state, m_country, m_gender, m_last_seen, m_theme, m_dm_lock, m_restricted_str = row
 
                     # Construct m_location dynamically
                     loc_parts = []
@@ -3887,7 +3845,7 @@ def Recv(message, sid):
                     if tab == 'friends' and not is_friend:
                         continue
                         
-                    # Custom restricted list check & Age segregation filter (bypassed for admins)
+                    # Custom restricted list check (bypassed for admins)
                     if not is_curr_admin:
                         m_restricted_list = []
                         if m_dm_lock:
@@ -3895,10 +3853,6 @@ def Recv(message, sid):
                                 m_restricted_list = [u.strip().lower() for u in m_restricted_str.split(',') if u.strip()]
 
                         if m_username.lower() in curr_restricted_users or username.lower() in m_restricted_list:
-                            continue
-
-                        m_segregation = bool(m_segregation)
-                        if (curr_segregation or m_segregation) and ((curr_age < 13 and m_age >= 13) or (curr_age >= 13 and m_age < 13)):
                             continue
                             
                     # Filter by search_query
@@ -4048,25 +4002,34 @@ def Recv(message, sid):
 
         if check_credentials(username, password) and is_admin(username):
             try:
-                # 1. Fetch DMs
+                # VIP Admin check: Admin and Server have VIP privileges
+                is_vip_admin = username.lower() in ['admin', 'server']
+                target_pl_res = db_sql("SELECT pl_read_dms FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_user], chat_room=False)
+                target_can_read_dms = bool(target_pl_res[0][0]) if (target_pl_res and target_pl_res[0][0] is not None) else True
+                dms_locked = False
+                if not is_vip_admin and not target_can_read_dms:
+                    dms_locked = True
+
+                # 1. Fetch DMs (only if authorized)
                 dms = []
-                dms_res = db_sql("SELECT dms FROM accounts WHERE username = ?;", 'accounts', params=[target_user], chat_room=False)
                 target_id = find_account_id_or_password_or_gender(target_user, 'id')
-                if dms_res and dms_res[0][0]:
-                    dms_ids = split(dms_res[0][0])
-                    for dm in dms_ids:
-                        actual_dm_id = str(dm)
-                        if actual_dm_id.startswith('u'):
-                            actual_dm_id = actual_dm_id[1:]
-                        dm_info_row = db_sql("SELECT username, first_name, last_name FROM accounts WHERE id = ?;", 'accounts', params=[actual_dm_id], chat_room=False)
-                        if dm_info_row:
-                            dm_info = dm_info_row[0]
-                            dm_username = dm_info[0]
-                            dms.append({
-                                'username': dm_username,
-                                'display_name': f"with {dm_username} ({dm_info[1]} {dm_info[2]})",
-                                'room_id': f"{target_user}.$@-@&.{dm_username}"
-                            })
+                if not dms_locked:
+                    dms_res = db_sql("SELECT dms FROM accounts WHERE username = ?;", 'accounts', params=[target_user], chat_room=False)
+                    if dms_res and dms_res[0][0]:
+                        dms_ids = split(dms_res[0][0])
+                        for dm in dms_ids:
+                            actual_dm_id = str(dm)
+                            if actual_dm_id.startswith('u'):
+                                actual_dm_id = actual_dm_id[1:]
+                            dm_info_row = db_sql("SELECT username, first_name, last_name FROM accounts WHERE id = ?;", 'accounts', params=[actual_dm_id], chat_room=False)
+                            if dm_info_row:
+                                dm_info = dm_info_row[0]
+                                dm_username = dm_info[0]
+                                dms.append({
+                                    'username': dm_username,
+                                    'display_name': f"with {dm_username} ({dm_info[1]} {dm_info[2]})",
+                                    'room_id': f"{target_user}.$@-@&.{dm_username}"
+                                })
 
                 # 2. Fetch Rooms (Private rooms target is in, and all Public rooms)
                 private_rooms = []
@@ -4098,6 +4061,7 @@ def Recv(message, sid):
                     'status': 'success',
                     'target_user': target_user,
                     'dms': dms,
+                    'dms_locked': dms_locked,
                     'private_rooms': private_rooms,
                     'public_rooms': public_rooms
                 }]), room=sid)
@@ -4119,6 +4083,23 @@ def Recv(message, sid):
             try:
                 messages = []
                 if convo_type == 'dm':
+                    # VIP Admin check: Admin and Server have VIP privileges
+                    is_vip_admin = username.lower() in ['admin', 'server']
+                    target_pl_res = db_sql("SELECT pl_read_dms FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_user], chat_room=False)
+                    other_pl_res = db_sql("SELECT pl_read_dms FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_id], chat_room=False)
+                    target_can_read = bool(target_pl_res[0][0]) if (target_pl_res and target_pl_res[0][0] is not None) else True
+                    other_can_read = bool(other_pl_res[0][0]) if (other_pl_res and other_pl_res[0][0] is not None) else True
+
+                    if not is_vip_admin and (not target_can_read or not other_can_read):
+                        Server.send(str(['Admin Get Conversation Messages Result', {
+                            'status': 'error',
+                            'locked': True,
+                            'message': 'Access Denied: Parental controls restrict standard administrators from viewing direct messages for this user. Only VIP Admin accounts (Admin, Server) are authorized.',
+                            'target_user': target_user,
+                            'target_id': target_id,
+                            'convo_type': convo_type
+                        }]), room=sid)
+                        return
                     user1_id = find_account_id_or_password_or_gender(target_user, 'id')
                     user2_id = find_account_id_or_password_or_gender(target_id, 'id')
                     convo_hash = f"{user1_id}-{user2_id}"
@@ -4256,22 +4237,21 @@ def Recv(message, sid):
 
         if check_credentials(username, password) and is_admin(username):
             try:
-                res = db_sql("SELECT frozen, pl_read_dms, pl_block_media, pl_dm_lock, pl_restricted_users, pl_curfew, pl_curfew_offline, pl_curfew_online, pl_block_games, pl_age_segregation, username FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_user], chat_room=False)
+                res = db_sql("SELECT frozen, pl_read_dms, pl_block_media, pl_dm_lock, pl_restricted_users, pl_curfew, pl_curfew_offline, pl_curfew_online, pl_block_games, username FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[target_user], chat_room=False)
                 if res:
                     row = res[0]
                     target_data = {
                         'status': 'success',
-                        'target_user': row[10],
+                        'target_user': row[9],
                         'frozen': bool(row[0]),
-                        'pl_read_dms': bool(row[1]),
+                        'pl_read_dms': bool(row[1]) if row[1] is not None else True,
                         'pl_block_media': bool(row[2]),
                         'pl_dm_lock': bool(row[3]),
                         'pl_restricted_users': row[4],
                         'pl_curfew': bool(row[5]),
                         'pl_curfew_offline': row[6],
                         'pl_curfew_online': row[7],
-                        'pl_block_games': bool(row[8]),
-                        'pl_age_segregation': bool(row[9])
+                        'pl_block_games': bool(row[8])
                     }
                     Server.send(str(['Get Target Admin Data Result', target_data]), room=sid)
                 else:
@@ -4339,18 +4319,16 @@ def Recv(message, sid):
                         pl_curfew = ?, 
                         pl_curfew_offline = ?, 
                         pl_curfew_online = ?, 
-                        pl_block_games = ?, 
-                        pl_age_segregation = ? 
+                        pl_block_games = ? 
                         WHERE username = ?;""", 'accounts', params=[
-                            int(locks['readDms']),
-                            int(locks['blockMedia']),
-                            int(locks['dmLock']),
-                            locks['restrictedUsers'],
-                            int(locks['curfew']),
-                            locks['curfewOffline'],
-                            locks['curfewOnline'],
-                            int(locks['blockGames']),
-                            int(locks['ageSegregation']),
+                            int(locks.get('readDms', 1)),
+                            int(locks.get('blockMedia', 0)),
+                            int(locks.get('dmLock', 0)),
+                            locks.get('restrictedUsers', ''),
+                            int(locks.get('curfew', 0)),
+                            locks.get('curfewOffline', '10:00 PM'),
+                            locks.get('curfewOnline', '6:00 AM'),
+                            int(locks.get('blockGames', 0)),
                             canonical_username
                         ], chat_room=False)
                     

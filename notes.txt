@@ -155,9 +155,7 @@ dm lock (you can't dm certain people)
 how late the child is allowed to be on
 they can't play games
 
-Age segregation is the ONLY PARENTAL CONTROL that is defaulted to ON but only as in a younger kid is allowed to talk to an older kid
-
-cutoff year is 13
+[DECOMMISSIONED]: Age segregation has been completely removed across TradChat. All accounts default to allow admins to read DMs (pl_read_dms=1), but if disabled, only VIP admins (Admin, Server) can read them.
 
 
 
@@ -280,9 +278,9 @@ fix profile page... make it look better, colors ect... pop up boxes are too weir
 have a report button for each post
 have ai go through all the "conditional database saftery adds" for example if I said in our chat to make sure all accoutns have this or that feature in it, whereas it should have used a termial command it hardcoded a conditional into the Server.py 🙄
 finish publish on the admin page
-Admin page is tested
-make sure the last of the parental controls work (for like games, or dm-locks, and cutting off the age gap limit)
+make the block gaming parental control works and make parental control "block media" also block posts once posts are made
 promote people past a stage when you're choosing room roles
+THIS IS BEGGINING OF CONVERSATION - at the beeging of a conversation
 sedeprivationlist also and take away the popular reference clause
 standerize sans serif on chat platofrm by default and they can change
 

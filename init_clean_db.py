@@ -75,15 +75,14 @@ def init_all():
             state TEXT,
             admin INTEGER,
             frozen INTEGER,
-            pl_read_dms INTEGER,
-            pl_block_media INTEGER,
-            pl_dm_lock INTEGER,
+            pl_read_dms INTEGER DEFAULT 1,
+            pl_block_media INTEGER DEFAULT 0,
+            pl_dm_lock INTEGER DEFAULT 0,
             pl_restricted_users TEXT,
-            pl_curfew INTEGER,
+            pl_curfew INTEGER DEFAULT 0,
             pl_curfew_offline TEXT,
             pl_curfew_online TEXT,
-            pl_block_games INTEGER,
-            pl_age_segregation INTEGER,
+            pl_block_games INTEGER DEFAULT 0,
             friends TEXT,
             country TEXT,
             last_seen TEXT,
@@ -101,11 +100,11 @@ def init_all():
 
     # Friendly test accounts
     test_accounts = [
-        (1, 'Server', 'ServerBotSecure_2026!', 'TradChat', 'Bot', 'bot@tradchat.community', '2024-01-01', 'male', 'classic', 'mainroom', '2-3-4-5', 1, 37.7749, -122.4194, 'San Francisco', 'CA', 0, 0, 0, 0, 0, '', 0, '10:00 PM', '6:00 AM', 0, 0, '', 'United States', 'Active Now', '2026-09-10'),
-        (2, 'Admin', 'AdminDemo_Pass2026!', 'Community', 'Admin', 'admin@tradchat.community', '2000-01-01', 'male', 'classic', 'mainroom', '1-3-4-5', 1, 30.2672, -97.7431, 'Austin', 'TX', 1, 0, 0, 0, 0, '', 0, '10:00 PM', '6:00 AM', 0, 0, '', 'United States', 'Active Now', '2026-09-10'),
-        (3, 'Alex', 'TestPass123!', 'Alex', 'M.', 'alex@tradchat.community', '2001-05-15', 'male', 'High-Mass', 'mainroom', '1-2-4-5', 1, 40.7128, -74.0060, 'New York', 'NY', 1, 0, 0, 0, 0, '', 0, '10:00 PM', '6:00 AM', 0, 0, '4', 'United States', '2026-09-10 16:30:00', '2026-09-10'),
-        (4, 'Sam', 'TestPass123!', 'Sam', 'K.', 'sam@tradchat.community', '2002-08-20', 'female', 'Umbria', 'mainroom', '1-2-3-5', 1, 47.6062, -122.3321, 'Seattle', 'WA', 0, 0, 0, 0, 0, '', 0, '10:00 PM', '6:00 AM', 0, 0, '3', 'United States', '2026-09-10 16:15:00', '2026-09-10'),
-        (5, 'Jordan', 'TestPass123!', 'Jordan', 'P.', 'jordan@tradchat.community', '2003-11-10', 'male', 'Consecration', 'mainroom', '1-2-3-4', 1, 32.7767, -96.7970, 'Dallas', 'TX', 0, 0, 0, 0, 0, '', 0, '10:00 PM', '6:00 AM', 0, 0, '', 'United States', '2026-09-09 14:00:00', '2026-09-09')
+        (1, 'Server', 'ServerBotSecure_2026!', 'TradChat', 'Bot', 'bot@tradchat.community', '2024-01-01', 'male', 'classic', 'mainroom', '2-3-4-5', 1, 37.7749, -122.4194, 'San Francisco', 'CA', 0, 0, 1, 0, 0, '', 0, '10:00 PM', '6:00 AM', 0, '', 'United States', 'Active Now', '2026-09-10'),
+        (2, 'Admin', 'AdminDemo_Pass2026!', 'Community', 'Admin', 'admin@tradchat.community', '2000-01-01', 'male', 'classic', 'mainroom', '1-3-4-5', 1, 30.2672, -97.7431, 'Austin', 'TX', 1, 0, 1, 0, 0, '', 0, '10:00 PM', '6:00 AM', 0, '', 'United States', 'Active Now', '2026-09-10'),
+        (3, 'Alex', 'TestPass123!', 'Alex', 'M.', 'alex@tradchat.community', '2001-05-15', 'male', 'High-Mass', 'mainroom', '1-2-4-5', 1, 40.7128, -74.0060, 'New York', 'NY', 1, 0, 1, 0, 0, '', 0, '10:00 PM', '6:00 AM', 0, '4', 'United States', '2026-09-10 16:30:00', '2026-09-10'),
+        (4, 'Sam', 'TestPass123!', 'Sam', 'K.', 'sam@tradchat.community', '2002-08-20', 'female', 'Umbria', 'mainroom', '1-2-3-5', 1, 47.6062, -122.3321, 'Seattle', 'WA', 0, 0, 1, 0, 0, '', 0, '10:00 PM', '6:00 AM', 0, '3', 'United States', '2026-09-10 16:15:00', '2026-09-10'),
+        (5, 'Jordan', 'TestPass123!', 'Jordan', 'P.', 'jordan@tradchat.community', '2003-11-10', 'male', 'Consecration', 'mainroom', '1-2-3-4', 1, 32.7767, -96.7970, 'Dallas', 'TX', 0, 0, 1, 0, 0, '', 0, '10:00 PM', '6:00 AM', 0, '', 'United States', '2026-09-09 14:00:00', '2026-09-09')
     ]
 
     for acc in test_accounts:
@@ -114,9 +113,9 @@ def init_all():
                 id, username, password, first_name, last_name, email, dob, gender,
                 theme, room, dms, show_location, latitude, longitude, city, state,
                 admin, frozen, pl_read_dms, pl_block_media, pl_dm_lock, pl_restricted_users,
-                pl_curfew, pl_curfew_offline, pl_curfew_online, pl_block_games, pl_age_segregation,
+                pl_curfew, pl_curfew_offline, pl_curfew_online, pl_block_games,
                 friends, country, last_seen, last_login_date
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, acc)
 
     cur.execute("INSERT INTO unseen_admin_actions (username, sub_tabs) VALUES ('Admin', '');")
@@ -389,7 +388,7 @@ def init_all():
 <ul>
   <li><strong>⚡ Low-Latency WebSockets:</strong> Experience bi-directional event dispatching and room state synchronization powered by <code>Flask-SocketIO</code> and eventlet concurrency.</li>
   <li><strong>🎨 Dynamic Theming Engine:</strong> Navigate to <em>Settings &rarr; Theme</em> to test runtime CSS token injection (switch between <em>High-Mass</em>, <em>Umbria</em>, <em>Consecration</em>, <em>Classic</em>, and <em>Coding</em> modes).</li>
-  <li><strong>🛡️ Granular Safety & Parental Controls:</strong> Inspect the automated curfew time lock scheduler, age-segregation rules, and direct message permissions.</li>
+  <li><strong>🛡️ Granular Safety & Parental Controls:</strong> Inspect the automated curfew time lock scheduler, content filters, and direct message permissions.</li>
   <li><strong>📊 Role-Based Admin Operations:</strong> Visit the <em>Admin</em> panel to view real-time alert queues, user freeze/unfreeze workflows, and room scan audits.</li>
   <li><strong>💾 Thread-Safe Persistence:</strong> Inspect SQLite connection pool management with parameterized queries protecting against SQL injection.</li>
 </ul>

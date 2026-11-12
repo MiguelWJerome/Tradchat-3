@@ -627,15 +627,6 @@
                                     </div>
                                 </div>
                                 
-                                <!-- Age Segregation Filter (Defaulted to ON) -->
-                                <div class="pl-control-item" style="border-top: 1px solid rgba(0,0,0,0.1); padding-top: 15px; margin-top: 5px;">
-                                    <input type="checkbox" id="pl-age-segregation" checked style="width: 20px; height: 20px; cursor: pointer; margin-top: 2px;" />
-                                    <div class="pl-control-label-grp">
-                                        <label for="pl-age-segregation" class="pl-control-label">Enable Age Segregation Filter (Cutoff Age: 13)</label>
-                                        <span class="pl-control-desc">Allows a younger kid to talk to an older kid, but prevents direct messaging in other age-segregated paths. (Defaulted to ON).</span>
-                                    </div>
-                                </div>
-                                
                                 <!-- Save Button -->
                                 <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
                                     <button class="az-btn btn-primary" onclick="saveParentalLocks()" style="width: auto; padding: 10px 24px;">SAVE CHANGES</button>
@@ -773,7 +764,6 @@
             const plCurfewOffline = document.getElementById('pl-curfew-offline').value;
             const plCurfewOnline = document.getElementById('pl-curfew-online').value;
             const plBlockGames = document.getElementById('pl-block-games').checked;
-            const plAgeSegregation = document.getElementById('pl-age-segregation').checked;
             
             AdminNetwork.emitUpdateParentalLocks(username, {
                 readDms: plReadDms,
@@ -783,8 +773,7 @@
                 curfew: plCurfew,
                 curfewOffline: plCurfewOffline,
                 curfewOnline: plCurfewOnline,
-                blockGames: plBlockGames,
-                ageSegregation: plAgeSegregation
+                blockGames: plBlockGames
             });
         };
 
@@ -893,7 +882,6 @@
                     document.getElementById('pl-curfew-offline').value = res.pl_curfew_offline || '10:00 PM';
                     document.getElementById('pl-curfew-online').value = res.pl_curfew_online || '6:00 AM';
                     document.getElementById('pl-block-games').checked = res.pl_block_games;
-                    document.getElementById('pl-age-segregation').checked = res.pl_age_segregation;
                     
                     // Toggle displays
                     document.getElementById('pl-dm-lock-input-grp').style.display = res.pl_dm_lock ? 'flex' : 'none';
@@ -1313,6 +1301,7 @@
             if (res.status === 'success' && res.target_user === activeSearchUser) {
                 activeConversations = {
                     dms: res.dms || [],
+                    dms_locked: !!res.dms_locked,
                     private_rooms: res.private_rooms || [],
                     public_rooms: res.public_rooms || []
                 };
@@ -1335,6 +1324,20 @@
             if (!list) return;
 
             list.innerHTML = '';
+
+            if (activeConvoType === 'dms' && activeConversations.dms_locked) {
+                list.innerHTML = `
+                    <div class="adv-empty-state" style="padding: 24px 14px; text-align: center;">
+                        <i class="fa-solid fa-lock" style="font-size: 2rem; color: var(--color-accent, #c0392b); margin-bottom: 10px;"></i>
+                        <h4 style="margin: 0 0 6px 0; font-size: 0.95rem;">Direct Messages Locked</h4>
+                        <p style="margin: 0; font-size: 0.82rem; opacity: 0.75; line-height: 1.45;">
+                            Parental controls restrict standard administrators from viewing DMs for this user. Only VIP Admin accounts (Admin, Server) are authorized.
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+
             const chats = activeConvoType === 'dms' ? activeConversations.dms :
                           (activeConvoType === 'private_rooms' ? activeConversations.private_rooms : activeConversations.public_rooms);
 
@@ -1424,7 +1427,21 @@
                     renderAdvMessages(true);
                 }
             } else if (res.status === 'error') {
-                document.getElementById('adv-message-log').innerHTML = `<div class="adv-empty-state">Error: ${res.message}</div>`;
+                const container = document.getElementById('adv-message-log');
+                if (container) {
+                    if (res.locked) {
+                        container.innerHTML = `
+                            <div class="adv-empty-state" style="padding: 40px 20px;">
+                                <i class="fa-solid fa-shield-halved" style="font-size: 2.5rem; margin-bottom: 12px; color: var(--color-accent, #c0392b);"></i>
+                                <h3 style="margin-bottom: 8px;">Direct Messages Restricted</h3>
+                                <p style="max-width: 440px; margin: 0 auto; opacity: 0.85; line-height: 1.5;">${res.message || 'Parental settings restrict standard administrators from viewing direct messages for this user.'}</p>
+                            </div>
+                        `;
+                    } else {
+                        container.innerHTML = `<div class="adv-empty-state">Error: ${res.message}</div>`;
+                    }
+                }
+                loadedMessages = [];
                 isFetchingOlder = false;
             }
         };

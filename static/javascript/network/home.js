@@ -572,6 +572,10 @@ window.emitGifSearch = function(query) {
 };
 
 window.attachGif = function(url, giphyId) {
+    if (window.PL_BLOCK_MEDIA) {
+        if (typeof Alert === 'function') Alert('GIF attachments are restricted by your parental settings.');
+        return;
+    }
     // Store the full Giphy URL for upload, and giphy_id for reference
     currentUpload.push(url);
     const idx = currentUpload.length - 1;
@@ -757,7 +761,13 @@ $(document).ready(function() {
     }
 
     // --- Image Upload Interaction (Multiple images) ---
-    $('#upload-btn').on('click', () => $('#file-upload-input').click());
+    $('#upload-btn').on('click', () => {
+        if (window.PL_BLOCK_MEDIA) {
+            if (typeof Alert === 'function') Alert('Media uploads are restricted by your parental settings.');
+            return;
+        }
+        $('#file-upload-input').click();
+    });
 
     $('#file-upload-input').on('change', function(e) {
         const files = Array.from(e.target.files);
