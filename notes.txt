@@ -298,6 +298,7 @@ RELEASE TRADCHAT
 
 POST RELEEASE: 
 
+private tradchat repo for real app and then resume one with gitirngore for user information
 Make old games from tc2 work
 get video calls working
 MAKE IT ALL PHONE AND MOBILE COMPATIBLE
