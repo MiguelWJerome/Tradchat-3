@@ -87,7 +87,8 @@ def init_all():
             friends TEXT,
             country TEXT,
             last_seen TEXT,
-            last_login_date TEXT
+            last_login_date TEXT,
+            is_solid_color INTEGER DEFAULT 0
         );
     """)
 

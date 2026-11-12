@@ -2313,11 +2313,12 @@ body {
   padding: 1px 6px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.05);
-  font-family: 'Comic Sans MS', sans-serif;
+  font-family: var(--font-body), sans-serif;
   color: black;
 }
 
 .advanced-search-view .message__text {
+  font-family: var(--font-body), sans-serif;
   font-size: 0.95rem;
   line-height: 1.4;
   font-weight: 600;

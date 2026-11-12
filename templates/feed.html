@@ -1,0 +1,176 @@
+{% extends "tradchat.html" %}
+
+{% block title %}TradChat — Feed{% endblock %}
+
+{% block styles %}
+<style>
+  .feed-main {
+    display: flex;
+    justify-content: center;
+    padding: 30px 20px;
+    min-height: calc(100vh - 80px);
+  }
+
+  .feed-container {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .feed-header-card {
+    background: rgba(232, 228, 220, 0.92);
+    border: 2px solid var(--color-border, #9E9589);
+    border-radius: 12px;
+    padding: 24px 28px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(8px);
+  }
+
+  .feed-title-wrap h1 {
+    font-family: var(--font-display, 'Bebas Neue', sans-serif);
+    font-size: 2rem;
+    color: var(--color-dark);
+    margin: 0 0 6px 0;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .feed-title-wrap p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--color-dark);
+    opacity: 0.8;
+  }
+
+  .feed-badge {
+    background: var(--color-medium);
+    color: var(--color-dark);
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--color-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .feed-card {
+    background: #ffffff;
+    border: 2px solid var(--color-border, #ccc);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .feed-card:hover {
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  }
+
+  .feed-author-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .feed-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--color-medium);
+  }
+
+  .feed-author-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .feed-author-name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--color-dark);
+  }
+
+  .feed-post-time {
+    font-size: 0.8rem;
+    color: #777;
+  }
+
+  .feed-content {
+    font-size: 1rem;
+    line-height: 1.55;
+    color: #222;
+  }
+
+  .feed-empty-state {
+    background: rgba(255, 255, 255, 0.85);
+    border: 2px dashed var(--color-border, #ccc);
+    border-radius: 12px;
+    padding: 50px 20px;
+    text-align: center;
+    color: var(--color-dark);
+  }
+
+  .feed-empty-state i {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    color: var(--color-medium);
+  }
+
+  .feed-empty-state h3 {
+    margin: 0 0 8px 0;
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+
+  .feed-empty-state p {
+    margin: 0;
+    font-size: 0.95rem;
+    opacity: 0.75;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="feed-main">
+  <div class="feed-container">
+    <div class="feed-header-card">
+      <div class="feed-title-wrap">
+        <h1>Community Feed</h1>
+        <p>Recent community posts, discussions, and activity.</p>
+      </div>
+      <div class="feed-badge">Live</div>
+    </div>
+
+    <!-- Pinned Announcement Card -->
+    <div class="feed-card">
+      <div class="feed-author-row">
+        <img src="/static/graphics/defaultMale.png" alt="Admin" class="feed-avatar">
+        <div class="feed-author-info">
+          <span class="feed-author-name">TradChat Team</span>
+          <span class="feed-post-time">Official Announcement</span>
+        </div>
+      </div>
+      <div class="feed-content">
+        Welcome to the community Feed! Stay tuned for upcoming posts, media sharing, and community highlights right here.
+      </div>
+    </div>
+
+    <!-- Empty State / Upcoming -->
+    <div class="feed-empty-state">
+      <i class="fa-regular fa-newspaper"></i>
+      <h3>More Posts Coming Soon</h3>
+      <p>Follow community channels and friends to see their latest updates here.</p>
+    </div>
+  </div>
+</main>
+{% endblock %}

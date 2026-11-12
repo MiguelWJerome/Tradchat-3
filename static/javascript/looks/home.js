@@ -77,7 +77,7 @@ $(document).ready(function () {
 
   // Function to update the sidebar search input placeholder
   window.updateSearchPlaceholder = function(view) {
-    const $searchInput = $('.sidebar__search .search-input');
+    const $searchInput = $('.sidebar .sidebar__search .search-input:not(#gif-search-input)');
     if (!$searchInput.length) return;
 
     if (view === 'messenger') {

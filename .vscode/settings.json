@@ -1,0 +1,44 @@
+{
+    "antigravity.enableInlineDiff": true,
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/**": true,
+        "**/.venv/**": true,
+        "**/venv/**": true,
+        "**/env/**": true,
+        "**/__pycache__/**": true,
+        "**/dist/**": true,
+        "**/build/**": true,
+        "**/.next/**": true,
+        "**/target/**": true,
+        "**/*.db-wal": true,
+        "**/*.db-shm": true,
+        "**/*.sqlite3": true,
+        "**/static/profile-pictures/**": true,
+        "**/static/uploads/**": true
+    },
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/bower_components": true,
+        "**/.git": true,
+        "**/.venv": true,
+        "**/venv": true,
+        "**/dist": true,
+        "**/build": true,
+        "**/.next": true,
+        "**/target": true,
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        "**/*.db-wal": true,
+        "**/*.db-shm": true,
+        "**/static/profile-pictures": true,
+        "**/static/uploads": true
+    },
+    "terminal.integrated.env.linux": {
+        "NODE_OPTIONS": "--max-old-space-size=8192"
+    },
+    "workbench.editor.animations": false,
+    "editor.smoothScrolling": false,
+    "workbench.list.smoothScrolling": false
+}

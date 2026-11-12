@@ -16,6 +16,7 @@ import ast
 import base64
 import io
 import json
+import colorsys
 # pyrefly: ignore [missing-import]
 from PIL import Image, ImageOps 
 import re
@@ -601,6 +602,53 @@ if os.path.exists(themes_dir):
             except Exception as e:
                 print(f"Error loading theme colors for {t}: {e}")
 
+def generate_palette_from_hex(hex_str):
+    """Generate cohesive color_light, color_medium, and color_dark from any HEX code."""
+    try:
+        hex_clean = hex_str.strip().lstrip('#')
+        if len(hex_clean) == 3:
+            hex_clean = ''.join([c*2 for c in hex_clean])
+        if len(hex_clean) != 6:
+            hex_clean = '7e0808'
+        r, g, b = [int(hex_clean[i:i+2], 16) / 255.0 for i in (0, 2, 4)]
+        h, l, s = colorsys.rgb_to_hls(r, g, b)
+        
+        # Light pastel tint for badges/surfaces
+        r_l, g_l, b_l = colorsys.hls_to_rgb(h, 0.90, min(s, 0.35))
+        # Deep dark tone for readable text & borders
+        r_d, g_d, b_d = colorsys.hls_to_rgb(h, 0.15, min(s, 0.50))
+        
+        return {
+            'color_light': '#{:02x}{:02x}{:02x}'.format(int(r_l * 255), int(r_l * 255), int(r_l * 255)),
+            'color_medium': '#' + hex_clean,
+            'color_dark': '#{:02x}{:02x}{:02x}'.format(int(r_d * 255), int(r_d * 255), int(r_d * 255))
+        }
+    except Exception as e:
+        print(f"Error generating palette for {hex_str}: {e}")
+        return {
+            'color_light': '#ffc67b',
+            'color_medium': '#C47A6B',
+            'color_dark': '#7e0808'
+        }
+
+def get_theme_colors(theme, is_solid_color=False):
+    """Retrieve color dictionary for either directory theme or solid color theme."""
+    if is_solid_color or (theme and theme.strip().startswith('#')):
+        return generate_palette_from_hex(theme)
+    try:
+        with open(f'static/themes/{theme}/colors.txt', 'r') as f:
+            return ast.literal_eval(f.read())
+    except Exception:
+        try:
+            with open('static/themes/classic/colors.txt', 'r') as f:
+                return ast.literal_eval(f.read())
+        except Exception:
+            return {
+                'color_light': '#ffc67b',
+                'color_medium': '#C47A6B',
+                'color_dark': '#7e0808'
+            }
+
 # Rename legacy database file to admin.db if it exists
 if os.path.exists("reportsAndAlerts.db") and not os.path.exists("admin.db"):
     try:
@@ -700,7 +748,8 @@ try:
             'friends': "TEXT DEFAULT ''",
             'country': "TEXT DEFAULT 'United States'",
             'last_seen': "TEXT DEFAULT 'Never'",
-            'last_login_date': "TEXT DEFAULT ''"
+            'last_login_date': "TEXT DEFAULT ''",
+            'is_solid_color': 'BOOLEAN DEFAULT 0'
         }
         for col, definition in new_cols.items():
             if col not in columns:
@@ -1257,12 +1306,10 @@ def home():
             # Update last_seen and conditional location data in the background
             update_presence(username, request)
 
-            theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
-
-
-            colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
-            colors = ast.literal_eval(colorsFile.read())
-            colorsFile.close()
+            theme_info = db_sql("SELECT theme, is_solid_color FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+            theme = theme_info[0][0] if theme_info else 'classic'
+            is_solid_color = bool(theme_info[0][1]) if (theme_info and len(theme_info[0]) > 1 and theme_info[0][1]) else (theme.startswith('#') if theme else False)
+            colors = get_theme_colors(theme, is_solid_color)
 
             room = db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
             
@@ -1280,6 +1327,7 @@ def home():
             return render_template(
                 'home.html',
                 theme=theme,
+                is_solid_color=is_solid_color,
                 color_dark=colors['color_dark'],
                 color_medium=colors['color_medium'],
                 color_light=colors['color_light'],
@@ -1307,11 +1355,10 @@ def settings():
         if check_credentials(username, password):
             # Record presence
             update_presence(username, request)
-            theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
-
-            colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
-            colors = ast.literal_eval(colorsFile.read())
-            colorsFile.close()
+            theme_info = db_sql("SELECT theme, is_solid_color FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+            theme = theme_info[0][0] if theme_info else 'classic'
+            is_solid_color = bool(theme_info[0][1]) if (theme_info and len(theme_info[0]) > 1 and theme_info[0][1]) else (theme.startswith('#') if theme else False)
+            colors = get_theme_colors(theme, is_solid_color)
             
             account_info = db_sql("SELECT first_name, last_name, show_location, city, state, email, dob, country FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
             first_name = account_info[0][0] if account_info else ''
@@ -1332,6 +1379,7 @@ def settings():
             return render_template(
                 'settings.html',
                 theme=theme,
+                is_solid_color=is_solid_color,
                 color_dark=colors['color_dark'],
                 color_medium=colors['color_medium'],
                 color_light=colors['color_light'],
@@ -1486,14 +1534,15 @@ def profile(target_username=None):
             flag_emoji = COUNTRY_TO_EMOJI.get(country.lower())
 
             # Fetch the logged-in user's theme for colors (so base page looks consistent for viewing user)
-            theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
-            colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
-            colors = ast.literal_eval(colorsFile.read())
-            colorsFile.close()
+            theme_info = db_sql("SELECT theme, is_solid_color FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+            theme = theme_info[0][0] if theme_info else 'classic'
+            is_solid_color = bool(theme_info[0][1]) if (theme_info and len(theme_info[0]) > 1 and theme_info[0][1]) else (theme.startswith('#') if theme else False)
+            colors = get_theme_colors(theme, is_solid_color)
 
             return render_template(
                 'profile.html',
                 theme=theme,
+                is_solid_color=is_solid_color,
                 color_dark=colors['color_dark'],
                 color_medium=colors['color_medium'],
                 color_light=colors['color_light'],
@@ -1528,11 +1577,10 @@ def members():
         password = session['password']
 
         if check_credentials(username, password):
-            theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
-
-            colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
-            colors = ast.literal_eval(colorsFile.read())
-            colorsFile.close()
+            theme_info = db_sql("SELECT theme, is_solid_color FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+            theme = theme_info[0][0] if theme_info else 'classic'
+            is_solid_color = bool(theme_info[0][1]) if (theme_info and len(theme_info[0]) > 1 and theme_info[0][1]) else (theme.startswith('#') if theme else False)
+            colors = get_theme_colors(theme, is_solid_color)
 
             # Record presence
             update_presence(username, request)
@@ -1540,6 +1588,7 @@ def members():
             return render_template(
                 'members.html',
                 theme=theme,
+                is_solid_color=is_solid_color,
                 color_dark=colors['color_dark'],
                 color_medium=colors['color_medium'],
                 color_light=colors['color_light'],
@@ -1553,6 +1602,37 @@ def members():
     except (KeyError, SyntaxError, ValueError):
         return redirect('/')
 
+@app.route('/feed/')
+def feed():
+    try:
+        username = session.get('username')
+        password = session.get('password')
+
+        if not username or not check_credentials(username, password):
+            return redirect('/')
+
+        theme_info = db_sql("SELECT theme, is_solid_color FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+        theme = theme_info[0][0] if theme_info else 'classic'
+        is_solid_color = bool(theme_info[0][1]) if (theme_info and len(theme_info[0]) > 1 and theme_info[0][1]) else (theme.startswith('#') if theme else False)
+        colors = get_theme_colors(theme, is_solid_color)
+
+        update_presence(username, request)
+
+        return render_template(
+            'feed.html',
+            theme=theme,
+            is_solid_color=is_solid_color,
+            color_dark=colors['color_dark'],
+            color_medium=colors['color_medium'],
+            color_light=colors['color_light'],
+            username=username,
+            password=password,
+            active_page='feed'
+        )
+    except Exception as e:
+        print(f"Error in feed route: {e}")
+        return redirect('/')
+
 @app.route('/news/')
 @app.route('/news/<articlename>/')
 def news(articlename=None):
@@ -1561,11 +1641,10 @@ def news(articlename=None):
         password = session['password']
 
         if check_credentials(username, password):
-            theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
-
-            colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
-            colors = ast.literal_eval(colorsFile.read())
-            colorsFile.close()
+            theme_info = db_sql("SELECT theme, is_solid_color FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+            theme = theme_info[0][0] if theme_info else 'classic'
+            is_solid_color = bool(theme_info[0][1]) if (theme_info and len(theme_info[0]) > 1 and theme_info[0][1]) else (theme.startswith('#') if theme else False)
+            colors = get_theme_colors(theme, is_solid_color)
 
             update_presence(username, request)
 
@@ -1623,6 +1702,7 @@ def news(articlename=None):
             return render_template(
                 'news.html',
                 theme=theme,
+                is_solid_color=is_solid_color,
                 color_dark=colors['color_dark'],
                 color_medium=colors['color_medium'],
                 color_light=colors['color_light'],
@@ -1700,10 +1780,10 @@ def admin():
             if not is_admin(username):
                 return "Unauthorized: Admin Only", 403
                 
-            theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
-            colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
-            colors = ast.literal_eval(colorsFile.read())
-            colorsFile.close()
+            theme_info = db_sql("SELECT theme, is_solid_color FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+            theme = theme_info[0][0] if theme_info else 'classic'
+            is_solid_color = bool(theme_info[0][1]) if (theme_info and len(theme_info[0]) > 1 and theme_info[0][1]) else (theme.startswith('#') if theme else False)
+            colors = get_theme_colors(theme, is_solid_color)
             
             # Check if there are any unseen & unresolved alerts
             unseen = db_sql("SELECT COUNT(*) FROM alerts WHERE seen = 0 AND resolved = 0;", 'reports_alerts')
@@ -1718,6 +1798,7 @@ def admin():
             return render_template(
                 'admin.html',
                 theme=theme,
+                is_solid_color=is_solid_color,
                 color_dark=colors['color_dark'],
                 color_medium=colors['color_medium'],
                 color_light=colors['color_light'],
@@ -1859,10 +1940,10 @@ def report_page():
         if not username or not check_credentials(username, password):
             return redirect('/')
             
-        theme = db_sql("SELECT theme FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
-        colorsFile = open(f'static/themes/{theme}/colors.txt', 'r')
-        colors = ast.literal_eval(colorsFile.read())
-        colorsFile.close()
+        theme_info = db_sql("SELECT theme, is_solid_color FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+        theme = theme_info[0][0] if theme_info else 'classic'
+        is_solid_color = bool(theme_info[0][1]) if (theme_info and len(theme_info[0]) > 1 and theme_info[0][1]) else (theme.startswith('#') if theme else False)
+        colors = get_theme_colors(theme, is_solid_color)
         
         has_unseen_actions = False
         if is_admin(username):
@@ -1885,6 +1966,7 @@ def report_page():
         return render_template(
             'report.html',
             theme=theme,
+            is_solid_color=is_solid_color,
             color_dark=colors['color_dark'],
             color_medium=colors['color_medium'],
             color_light=colors['color_light'],
@@ -3092,10 +3174,11 @@ def Recv(message, sid):
         username = data.get('username')
         password = data.get('password')
         theme = data.get('theme')
+        is_solid = bool(data.get('is_solid_color', False) or (theme and theme.startswith('#')))
 
         if check_credentials(username, password):
             user_id = find_account_id_or_password_or_gender(username, 'id')
-            db_sql("UPDATE accounts SET theme = ? WHERE id = ?;", 'accounts', params=[theme, user_id], chat_room=False)
+            db_sql("UPDATE accounts SET theme = ?, is_solid_color = ? WHERE id = ?;", 'accounts', params=[theme, 1 if is_solid else 0, user_id], chat_room=False)
 
     elif msg[0] == 'Update Profile Picture':
         data = msg[1]
@@ -4077,14 +4160,9 @@ def Recv(message, sid):
                             pfp = '/static/graphics/defaultMale.png'
                             sender_theme = 'classic'
 
-                        try:
-                            with open(f'static/themes/{sender_theme}/colors.txt', 'r') as theme_file:
-                                color_dict = eval(theme_file.read())
-                            color_light = color_dict.get('color_light', '#ffc67b')
-                            color_dark = color_dict.get('color_dark', '#7e0808')
-                        except:
-                            color_light = '#ffc67b'
-                            color_dark = '#7e0808'
+                        color_dict = get_theme_colors(sender_theme)
+                        color_light = color_dict.get('color_light', '#ffc67b')
+                        color_dark = color_dict.get('color_dark', '#7e0808')
 
                         msg_text = msg_row[2]
                         if msg_row[7]:
@@ -4137,14 +4215,9 @@ def Recv(message, sid):
                             pfp = '/static/graphics/defaultMale.png'
                             sender_theme = 'classic'
 
-                        try:
-                            with open(f'static/themes/{sender_theme}/colors.txt', 'r') as theme_file:
-                                color_dict = eval(theme_file.read())
-                            color_light = color_dict.get('color_light', '#ffc67b')
-                            color_dark = color_dict.get('color_dark', '#7e0808')
-                        except:
-                            color_light = '#ffc67b'
-                            color_dark = '#7e0808'
+                        color_dict = get_theme_colors(sender_theme)
+                        color_light = color_dict.get('color_light', '#ffc67b')
+                        color_dark = color_dict.get('color_dark', '#7e0808')
 
                         msg_text = msg_row[2]
                         if msg_row[7]:

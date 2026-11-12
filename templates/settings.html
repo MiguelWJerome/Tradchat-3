@@ -128,7 +128,22 @@
       </div>
       <div class="tab-pane" id="pane-theme">
         <div class="theme-grid" id="theme-grid-container">
-          <!-- Theme cards will be injected here by Javascript -->
+          <!-- First Option: Choose Solid Color -->
+          <div class="theme-card solid-color-card{% if is_solid_color or (theme and theme.startswith('#')) %} active{% endif %}" id="choose-solid-color-card">
+            <div class="theme-preview" style="background: linear-gradient(to right, red, purple);"></div>
+            <div class="theme-info">
+              <div class="theme-name">Choose Solid Color</div>
+              <div class="theme-colors solid-rainbow-bar">
+                <div class="theme-color-swatch" style="background-color: #ff0000;"></div>
+                <div class="theme-color-swatch" style="background-color: #ff7f00;"></div>
+                <div class="theme-color-swatch" style="background-color: #ffff00;"></div>
+                <div class="theme-color-swatch" style="background-color: #00ff00;"></div>
+                <div class="theme-color-swatch" style="background-color: #0000ff;"></div>
+                <div class="theme-color-swatch" style="background-color: #8b00ff;"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Directory themes injected by Javascript -->
         </div>
       </div>
       <div class="tab-pane" id="pane-home-page">
@@ -157,6 +172,113 @@
       </div>
     </div>
   </div>
+
+  <!-- Adobe AE / Mozilla Style Solid Color Picker Modal -->
+  <div id="solid-color-modal" class="tc-alert-overlay">
+    <div class="tc-alert-content solid-modal-container">
+      <div class="solid-modal-header">
+        <div class="modal-title-group">
+          <i class="fa-solid fa-palette"></i>
+          <h3>Choose Solid Color Theme</h3>
+        </div>
+        <button type="button" class="tc-alert-close-btn" id="solid-modal-close" aria-label="Close">&times;</button>
+      </div>
+
+      <div class="solid-modal-body">
+        <!-- Interactive Visual Column -->
+        <div class="picker-visual-col">
+          <div class="canvas-wrapper" id="color-canvas-wrap">
+            <canvas id="color-canvas" width="280" height="180"></canvas>
+            <div class="canvas-handle" id="canvas-handle"></div>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label-row">
+              <label><i class="fa-solid fa-rainbow"></i> Hue</label>
+              <span id="hue-val-display">0°</span>
+            </div>
+            <input type="range" id="picker-hue" min="0" max="360" value="0" class="spectrum-slider">
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label-row">
+              <label><i class="fa-solid fa-circle-half-stroke"></i> Brightness</label>
+              <span id="lightness-val-display">50%</span>
+            </div>
+            <input type="range" id="picker-lightness" min="0" max="100" value="50" class="lightness-slider">
+          </div>
+
+          <div class="swatch-and-eyedropper">
+            <div class="swatch-preview-split">
+              <div class="swatch-box" id="prev-swatch" title="Original / Active Theme Color"></div>
+              <div class="swatch-box" id="new-swatch" title="New Selected Color"></div>
+            </div>
+            <button type="button" class="btn-eyedropper" id="eyedropper-btn" title="Sample color from screen">
+              <i class="fa-solid fa-eye-dropper"></i> Pipette
+            </button>
+          </div>
+        </div>
+
+        <!-- Numeric & Channel Input Column (Adobe / Mozilla style) -->
+        <div class="picker-inputs-col">
+          <div class="input-block">
+            <label class="block-label">HEX Code</label>
+            <div class="hex-input-group">
+              <span class="prefix">#</span>
+              <input type="text" id="picker-hex" maxlength="6" value="FF0000" spellcheck="false">
+              <button type="button" class="btn-copy" id="copy-hex-btn" title="Copy HEX"><i class="fa-regular fa-copy"></i></button>
+            </div>
+          </div>
+
+          <div class="input-block">
+            <label class="block-label">RGB Channels (0–255)</label>
+            <div class="channel-inputs">
+              <div class="channel-field"><label>R</label><input type="number" id="picker-r" min="0" max="255" value="255"></div>
+              <div class="channel-field"><label>G</label><input type="number" id="picker-g" min="0" max="255" value="0"></div>
+              <div class="channel-field"><label>B</label><input type="number" id="picker-b" min="0" max="255" value="0"></div>
+            </div>
+          </div>
+
+          <div class="input-block">
+            <label class="block-label">HSL Values</label>
+            <div class="channel-inputs">
+              <div class="channel-field"><label>H°</label><input type="number" id="picker-h" min="0" max="360" value="0"></div>
+              <div class="channel-field"><label>S%</label><input type="number" id="picker-s" min="0" max="100" value="100"></div>
+              <div class="channel-field"><label>L%</label><input type="number" id="picker-l" min="0" max="100" value="50"></div>
+            </div>
+          </div>
+
+          <div class="preview-toggle-wrap">
+            <label class="toggle-checkbox">
+              <input type="checkbox" id="live-preview-checkbox" checked>
+              <span>Live Background Preview</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Presets & Recent Swatches -->
+      <div class="solid-modal-presets">
+        <div class="preset-section">
+          <span class="preset-label">Curated Swatches:</span>
+          <div class="swatches-grid" id="curated-swatches"></div>
+        </div>
+        <div class="preset-section">
+          <span class="preset-label">Recent History:</span>
+          <div class="swatches-grid" id="recent-swatches"></div>
+        </div>
+      </div>
+
+      <!-- Actions Footer -->
+      <div class="solid-modal-footer">
+        <button type="button" class="btn-soft reset-btn" id="solid-modal-reset">Reset</button>
+        <div class="footer-right">
+          <button type="button" class="btn-soft cancel-btn" id="solid-modal-cancel">Cancel</button>
+          <button type="button" class="btn-soft save-btn" id="solid-modal-apply">Apply Theme</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </main>
 {% endblock %}
 
@@ -171,7 +293,9 @@
     location: "{{ location }}",
     show_location: eval("{{ show_location }}"),
     email: "{{ email }}",
-    dob: "{{ dob }}"
+    dob: "{{ dob }}",
+    currentTheme: "{{ theme }}",
+    isSolidColor: {{ 'true' if is_solid_color else 'false' }}
   };
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>

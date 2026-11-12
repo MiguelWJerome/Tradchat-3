@@ -421,13 +421,13 @@ body {
   border-radius: 4px;
   background: rgba(0,0,0,0.05);
   color: black;
-  font-family: comic sans ms;
+  font-family: var(--font-body), sans-serif;
 }
 
 .message.own .message__name {
   text-align: right;
 }
-.message__text { font-size: 1.1rem; line-height: 1.45; font-weight: 600; }
+.message__text { font-family: var(--font-body), sans-serif; font-size: 1.1rem; line-height: 1.45; font-weight: 600; }
 
 /* Fade-in for new messages */
 @keyframes msgFadeIn {
@@ -847,10 +847,11 @@ body {
   display: block;
   color: black;
   font-size: 15px;
-  font-family: comic sans ms;
+  font-family: var(--font-body), sans-serif;
 }
 
 .reply-preview-text {
+  font-family: var(--font-body), sans-serif;
   font-size: 0.8rem;
   color: black;
   display: block;

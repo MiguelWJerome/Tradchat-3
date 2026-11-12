@@ -1,0 +1,44 @@
+# Version control
+.git/
+.gitignore
+
+# Package managers & virtual environments
+node_modules/
+venv/
+.venv/
+env/
+.env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build outputs & caches
+dist/
+build/
+.next/
+out/
+target/
+.cache/
+*.egg-info/
+.eggs/
+
+# Database files & temporary journals
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+
+# Large binary / media upload directories
+static/uploads/*
+static/profile-pictures/*
+!static/profile-pictures/*.png
+
+# Logs & temp files
+logs/
+*.log
+tmp/
+temp/
+.DS_Store
+Thumbs.db

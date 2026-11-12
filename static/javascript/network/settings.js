@@ -59,14 +59,56 @@ function Recv(message) {
     const themes = msg[1];
     const container = document.getElementById('theme-grid-container');
     if (container) {
-      container.innerHTML = ''; // Clear container
+      // Find or create "Choose Solid Color" card
+      let solidCard = document.getElementById('choose-solid-color-card');
+      if (!solidCard) {
+        solidCard = document.createElement('div');
+        solidCard.className = 'theme-card solid-color-card';
+        solidCard.id = 'choose-solid-color-card';
+        solidCard.innerHTML = `
+          <div class="theme-preview" style="background: linear-gradient(to right, red, purple);"></div>
+          <div class="theme-info">
+            <div class="theme-name">Choose Solid Color</div>
+            <div class="theme-colors solid-rainbow-bar">
+              <div class="theme-color-swatch" style="background-color: #ff0000;"></div>
+              <div class="theme-color-swatch" style="background-color: #ff7f00;"></div>
+              <div class="theme-color-swatch" style="background-color: #ffff00;"></div>
+              <div class="theme-color-swatch" style="background-color: #00ff00;"></div>
+              <div class="theme-color-swatch" style="background-color: #0000ff;"></div>
+              <div class="theme-color-swatch" style="background-color: #8b00ff;"></div>
+            </div>
+          </div>
+        `;
+        container.prepend(solidCard);
+      }
+
+      const isSolidActive = window.initialProfileData && (
+        window.initialProfileData.isSolidColor ||
+        (window.initialProfileData.currentTheme && window.initialProfileData.currentTheme.startsWith('#'))
+      );
+      if (isSolidActive) {
+        solidCard.classList.add('active');
+      } else {
+        solidCard.classList.remove('active');
+      }
+
+      solidCard.onclick = () => {
+        if (typeof window.openSolidColorModal === 'function') {
+          window.openSolidColorModal();
+        }
+      };
+
+      // Remove existing directory theme cards so we don't duplicate on re-render
+      const oldThemeCards = container.querySelectorAll('.theme-card:not(#choose-solid-color-card)');
+      oldThemeCards.forEach(card => card.remove());
+
+      // 2. Directory themes
       themes.forEach(theme => {
         const card = document.createElement('div');
         card.className = 'theme-card';
-        // Get current theme from body or a global var, for now we can just assume no active state is initially set, 
-        // or check against the current background image
+        
         const currentBg = document.body.style.backgroundImage;
-        if (currentBg.includes(theme.name)) {
+        if (!isSolidActive && currentBg.includes(theme.name)) {
           card.classList.add('active');
         }
 
@@ -93,13 +135,20 @@ function Recv(message) {
           document.documentElement.style.setProperty('--color-dark', theme.colors.color_dark);
           
           // Instantly update background
+          document.body.style.backgroundColor = '';
           document.body.style.backgroundImage = `url('/static/themes/${theme.name}/background.jpg')`;
+
+          if (window.initialProfileData) {
+            window.initialProfileData.currentTheme = theme.name;
+            window.initialProfileData.isSolidColor = false;
+          }
 
           // Send update to server (no save needed)
           cl.send(JSON.stringify(['Update Theme', {
             username: initialProfileData.username,
             password: initialProfileData.password,
-            theme: theme.name
+            theme: theme.name,
+            is_solid_color: false
           }]));
         });
 
@@ -109,7 +158,17 @@ function Recv(message) {
   }
 }
 
-cl.on('message', Recv)
+cl.on('message', Recv);
+
+function fetchThemes() {
+  if (typeof cl !== 'undefined' && cl.send) {
+    cl.send(JSON.stringify(['Get Themes']));
+  }
+}
+
+cl.on('connect', () => {
+  fetchThemes();
+});
 
 document.addEventListener('DOMContentLoaded', () => {
   const saveBtn = document.getElementById('save-profile-btn');
@@ -139,6 +198,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Bind click directly to Choose Solid Color card if pre-rendered
+  const solidCard = document.getElementById('choose-solid-color-card');
+  if (solidCard) {
+    solidCard.onclick = () => {
+      if (typeof window.openSolidColorModal === 'function') {
+        window.openSolidColorModal();
+      }
+    };
+  }
+
   // Fetch themes for the themes tab
-  cl.send(JSON.stringify(['Get Themes']));
+  fetchThemes();
 });

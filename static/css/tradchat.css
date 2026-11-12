@@ -552,3 +552,27 @@ img {
     border: 1px solid white;
     box-shadow: 0 0 4px rgba(255, 51, 51, 0.6);
 }
+
+/* ====================================================
+   STANDARDIZED SANS-SERIF MESSAGE & BODY TEXT
+   ==================================================== */
+.message,
+.message__text,
+.message__name,
+.message__bubble,
+.reply-username,
+.reply-preview-text,
+.chat-panel__input-field,
+.chat-feed,
+.chat-message,
+.conversation-item,
+.sidebar__item,
+.chat-upload-filename,
+.members-card,
+.members-detail-name,
+.members-detail-location,
+.feed-content,
+.feed-author-name,
+.feed-empty-state {
+    font-family: var(--font-body), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+}

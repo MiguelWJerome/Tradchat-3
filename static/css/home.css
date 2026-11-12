@@ -600,7 +600,7 @@
   padding: 2px 6px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.05);
-  font-family: comic sans ms;
+  font-family: var(--font-body), sans-serif;
   color: black;
 }
 
@@ -609,6 +609,7 @@
 }
 
 .message__text {
+  font-family: var(--font-body), sans-serif;
   font-size: 1.1rem;
   line-height: 1.45;
   font-weight: 600;
@@ -1577,10 +1578,11 @@
   display: block;
   color: black;
   font-size: 15px;
-  font-family: comic sans ms;
+  font-family: var(--font-body), sans-serif;
 }
 
 .reply-preview-text {
+  font-family: var(--font-body), sans-serif;
   font-size: 0.8rem;
   color: black;
   display: block;
