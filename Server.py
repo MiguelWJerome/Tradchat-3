@@ -220,7 +220,19 @@ def fetch_room_messages(room_name, limit, offset, underhead, username=None):
             current_max_id = max(m['id'] for m in messages)
             at_bottom = (current_max_id >= max_id)
     
-    return messages, lastTimeStamp, at_bottom
+    at_top = True
+    min_id_row = db_sql("SELECT MIN(id) FROM messages;", room_name, chat_room=True)
+    if min_id_row and min_id_row[0][0] is not None:
+        min_id = min_id_row[0][0]
+        if messages:
+            current_min_id = min(m['id'] for m in messages)
+            at_top = (current_min_id <= min_id)
+        else:
+            at_top = False
+    else:
+        at_top = True
+
+    return messages, lastTimeStamp, at_bottom, at_top
 
 
 def fetch_dm_messages(dm_string, username, limit, offset, underhead):
@@ -304,8 +316,20 @@ def fetch_dm_messages(dm_string, username, limit, offset, underhead):
             max_id = max_id_row[0][0]
             current_max_id = max(m['id'] for m in messages)
             at_bottom = (current_max_id >= max_id)
+
+    at_top = True
+    min_id_row = db_sql(f"SELECT MIN(id) FROM {genderDict[primaryGender]} WHERE (convo_hash = ? OR convo_hash = ?);", genderDict[primaryGender], params=[convo_hash, anti_convo_hash], chat_room=False)
+    if min_id_row and min_id_row[0][0] is not None:
+        min_id = min_id_row[0][0]
+        if messages:
+            current_min_id = min(m['id'] for m in messages)
+            at_top = (current_min_id <= min_id)
+        else:
+            at_top = False
+    else:
+        at_top = True
             
-    return messages, actual_user_dm_username, lastTimeStamp, at_bottom
+    return messages, actual_user_dm_username, lastTimeStamp, at_bottom, at_top
 
 
 accounts_dict = {}
@@ -410,6 +434,100 @@ def find_username_from_id(user_id):
             id_to_accounts_dict[user_id] = username
             return username
         return None
+
+def format_display_date(date_str):
+    if not date_str:
+        return datetime.datetime.now().strftime("%B %d, %Y")
+    try:
+        clean_str = str(date_str).strip()
+        if ' ' in clean_str and ':' in clean_str:
+            dt = datetime.datetime.strptime(clean_str.split('.')[0], "%Y-%m-%d %H:%M:%S")
+            return dt.strftime("%B %d, %Y")
+        elif '-' in clean_str and len(clean_str) == 10:
+            dt = datetime.datetime.strptime(clean_str, "%Y-%m-%d")
+            return dt.strftime("%B %d, %Y")
+    except Exception:
+        pass
+    return str(date_str)
+
+def get_user_display_name(user_identifier):
+    """
+    Returns 'First Last' if available, otherwise 'First', or falls back to username.
+    Accepts username (str) or user_id (int or numeric str).
+    """
+    if not user_identifier:
+        return ""
+    try:
+        if isinstance(user_identifier, int) or (isinstance(user_identifier, str) and str(user_identifier).isdigit()):
+            row = db_sql("SELECT first_name, last_name, username FROM accounts WHERE id = ?;", 'accounts', params=[int(user_identifier)], chat_room=False)
+        else:
+            row = db_sql("SELECT first_name, last_name, username FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[str(user_identifier)], chat_room=False)
+        if row and row[0]:
+            first, last, uname = row[0]
+            full = f"{first or ''} {last or ''}".strip()
+            return full if full else uname
+    except Exception as e:
+        print(f"Error fetching display name for {user_identifier}: {e}")
+    return str(user_identifier)
+
+def get_room_conversation_meta(room_name):
+    room_info = db_sql("SELECT owners, created_at, emoji FROM rooms WHERE room_name = ?;", 'rooms', params=[room_name], chat_room=False)
+    creator_id = '1'
+    created_at_raw = None
+    emoji = '💬'
+    if room_info and room_info[0]:
+        owners_list = split(room_info[0][0])
+        if owners_list:
+            creator_id = owners_list[0]
+        created_at_raw = room_info[0][1]
+        if room_info[0][2]:
+            emoji = room_info[0][2]
+
+    if not created_at_raw:
+        first_msg = db_sql("SELECT timestamp FROM messages ORDER BY id ASC LIMIT 1;", room_name, chat_room=True)
+        if first_msg and first_msg[0][0]:
+            created_at_raw = first_msg[0][0]
+
+    creator_full_name = get_user_display_name(creator_id)
+    formatted_date = format_display_date(created_at_raw)
+
+    return {
+        'is_dm': False,
+        'title': 'Here is where it all began.',
+        'room_name': room_name,
+        'creator_name': creator_full_name,
+        'date': formatted_date,
+        'subtext': f"{room_name} was created by {creator_full_name} • {formatted_date}.",
+        'emoji': emoji
+    }
+
+def get_dm_conversation_meta(dm_string, current_username):
+    dm_parts = dm_string.split('.$@-@&.')
+    partner_username = dm_parts[1] if dm_parts[0].lower() == current_username.lower() else dm_parts[0]
+    partner_full_name = get_user_display_name(partner_username)
+
+    primary_user_id = find_account_id_or_password_or_gender(dm_parts[0], 'id')
+    primary_gender = find_account_id_or_password_or_gender(dm_parts[0], 'gender')
+    secondary_user_id = find_account_id_or_password_or_gender(dm_parts[1], 'id')
+    convo_hash = f"{primary_user_id}-{secondary_user_id}"
+    anti_convo_hash = f"{secondary_user_id}-{primary_user_id}"
+
+    genderDict = {'male': 'boys_dm', 'female': 'girls_dm'}
+    target_table = genderDict.get(primary_gender, 'boys_dm')
+
+    first_msg = db_sql(f"SELECT timestamp FROM {target_table} WHERE (convo_hash = ? OR convo_hash = ?) ORDER BY id ASC LIMIT 1;", target_table, params=[convo_hash, anti_convo_hash], chat_room=False)
+    start_date_raw = first_msg[0][0] if first_msg and first_msg[0][0] else None
+    formatted_date = format_display_date(start_date_raw)
+
+    return {
+        'is_dm': True,
+        'title': 'All friendships start somewhere.',
+        'partner_name': partner_full_name,
+        'partner_username': partner_username,
+        'partner_pfp': f'/static/profile-pictures/{partner_username}.png',
+        'date': formatted_date,
+        'subtext': f"Conversation with {partner_full_name} • Started {formatted_date}"
+    }
 
 def is_admin(username):
     if not username:
@@ -884,12 +1002,26 @@ if not os.path.exists("rooms.db"):
             curators TEXT NOT NULL,
             members TEXT NOT NULL,
             emoji TEXT NOT NULL,
-            deleted BOOLEAN NOT NULL DEFAULT 0
+            deleted BOOLEAN NOT NULL DEFAULT 0,
+            created_at TEXT
         );
     ''')
-    rooms_cursor.execute("""INSERT INTO rooms (room_name, room_type, description, owners, managers, curators, members, emoji) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", ('mainroom', 'public', 'The main room for all users', '1', '', '', '', 'MR'))
+    rooms_cursor.execute("""INSERT INTO rooms (room_name, room_type, description, owners, managers, curators, members, emoji, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);""", ('mainroom', 'public', 'The main room for all users', '1', '', '', '', 'MR', 'September 10, 2026'))
     rooms_db.commit()
     rooms_db.close()
+else:
+    try:
+        with rooms_lock:
+            conn = sqlite3.connect('rooms.db')
+            cursor = conn.cursor()
+            cols = [info[1] for info in cursor.execute("PRAGMA table_info(rooms);").fetchall()]
+            if 'created_at' not in cols:
+                cursor.execute("ALTER TABLE rooms ADD COLUMN created_at TEXT;")
+                cursor.execute("UPDATE rooms SET created_at = ? WHERE created_at IS NULL OR created_at = '';", ('September 10, 2026',))
+                conn.commit()
+            conn.close()
+    except Exception as e:
+        print(f"Error checking rooms.db created_at column: {e}")
 
 if not os.path.exists("dms/boys_dm.db"):
     boys_dm_db = sqlite3.connect("dms/boys_dm.db")
@@ -2486,9 +2618,20 @@ def Recv(message, sid):
         if is_dm:
             if not check_dm_access(room, username):
                 return
-            messages, actual_user_dm_username, lastTimeStamp, at_bottom = fetch_dm_messages(room, username, limit, offset, underhead)
+            messages, actual_user_dm_username, lastTimeStamp, at_bottom, at_top = fetch_dm_messages(room, username, limit, offset, underhead)
             db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[room, username], chat_room=False)
-            Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': room, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'overhead': (offset != -1 and not underhead), 'underhead': underhead, 'lastTimeStamp': lastTimeStamp, 'at_bottom': at_bottom}]), room=sid)
+            convo_meta = get_dm_conversation_meta(room, username)
+            Server.send(str(['Fetch DM Messages', {
+                'messages': messages,
+                'room': room,
+                'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png',
+                'overhead': (offset != -1 and not underhead),
+                'underhead': underhead,
+                'lastTimeStamp': lastTimeStamp,
+                'at_bottom': at_bottom,
+                'at_top': at_top,
+                'conversation_meta': convo_meta
+            }]), room=sid)
         else:
             if not check_room_access(room, username):
                 # Check if it was deleted
@@ -2496,8 +2639,19 @@ def Recv(message, sid):
                 if is_deleted and is_deleted[0][0]:
                     Server.send(str(['Room Deleted', {'room': room}]), room=sid)
                 return
-            messages, lastTimeStamp, at_bottom = fetch_room_messages(room, limit, offset, underhead, username)
-            Server.send(str(['Fetch Room Messages', {'messages': messages, 'room': room, 'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[room], chat_room=False)[0][0], 'overhead': (offset != -1 and not underhead), 'underhead': underhead, 'lastTimeStamp': lastTimeStamp, 'at_bottom': at_bottom}]), room=sid)
+            messages, lastTimeStamp, at_bottom, at_top = fetch_room_messages(room, limit, offset, underhead, username)
+            convo_meta = get_room_conversation_meta(room)
+            Server.send(str(['Fetch Room Messages', {
+                'messages': messages,
+                'room': room,
+                'emoji': db_sql("""SELECT emoji FROM rooms WHERE room_name = ?;""", 'rooms', params=[room], chat_room=False)[0][0],
+                'overhead': (offset != -1 and not underhead),
+                'underhead': underhead,
+                'lastTimeStamp': lastTimeStamp,
+                'at_bottom': at_bottom,
+                'at_top': at_top,
+                'conversation_meta': convo_meta
+            }]), room=sid)
 
     elif msg[0] == 'Join Room':
         data = msg[1]
@@ -2552,7 +2706,8 @@ def Recv(message, sid):
                     elif user_id_str in managers_list: my_role = 'Manager'
                     elif user_id_str in curators_list: my_role = 'Curator'
 
-                messages, lastTimeStamp, at_bottom = fetch_room_messages(new_room, limit, -1, False, username)
+                messages, lastTimeStamp, at_bottom, at_top = fetch_room_messages(new_room, limit, -1, False, username)
+                convo_meta = get_room_conversation_meta(new_room)
 
                 Server.send(str(['Fetch Room Messages', {
                     'messages': messages,
@@ -2561,7 +2716,9 @@ def Recv(message, sid):
                     'myRole': my_role,
                     'clear': False,
                     'lastTimeStamp': lastTimeStamp,
-                    'at_bottom': at_bottom
+                    'at_bottom': at_bottom,
+                    'at_top': at_top,
+                    'conversation_meta': convo_meta
                 }]), room=sid)
             else:
                 is_deleted = db_sql("SELECT deleted FROM rooms WHERE room_name = ?;", 'rooms', params=[new_room], chat_room=False)
@@ -2585,11 +2742,21 @@ def Recv(message, sid):
             Server.server.enter_room(sid, new_dm)
             process_room_join(sid, username, new_dm)
             
-            messages, actual_user_dm_username, lastTimeStamp, at_bottom = fetch_dm_messages(new_dm, username, limit, -1, False)
+            messages, actual_user_dm_username, lastTimeStamp, at_bottom, at_top = fetch_dm_messages(new_dm, username, limit, -1, False)
+            convo_meta = get_dm_conversation_meta(new_dm, username)
 
             db_sql("""UPDATE accounts SET room = ? WHERE username = ?;""", 'accounts', params=[new_dm, username], chat_room=False)
             
-            Server.send(str(['Fetch DM Messages', {'messages': messages, 'room': new_dm, 'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png', 'clear': False, 'lastTimeStamp': lastTimeStamp, 'at_bottom': at_bottom}]), room=sid)
+            Server.send(str(['Fetch DM Messages', {
+                'messages': messages,
+                'room': new_dm,
+                'profile_picture': f'/static/profile-pictures/{actual_user_dm_username}.png',
+                'clear': False,
+                'lastTimeStamp': lastTimeStamp,
+                'at_bottom': at_bottom,
+                'at_top': at_top,
+                'conversation_meta': convo_meta
+            }]), room=sid)
 
     elif msg[0] == 'Leave Room':
         data = msg[1]
@@ -2985,6 +3152,20 @@ def Recv(message, sid):
                     user_dms.append(str(username_id))
                     db_sql("""UPDATE accounts SET dms = ? WHERE username = ?;""", 'accounts', params=[join(user_dms), user], chat_room=False)
                 
+                # Send an introductory message from Server into the DM
+                try:
+                    primary_gender = find_account_id_or_password_or_gender(username, 'gender')
+                    fm_to_gb = {'female': 'girls_dm', 'male': 'boys_dm'}
+                    tbl = fm_to_gb.get(primary_gender, 'boys_dm')
+                    dm_now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    name_a = get_user_display_name(username)
+                    name_b = get_user_display_name(user)
+                    intro_text = f"Welcome! Direct messaging between {name_a} and {name_b} has started."
+                    convo_hash = f"{username_id}-{user_id}"
+                    db_sql(f"""INSERT INTO {tbl} (convo_hash, sender_id, message, timestamp, reply_id, upload, reactions, deleted) VALUES (?, 1, ?, ?, -1, '', '', 0);""", tbl, params=[convo_hash, intro_text, dm_now], chat_room=False)
+                except Exception as intro_err:
+                    print(f"Error posting initial DM intro message: {intro_err}")
+
                 Server.send(str(['Create DM Results', 'DM Created']), room=sid)
 
     elif msg[0] == 'Create Account':
@@ -3071,7 +3252,8 @@ def Recv(message, sid):
 
                 room_dict[roomname] = {'file_path': f'rooms/{roomname}.db', 'lock': Lock()}
 
-                db_sql("""INSERT INTO rooms (room_name, description, room_type, owners, managers, curators, members, emoji) VALUES (?, ?, ?, ?, ?, ?, ?, ?);""", 'rooms', params=[roomname, description, roomtype, str(find_account_id_or_password_or_gender(username, 'id')), '', '', '', emoji], chat_room=False)
+                room_created_at = datetime.datetime.now().strftime("%B %d, %Y")
+                db_sql("""INSERT INTO rooms (room_name, description, room_type, owners, managers, curators, members, emoji, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);""", 'rooms', params=[roomname, description, roomtype, str(find_account_id_or_password_or_gender(username, 'id')), '', '', '', emoji, room_created_at], chat_room=False)
                 
                 Server.send(str(['Create Room Results', 'Room Created']), room=sid)
 

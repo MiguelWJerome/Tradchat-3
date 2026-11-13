@@ -279,7 +279,6 @@ have ai go through all the "conditional database saftery adds" for example if I 
 finish publish on the admin page
 make the block gaming parental control works and make parental control "block media" also block posts once posts are made
 promote people past a stage when you're choosing room roles
-THIS IS BEGGINING OF CONVERSATION - at the beeging of a conversation
 sedeprivationlist also and take away the popular reference clause
 standerize sans serif on chat platofrm by default and they can change
 

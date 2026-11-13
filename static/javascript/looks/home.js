@@ -50,7 +50,7 @@ $(document).ready(function () {
 
     // Get the label to determine what to show
     var label = $(this).find('.tray-item__label').text().replace(/\s+/g, '').toLowerCase();
-    
+
     // Update the search placeholder
     updateSearchPlaceholder(label);
 
@@ -59,13 +59,13 @@ $(document).ready(function () {
   });
 
   // Handle Sidebar Search Filtering
-  $(document).ready(function() {
-    $('.sidebar__search .search-input').on('input', function() {
+  $(document).ready(function () {
+    $('.sidebar__search .search-input').on('input', function () {
       const term = $(this).val().toLowerCase().trim();
-      $('.sidebar__list .convo-item').each(function() {
+      $('.sidebar__list .convo-item').each(function () {
         const roomName = $(this).find('.convo-item__name').text().toLowerCase();
         const roomDesc = $(this).find('.convo-item__preview').text().toLowerCase();
-        
+
         if (roomName.includes(term) || roomDesc.includes(term)) {
           $(this).show();
         } else {
@@ -76,7 +76,7 @@ $(document).ready(function () {
   });
 
   // Function to update the sidebar search input placeholder
-  window.updateSearchPlaceholder = function(view) {
+  window.updateSearchPlaceholder = function (view) {
     const $searchInput = $('.sidebar .sidebar__search .search-input:not(#gif-search-input)');
     if (!$searchInput.length) return;
 
@@ -126,7 +126,7 @@ document.body.onclick = function () {
       $chatFeed = $("#chat-feed");
 
       // Handle message avatar clicks to redirect to profile pages
-      $(document).on('click', '.message__avatar', function() {
+      $(document).on('click', '.message__avatar', function () {
         var user = $(this).attr('data-username');
         if (user) {
           window.location.href = "/profile/" + encodeURIComponent(user) + "/";
@@ -710,6 +710,43 @@ document.body.onclick = function () {
      * @param {boolean} overhead - If true, inserts message at top for historical loading
      */
 
+    /**
+     * Renders a centered conversation beginning header for DMs and Rooms
+     */
+    window.renderBeginningHeader = function (meta, prepend = false) {
+      if (!meta) return;
+      const $container = $("#message-container");
+      if (!$container.length) return;
+
+      if ($("#chat-beginning-header").length > 0) {
+        return; // Already rendered
+      }
+
+      const isDM = meta.is_dm;
+      const title = meta.title || (isDM ? "All friendships start somewhere." : "Here is where it all began.");
+      const subtext = meta.subtext || "";
+
+      let badgeHtml = "";
+      if (isDM && meta.partner_pfp) {
+        badgeHtml = `<div class="chat-beginning-badge" style="cursor: pointer;" onclick="window.location.href='/profile/' + encodeURIComponent('${meta.partner_username || ''}') + '/';"><img class="message__avatar" data-username="${meta.partner_username || ''}" style="cursor: pointer;" src="${meta.partner_pfp}" alt="${meta.partner_name || 'User'}" onerror="this.src='/static/graphics/defaultMale.png'"></div>`;
+      } else if (!isDM && meta.emoji) {
+        badgeHtml = `<div class="chat-beginning-badge">${meta.emoji}</div>`;
+      } else {
+        badgeHtml = `<div class="chat-beginning-badge">💬</div>`;
+      }
+
+      const headerHtml = `
+        <div id="chat-beginning-header" class="chat-beginning-header">
+          ${badgeHtml}
+          <h2 class="chat-beginning-title">${title}</h2>
+          <p class="chat-beginning-subtext">${subtext}</p>
+          <div class="chat-beginning-divider"></div>
+        </div>
+      `;
+
+      $container.prepend(headerHtml);
+    };
+
     window.appendMessage = function (data, scrollData = { 'scrollToBottom': true, 'specialScrollTo': null }) {
       we_are_currently_appending_messages_rn = true;
       let index = data['index'];
@@ -751,9 +788,9 @@ document.body.onclick = function () {
       // Header Display: hide day if it's today
       var today = new Date();
       var isToday = msgDate.getDate() === today.getDate() &&
-                    msgDate.getMonth() === today.getMonth() &&
-                    msgDate.getFullYear() === today.getFullYear();
-      
+        msgDate.getMonth() === today.getMonth() &&
+        msgDate.getFullYear() === today.getFullYear();
+
       var headerStamp = (isToday ? "" : dayShort + " ") + timeStr;
 
       // --- 2. Big Centered Date Stamp and User Grouping Logic ---
@@ -2107,6 +2144,10 @@ document.body.onclick = function () {
         $chatFeed.on("scroll", function () {
           // Check if scrolled to top (with small threshold for tolerance)
           if ($chatFeed.scrollTop() <= 10) {
+            // --- GUARD: Reached the absolute top of the conversation ---
+            if ($("#chat-beginning-header").length > 0) {
+              return;
+            }
             // --- GUARD: Don't trigger overhead if already attached to bottom ---
             if (window.attached_to_bottom) {
               return;
@@ -2403,12 +2444,12 @@ document.body.onclick = function () {
       // ── Fetch emoji data independently ────────────────────────────────────
       var typeaheadEmojiData = null;
       fetch("/static/emoji.json")
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
           typeaheadEmojiData = data;
           console.log("[EMOJI] emoji.json loaded independently. Categories:", Object.keys(data).length);
         })
-        .catch(function(err) {
+        .catch(function (err) {
           console.error("[EMOJI] Failed to fetch emoji.json:", err);
         });
 
@@ -2423,7 +2464,7 @@ document.body.onclick = function () {
             var item = items[i];
             var matched = !keyword
               || item.description.toLowerCase().includes(keyword)
-              || (item.keywords && item.keywords.some(function(k) { return k.toLowerCase().includes(keyword); }));
+              || (item.keywords && item.keywords.some(function (k) { return k.toLowerCase().includes(keyword); }));
             if (matched) {
               results.push(item);
               if (results.length >= 20) return results;
@@ -2465,18 +2506,18 @@ document.body.onclick = function () {
           return;
         }
 
-        emojiSearchState.results.forEach(function(item, index) {
+        emojiSearchState.results.forEach(function (item, index) {
           var $item = $("<div>").addClass("emoji-typeahead-item");
           if (index === emojiSearchState.selectedIndex) {
             $item.addClass("selected");
           }
 
           var $emoji = $("<span>").addClass("emoji").text(item.emoji);
-          var $name  = $("<span>").addClass("emoji-name").text(item.description.toLowerCase());
+          var $name = $("<span>").addClass("emoji-name").text(item.description.toLowerCase());
 
           $item.append($emoji).append($name);
 
-          $item.on("mousedown", function(e) {
+          $item.on("mousedown", function (e) {
             e.preventDefault();
             console.log("[EMOJI] Item mousedown — inserting:", item.emoji);
             insertEmoji($input, item.emoji);
@@ -2495,10 +2536,10 @@ document.body.onclick = function () {
 
       function insertEmoji($input, emoji) {
         console.log("[EMOJI] insertEmoji() called with:", emoji);
-        var val        = $input.val();
-        var cursor     = $input[0].selectionStart;
+        var val = $input.val();
+        var cursor = $input[0].selectionStart;
         var textBefore = val.substring(0, cursor);
-        var textAfter  = val.substring(cursor);
+        var textAfter = val.substring(cursor);
 
         var lastColonIdx = textBefore.lastIndexOf(":");
         if (lastColonIdx !== -1) {
@@ -2512,10 +2553,10 @@ document.body.onclick = function () {
       }
 
       // ── INPUT ──────────────────────────────────────────────────────────────
-      $(document).on("input", "#chat-input", function() {
-        var $input     = $(this);
-        var val        = $input.val();
-        var cursor     = $input[0].selectionStart;
+      $(document).on("input", "#chat-input", function () {
+        var $input = $(this);
+        var val = $input.val();
+        var cursor = $input[0].selectionStart;
         var textBefore = val.substring(0, cursor);
 
         var match = textBefore.match(/(?:^|\s):([^\s]*)$/);
@@ -2524,9 +2565,9 @@ document.body.onclick = function () {
         if (match) {
           var keyword = match[1];
           console.log("[EMOJI] Regex matched! Keyword:", JSON.stringify(keyword));
-          emojiSearchState.active        = true;
-          window.emojiTypeaheadActive    = true;
-          emojiSearchState.keyword       = keyword;
+          emojiSearchState.active = true;
+          window.emojiTypeaheadActive = true;
+          emojiSearchState.keyword = keyword;
           emojiSearchState.selectedIndex = -1;
 
           emojiSearchState.results = searchEmoji(keyword);
@@ -2536,7 +2577,7 @@ document.body.onclick = function () {
       });
 
       // ── KEYDOWN ────────────────────────────────────────────────────────────
-      $(document).on("keydown", "#chat-input", function(e) {
+      $(document).on("keydown", "#chat-input", function (e) {
         if (!emojiSearchState.active || emojiSearchState.results.length === 0) return;
         var $input = $(this);
 
@@ -2555,7 +2596,7 @@ document.body.onclick = function () {
       });
 
       // ── CLICK OUTSIDE ──────────────────────────────────────────────────────
-      $(document).on("mousedown", function(e) {
+      $(document).on("mousedown", function (e) {
         if (!emojiSearchState.active) return;
         if (!$(e.target).closest("#emoji-typeahead-container, #chat-input").length) {
           console.log("[EMOJI] Clicked outside — hiding");
@@ -2568,7 +2609,7 @@ document.body.onclick = function () {
     // Document ready handlers for modal
     $(document).ready(function () {
       initEmojiTypeahead();
-      
+
       // Connect Create button from sidebar - Handled in network/home.js to support DM selection
 
 

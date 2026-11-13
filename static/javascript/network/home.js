@@ -50,6 +50,7 @@ function recv(message) {
                 window.attached_to_bottom = true;
                 window.__placed_unread_marker = false;
                 window.__unread_marker_element = null;
+                window.__current_conversation_meta = data['conversation_meta'];
             }
             messages = data['messages'];
             if (data['underhead'] && messages.length < 1) {
@@ -62,14 +63,14 @@ function recv(message) {
                 // If we are loading the initial batch or scrolling down (underhead)
                 // We become attached if the batch reaches the actual bottom AND we aren't in "unread lookup" mode
                 let inUnreadMode = (data['lastTimeStamp'] !== undefined && data['lastTimeStamp'] !== false && !data['overhead'] && !data['underhead']);
-                
+
                 if (data['at_bottom'] !== false && !inUnreadMode) {
                     window.attached_to_bottom = true;
                 } else {
                     window.attached_to_bottom = false;
                 }
             }
-            
+
             for (var i in messages) {
                 appendMessage({
                     'index': messages[i]['id'], 'username': messages[i]['username'],
@@ -89,6 +90,13 @@ function recv(message) {
                             add_reaction($target, r.emoji, u);
                         }
                     }
+                }
+            }
+
+            // Render conversation beginning header if at top of chat history or empty room/DM
+            if (data['at_top'] || messages.length === 0) {
+                if (typeof window.renderBeginningHeader === 'function') {
+                    window.renderBeginningHeader(data['conversation_meta'] || window.__current_conversation_meta, data['overhead']);
                 }
             }
             if (msg[0] === 'Fetch Room Messages') {
@@ -143,7 +151,7 @@ function recv(message) {
     else if (msg[0] === 'Get Rooms') {
         clearAllChatRoomOptions();
         data = msg[1];
-        
+
         // Sort: Unread rooms first
         data.sort((a, b) => {
             const aUnread = a['lastTimeStamp'] !== false;
@@ -178,7 +186,7 @@ function recv(message) {
             let dmId = sortAndJoinStrings(username, dm['username']);
             let otherUsername = dm['username'];
             let isUnread = dm['lastTimeStamp'] !== false;
-            
+
             createChatRoomOption(dmId, otherUsername, `${dm['first_name']} ${dm['last_name']}`, function () {
                 switch_dm(otherUsername);
             }, `/static/profile-pictures/${otherUsername}.png`, isUnread, true, (dmId === ROOM));
@@ -193,7 +201,7 @@ function recv(message) {
             $indicator.find('.reply-username').text(message.username);
             const $previewText = $indicator.find('.reply-preview-text');
             $previewText.text(message.message);
-            if (message.deleted) $previewText.css({"font-style": "italic", "color": "#777"});
+            if (message.deleted) $previewText.css({ "font-style": "italic", "color": "#777" });
             $indicator.find('.reply-avatar').attr('src', `/static/profile-pictures/${message.username}.png`);
         }
     }
@@ -235,11 +243,11 @@ function recv(message) {
     }
     else if (msg[0] === 'Create Room Results') {
         if (msg[1] === 'Room Already Exists') Alert('Room already exists. Please choose a different name.');
-        else if (msg[1] === 'Room Created') Alert('Room created successfully!', function() { location.reload(); });
+        else if (msg[1] === 'Room Created') Alert('Room created successfully!', function () { location.reload(); });
     }
     else if (msg[0] === 'Create DM Results') {
         if (msg[1] === 'DM Already Exists') Alert('DM already exists with this user!');
-        else if (msg[1] === 'DM Created') Alert('DM created successfully!', function() { location.reload(); });
+        else if (msg[1] === 'DM Created') Alert('DM created successfully!', function () { location.reload(); });
         else Alert(msg[1]);
     }
     else if (msg[0] === 'Get Room Members Results') {
@@ -300,13 +308,13 @@ function recv(message) {
                 const isOwn = $msgGroup.hasClass('own');
                 const $prevBubbles = $bubble.prevAll('.message__bubble');
                 const $nextBubbles = $bubble.nextAll('.message__bubble');
-                
+
                 const $originalAvatar = $msgGroup.find('.message__avatar').first().clone();
                 const $originalNameWrapper = $msgGroup.find('.message__content > div').first().clone();
-                
+
                 const $deletedGroup = $('<div>').addClass('message').addClass(isOwn ? 'own' : '');
                 const $deletedContent = $('<div>').addClass('message__content');
-                
+
                 // Remove any image groups inside or adjacent to the bubble
                 $bubble.find('.chat-image-group').remove();
                 $bubble.next('.chat-image-group').remove();
@@ -329,13 +337,13 @@ function recv(message) {
                     }
                     $bubble.append($text);
                 }
-                $text.text("(message has been deleted)").css({"font-style": "italic", "color": "#777"});
+                $text.text("(message has been deleted)").css({ "font-style": "italic", "color": "#777" });
                 $bubble.find('.message-actions').remove();
-                $bubble.next('.message__reactions').remove(); 
-                
+                $bubble.next('.message__reactions').remove();
+
                 $deletedContent.append($bubble);
                 $deletedGroup.append($deletedContent);
-                
+
                 if ($nextBubbles.length > 0) {
                     const $afterGroup = $('<div>').addClass('message').addClass(isOwn ? 'own' : '');
                     const $afterContent = $('<div>').addClass('message__content');
@@ -349,14 +357,14 @@ function recv(message) {
                 } else {
                     $msgGroup.after($deletedGroup);
                 }
-                
+
                 if ($prevBubbles.length === 0) {
                     $msgGroup.remove();
                 }
 
-                $(`.reply-container[data-target-index="${index}"]`).each(function() {
+                $(`.reply-container[data-target-index="${index}"]`).each(function () {
                     let $preview = $(this).find('.reply-preview-text');
-                    $preview.text("(message has been deleted)").css({"font-style": "italic", "color": "#777"});
+                    $preview.text("(message has been deleted)").css({ "font-style": "italic", "color": "#777" });
                 });
             }
         }
@@ -414,7 +422,7 @@ function switch_dm(dm_username) {
     window.reached_real_bottom = false;
 }
 
-window.emitCreateRoom = function(roomname, description, emoji, roomtype) {
+window.emitCreateRoom = function (roomname, description, emoji, roomtype) {
     cl.send(JSON.stringify(['Create Room', {
         'username': username,
         'password': password,
@@ -452,7 +460,7 @@ sendButton.addEventListener('click', function () {
     cl.send(JSON.stringify(['Message', {
         'setting': setting, 'room': ROOM, 'username': username,
         'password': password, 'time-stamp': Date(),
-        'message': chatInput.value, 'reply-index': currentreply_id, 
+        'message': chatInput.value, 'reply-index': currentreply_id,
         'upload': uploadData
     }]));
 
@@ -489,7 +497,7 @@ document.getElementById('back-to-mainroom').addEventListener('click', function (
     document.getElementById('messenger-icon').classList.remove('active');
     document.getElementById('private-rooms-icon').classList.remove('active');
     document.getElementById('public-rooms-icon').classList.add('active');
-    
+
     // Update search placeholder via looks layer function
     if (typeof updateSearchPlaceholder === 'function') {
         updateSearchPlaceholder('publicrooms');
@@ -502,7 +510,7 @@ document.getElementById('back-to-mainroom').addEventListener('click', function (
 document.getElementById('create-btn').addEventListener('click', function () {
     if (document.getElementById('messenger-icon').classList.contains('active')) {
         // Messenger is active - show user selection modal for DMs
-        choose_usernames(false, function(selectedUsernames) {
+        choose_usernames(false, function (selectedUsernames) {
             if (selectedUsernames && selectedUsernames.length > 0) {
                 create_dm(selectedUsernames[0]);
             }
@@ -562,7 +570,7 @@ function broadcast_removed_reaction(index, emoji) {
     cl.send(JSON.stringify(['Removed Reaction', { 'username': username, 'password': password, 'index': index, 'room': ROOM, 'emoji': emoji }]))
 }
 
-window.emitGifSearch = function(query) {
+window.emitGifSearch = function (query) {
     // Clean query: lowercase, remove punctuation, strip spaces
     let cleanQuery = query.toLowerCase().trim();
     cleanQuery = cleanQuery.replace(/[^\w\s]/g, '').trim();
@@ -571,7 +579,7 @@ window.emitGifSearch = function(query) {
     }
 };
 
-window.attachGif = function(url, giphyId) {
+window.attachGif = function (url, giphyId) {
     if (window.PL_BLOCK_MEDIA) {
         if (typeof Alert === 'function') Alert('GIF attachments are restricted by your parental settings.');
         return;
@@ -588,12 +596,12 @@ window.attachGif = function(url, giphyId) {
         </div>
     `);
 
-    $card.find('.preview-close-btn').on('click', function(e) {
+    $card.find('.preview-close-btn').on('click', function (e) {
         e.preventDefault();
         const cardIdx = parseInt($card.attr('data-idx'));
         currentUpload.splice(cardIdx, 1);
         $card.remove();
-        $('#upload-preview-strip .upload-preview-item').each(function(i) {
+        $('#upload-preview-strip .upload-preview-item').each(function (i) {
             $(this).attr('data-idx', i);
         });
         if (currentUpload.length === 0) {
@@ -610,12 +618,12 @@ window.attachGif = function(url, giphyId) {
     }
 };
 
-window.sendGif = function(url) {
+window.sendGif = function (url) {
     // Deprecated in favor of attachGif, but kept for compatibility
     window.attachGif(url);
 };
 
-window.addGif = function(giphy_id, keywords) {
+window.addGif = function (giphy_id, keywords) {
     cl.send(JSON.stringify(['Add GIF', { 'username': username, 'password': password, giphy_id: giphy_id, keywords: keywords }]));
 };
 
@@ -654,11 +662,11 @@ roomDescInput.addEventListener('input', function () { validateInput(this); });
 
 if (createRoomForm) {
     const createRoomSubmitBtn = document.getElementById('create-room-submit');
-    
+
     createRoomSubmitBtn.addEventListener('click', function () {
         const selector = document.querySelector('.emoji-selector');
         const display = document.querySelector('.emoji-display');
-        
+
         // Reset validation visuals
         selector.classList.remove('invalid');
         display.classList.remove('invalid');
@@ -667,7 +675,7 @@ if (createRoomForm) {
         if (!window.isRoomEmojiSelected) {
             selector.classList.add('invalid');
             display.classList.add('invalid');
-            return; 
+            return;
         }
 
         // 2. Check Native Form Validity (Name, Description, etc.)
@@ -682,12 +690,12 @@ if (createRoomForm) {
         const description = roomDescInput.value.trim();
         const emoji = roomEmojiInput.value;
         const roomtype = document.querySelector('input[name="roomtype"]:checked').value;
-        
+
         create_chat_room(roomname, description, emoji, roomtype);
     });
 
     // Also handle Enter key to trigger the same logic
-    createRoomForm.addEventListener('keypress', function(e) {
+    createRoomForm.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') {
             e.preventDefault();
             createRoomSubmitBtn.click();
@@ -733,25 +741,25 @@ $(document).ready(function () {
 });
 
 const roomMemberCallbacks = {
-    onPromoteDemote: function(targetUsername, action) {
+    onPromoteDemote: function (targetUsername, action) {
         cl.send(JSON.stringify(['Update Room Member', { 'username': username, 'password': password, 'room': ROOM, 'target_username': targetUsername, 'action': action }]));
     },
-    onRemove: function(targetUsername) {
+    onRemove: function (targetUsername) {
         cl.send(JSON.stringify(['Update Room Member', { 'username': username, 'password': password, 'room': ROOM, 'target_username': targetUsername, 'action': 'remove' }]));
     },
-    onAdd: function(newUsername) {
+    onAdd: function (newUsername) {
         cl.send(JSON.stringify(['Add Room Member', { 'username': username, 'password': password, 'room': ROOM, 'new_username': newUsername }]));
     },
-    onDeleteRoom: function() {
+    onDeleteRoom: function () {
         cl.send(JSON.stringify(['Delete Room', { 'username': username, 'password': password, 'room': ROOM }]));
     }
 };
 
-window.onOpenRoomDetails = function() {
+window.onOpenRoomDetails = function () {
     cl.send(JSON.stringify(['Get Room Members', { 'username': username, 'password': password, 'room': ROOM }]));
 };
 
-$(document).ready(function() {
+$(document).ready(function () {
     if (ROOM_TYPE === 'dm') {
         const dmParts = ROOM.split('.$@-@&.');
         const otherUser = dmParts[0] === username ? dmParts[1] : dmParts[0];
@@ -769,7 +777,7 @@ $(document).ready(function() {
         $('#file-upload-input').click();
     });
 
-    $('#file-upload-input').on('change', function(e) {
+    $('#file-upload-input').on('change', function (e) {
         const files = Array.from(e.target.files);
         if (!files.length) return;
 
@@ -780,32 +788,32 @@ $(document).ready(function() {
             }
 
             const reader = new FileReader();
-            reader.onload = function(event) {
+            reader.onload = function (event) {
                 const img = new Image();
-                img.onload = function() {
+                img.onload = function () {
                     console.log(`[DEBUG] Image loaded in browser: ${img.width}x${img.height}`);
-                    
+
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    
+
                     let w = img.width;
                     let h = img.height;
                     const narrowest = Math.min(w, h);
-                    
+
                     if (narrowest > 800) {
                         const scale = 800 / narrowest;
                         w = Math.floor(w * scale);
                         h = Math.floor(h * scale);
                         console.log(`[DEBUG] Resizing client-side to: ${w}x${h}`);
                     }
-                    
+
                     canvas.width = w;
                     canvas.height = h;
                     ctx.drawImage(img, 0, 0, w, h);
-                    
+
                     const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
                     console.log(`[DEBUG] Client-side processing complete. Final payload size: ${Math.round(resizedDataUrl.length / 1024)} KB`);
-                    
+
                     currentUpload.push(resizedDataUrl);
 
                     // Build a thumbnail card with its own X
@@ -819,13 +827,13 @@ $(document).ready(function() {
                         </div>
                     `);
 
-                    $card.find('.preview-close-btn').on('click', function(e) {
+                    $card.find('.preview-close-btn').on('click', function (e) {
                         e.preventDefault();
                         const cardIdx = parseInt($card.attr('data-idx'));
                         currentUpload.splice(cardIdx, 1);
                         $card.remove();
                         // Re-index remaining cards
-                        $('#upload-preview-strip .upload-preview-item').each(function(i) {
+                        $('#upload-preview-strip .upload-preview-item').each(function (i) {
                             $(this).attr('data-idx', i);
                         });
                         if (currentUpload.length === 0) {
@@ -851,9 +859,9 @@ $(document).ready(function() {
     });
 });
 
-window.reportActiveRoom = function() {
+window.reportActiveRoom = function () {
     if (!ROOM || ROOM.includes('.$@-@&.')) return;
-    Confirm(`Are you sure you want to report the room "${ROOM}" to administrators?`, function(agreed) {
+    Confirm(`Are you sure you want to report the room "${ROOM}" to administrators?`, function (agreed) {
         if (agreed) {
             fetch('/report/room/', {
                 method: 'POST',
@@ -862,23 +870,23 @@ window.reportActiveRoom = function() {
                 },
                 body: JSON.stringify({ room_name: ROOM })
             })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    Alert('Thank you. The room has been reported to the administrators.');
-                } else {
-                    Alert('Failed to submit report: ' + data.message);
-                }
-            })
-            .catch(err => {
-                Alert('Failed to communicate with the server.');
-            });
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        Alert('Thank you. The room has been reported to the administrators.');
+                    } else {
+                        Alert('Failed to submit report: ' + data.message);
+                    }
+                })
+                .catch(err => {
+                    Alert('Failed to communicate with the server.');
+                });
         }
     });
 };
 
-window.reportMessageContent = function(index, sender, text) {
-    Confirm(`Are you sure you want to report this message by ${sender}?`, function(agreed) {
+window.reportMessageContent = function (index, sender, text) {
+    Confirm(`Are you sure you want to report this message by ${sender}?`, function (agreed) {
         if (agreed) {
             fetch('/report/message/', {
                 method: 'POST',
@@ -892,17 +900,17 @@ window.reportMessageContent = function(index, sender, text) {
                     text: text
                 })
             })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    Alert('Thank you. The message has been reported to the administrators.');
-                } else {
-                    Alert('Failed to submit report: ' + data.message);
-                }
-            })
-            .catch(err => {
-                Alert('Failed to communicate with the server.');
-            });
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        Alert('Thank you. The message has been reported to the administrators.');
+                    } else {
+                        Alert('Failed to submit report: ' + data.message);
+                    }
+                })
+                .catch(err => {
+                    Alert('Failed to communicate with the server.');
+                });
         }
     });
 };

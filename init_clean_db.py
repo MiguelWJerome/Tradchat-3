@@ -183,20 +183,21 @@ def init_all():
             curators TEXT,
             members TEXT,
             emoji TEXT,
-            deleted INTEGER
+            deleted INTEGER,
+            created_at TEXT
         );
     """)
 
     standard_rooms = [
-        (1, 'mainroom', 'The main community lounge for all members', 'public', '1', '2', '', '', 'MR', 0),
-        (2, 'announcements', 'Community news, platform updates, and event schedules', 'public', '2', '3', '', '', '📢', 0),
-        (3, 'community-games', 'Casual board games, chess tournaments, and friendly matches', 'public', '3', '2', '', '', '🎲', 0),
-        (4, 'reading-and-study', 'Book discussions, study sessions, and helpful resources', 'public', '3', '4', '', '', '📚', 0)
+        (1, 'mainroom', 'The main community lounge for all members', 'public', '1', '2', '', '', 'MR', 0, 'September 10, 2026'),
+        (2, 'announcements', 'Community news, platform updates, and event schedules', 'public', '2', '3', '', '', '📢', 0, 'September 10, 2026'),
+        (3, 'community-games', 'Casual board games, chess tournaments, and friendly matches', 'public', '3', '2', '', '', '🎲', 0, 'September 10, 2026'),
+        (4, 'reading-and-study', 'Book discussions, study sessions, and helpful resources', 'public', '3', '4', '', '', '📚', 0, 'September 10, 2026')
     ]
     for r in standard_rooms:
         cur.execute("""
-            INSERT INTO rooms (roomid, room_name, description, room_type, owners, managers, curators, members, emoji, deleted)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO rooms (roomid, room_name, description, room_type, owners, managers, curators, members, emoji, deleted, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, r)
 
     conn.commit()
