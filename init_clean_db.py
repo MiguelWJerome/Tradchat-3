@@ -7,6 +7,7 @@ with friendly, wholesome community test fixtures (real-life casual friend intera
 import os
 import shutil
 import sqlite3
+import hashlib
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -108,6 +109,8 @@ def init_all():
     ]
 
     for acc in test_accounts:
+        acc_list = list(acc)
+        acc_list[2] = hashlib.sha224(acc_list[2].encode('utf-8')).hexdigest()
         cur.execute("""
             INSERT INTO accounts (
                 id, username, password, first_name, last_name, email, dob, gender,
@@ -116,7 +119,7 @@ def init_all():
                 pl_curfew, pl_curfew_offline, pl_curfew_online, pl_block_games,
                 friends, country, last_seen, last_login_date
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        """, acc)
+        """, acc_list)
 
     cur.execute("INSERT INTO unseen_admin_actions (username, sub_tabs) VALUES ('Admin', '');")
     cur.execute("INSERT INTO unseen_admin_actions (username, sub_tabs) VALUES ('Alex', '');")

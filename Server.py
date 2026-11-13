@@ -10,6 +10,7 @@ import datetime
 import os
 import shutil
 import secrets
+import hashlib
 
 from threading import Thread, Lock
 import ast
@@ -127,9 +128,26 @@ def check_dm_access(dm_room, username):
     dm_parts = dm_room.split('.$@-@&.')
     return username == dm_parts[0] or username == dm_parts[1]
 
+def hash_password(password):
+    if password is None:
+        return ""
+    if not isinstance(password, str):
+        password = str(password)
+    return hashlib.sha224(password.encode('utf-8')).hexdigest()
+
 def check_credentials(username, password):
+    if not username or not password:
+        return False
     stored_password = find_account_id_or_password_or_gender(username, 'password', RGS=True)
-    return (stored_password and stored_password == password)
+    if not stored_password:
+        return False
+    # Direct match (e.g. session / localStorage token matching stored sha-224 hash, or legacy string)
+    if stored_password == password:
+        return True
+    # Plaintext input hashed with sha-224 matching stored sha-224 hash
+    if stored_password.lower() == hash_password(password).lower():
+        return True
+    return False
 
 
 def fetch_room_messages(room_name, limit, offset, underhead, username=None):
@@ -787,6 +805,23 @@ try:
 except Exception as e:
     print(f"Unseen admin actions table creation error: {e}")
 
+# Migration: Hash all existing plaintext passwords in accounts.db with SHA-224
+try:
+    with accounts_lock:
+        conn = sqlite3.connect('accounts.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, password FROM accounts;")
+        rows = cursor.fetchall()
+        for row_id, u_name, pwd in rows:
+            if pwd and not (len(pwd) == 56 and all(c in '0123456789abcdefABCDEF' for c in pwd)):
+                new_hash = hash_password(pwd)
+                cursor.execute("UPDATE accounts SET password = ? WHERE id = ?;", (new_hash, row_id))
+                print(f"Migrated password for {u_name} to SHA-224 hash.")
+        conn.commit()
+        conn.close()
+except Exception as e:
+    print(f"Password hashing migration error: {e}")
+
 # Migration: Add admin_requests and reports tables to admin.db if they don't exist
 try:
     with admin_lock:
@@ -1240,7 +1275,7 @@ def index():
 
         if check_credentials(username, password):   
             session['username'] = username
-            session['password'] = password
+            session['password'] = find_account_id_or_password_or_gender(username, 'password', RGS=True)
 
             return redirect('/home/')
 
@@ -1258,7 +1293,7 @@ def computer_log_into_server():
 
         if check_credentials(username, password):
             session['username'] = username
-            session['password'] = password
+            session['password'] = find_account_id_or_password_or_gender(username, 'password', RGS=True)
             return redirect('/home/')
         else:
             raise werkzeug.exceptions.BadRequestKeyError('Lets get him directed back to the welcome page')
@@ -2884,38 +2919,36 @@ def Recv(message, sid):
 
     elif msg[0] == 'Secret Log In':
         data = msg[1]
-        username = data['username']
-        password = data['password']
+        raw_username = data.get('username', '')
+        provided_password = data.get('password', '')
 
-        password = find_account_id_or_password_or_gender(username, 'password', RGS=True)
+        user_info = find_account_id_or_password_or_gender(raw_username, 'password', RGS=True, RU=True)
 
-        if password:
-            if remove_go_spaces(password.lower()) == remove_go_spaces(password.lower()):
-                Server.send(str(['Log In Results', username, 'Success', password]), room=sid)
-
+        if user_info and user_info[0]:
+            canonical_username, stored_password = user_info
+            if check_credentials(canonical_username, provided_password):
+                Server.send(str(['Log In Results', canonical_username, 'Success', stored_password]), room=sid)
             else:
                 return # Invalid password
-    
         else:
             return # User not found
     
             
     elif msg[0] == 'Log In':
         data = msg[1]
-        username = data['username']
-        password = data['password']
+        raw_username = data.get('username', '')
+        provided_password = data.get('password', '')
 
-        username, password = find_account_id_or_password_or_gender(username, 'password', RGS=True, RU=True)
+        user_info = find_account_id_or_password_or_gender(raw_username, 'password', RGS=True, RU=True)
 
-        if password:
-            if remove_go_spaces(password.lower()) == remove_go_spaces(password.lower()):
-                Server.send(str(['Log In Results', username, 'Success', password]), room=sid)
-
+        if user_info and user_info[0]:
+            canonical_username, stored_password = user_info
+            if check_credentials(canonical_username, provided_password):
+                Server.send(str(['Log In Results', canonical_username, 'Success', stored_password]), room=sid)
             else:
-                Server.send(str(['Log In Results', username, 'Wrong Password']), room=sid)
-    
+                Server.send(str(['Log In Results', canonical_username, 'Wrong Password']), room=sid)
         else:
-            Server.send(str(['Log In Results', username, 'Wrong Username']), room=sid)
+            Server.send(str(['Log In Results', raw_username, 'Wrong Username']), room=sid)
 
     elif msg[0] == 'Create DM':
         data = msg[1]
@@ -2969,6 +3002,7 @@ def Recv(message, sid):
             return
 
         password = remove_go_spaces(data['password'])
+        hashed_password = hash_password(password)
         first_name = remove_go_spaces(data['first_name'])
         last_name = remove_go_spaces(data['last_name'])
         email = remove_go_spaces(data['email'])
@@ -2983,7 +3017,7 @@ def Recv(message, sid):
         now = datetime.datetime.now()
         now_str = now.strftime('%Y-%m-%d %H:%M:%S')
         today_str = now.strftime('%Y-%m-%d')
-        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms, show_location, latitude, longitude, city, state, country, friends, last_seen, last_login_date, pl_read_dms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);""", 'accounts', params=[username, password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2', 1, loc['latitude'], loc['longitude'], loc['city'], loc['state'], loc['country'], '', now_str, today_str], chat_room=False)
+        db_sql("""INSERT INTO accounts (username, password, first_name, last_name, email, dob, gender, theme, room, dms, show_location, latitude, longitude, city, state, country, friends, last_seen, last_login_date, pl_read_dms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);""", 'accounts', params=[username, hashed_password, first_name, last_name, email, dob, gender, 'classic', 'mainroom', '1-2', 1, loc['latitude'], loc['longitude'], loc['city'], loc['state'], loc['country'], '', now_str, today_str], chat_room=False)
 
         # Get new user ID and add to Server/Admin dms
         new_id = str(find_account_id_or_password_or_gender(username, 'id'))
@@ -3084,9 +3118,28 @@ def Recv(message, sid):
                 else:
                     city_parsed = parts[0]
 
+            # Determine updated password
+            curr_stored_password = find_account_id_or_password_or_gender(old_username, 'password', RGS=True)
+            password_changed = False
+            if new_password and new_password != curr_stored_password and hash_password(new_password) != curr_stored_password:
+                final_password = hash_password(new_password)
+                password_changed = True
+            else:
+                final_password = curr_stored_password
+
             # Update database
-            db_sql("""UPDATE accounts SET username = ?, password = ?, first_name = ?, last_name = ?, show_location = ?, email = ?, city = ?, state = ?, country = ? WHERE id = ?;""", 'accounts', params=[new_username, new_password, new_first_name, new_last_name, new_show_location, new_email, city_parsed, state_parsed, country_parsed, user_id], chat_room=False)
+            db_sql("""UPDATE accounts SET username = ?, password = ?, first_name = ?, last_name = ?, show_location = ?, email = ?, city = ?, state = ?, country = ? WHERE id = ?;""", 'accounts', params=[new_username, final_password, new_first_name, new_last_name, new_show_location, new_email, city_parsed, state_parsed, country_parsed, user_id], chat_room=False)
             
+            # Remove from caches as requested
+            for u in [old_username, new_username]:
+                if u in accounts_dict:
+                    del accounts_dict[u]
+            for k in list(accounts_dict.keys()):
+                if k.lower() in [old_username.lower(), new_username.lower()]:
+                    del accounts_dict[k]
+            if user_id in id_to_accounts_dict:
+                del id_to_accounts_dict[user_id]
+
             username_changed = (new_username != old_username)
             if username_changed:
                 # Reset room to mainroom to avoid stale DM room names crashing the server
@@ -3101,20 +3154,10 @@ def Recv(message, sid):
                     except Exception as e:
                         print(f"Error renaming profile picture: {e}")
 
-                # Remove from caches as requested
-                if old_username in accounts_dict:
-                    del accounts_dict[old_username]
-                if user_id in id_to_accounts_dict:
-                    del id_to_accounts_dict[user_id]
-                
                 # Signal client to log out
-                Server.send(str(['Update Profile Result', {'status': 'success', 'username_changed': True}]), room=sid)
+                Server.send(str(['Update Profile Result', {'status': 'success', 'username_changed': True, 'password_changed': password_changed}]), room=sid)
             else:
-                # Update password in cache if username didn't change
-                if old_username in accounts_dict:
-                    accounts_dict[old_username]['password'] = new_password
-                
-                Server.send(str(['Update Profile Result', {'status': 'success', 'username_changed': False}]), room=sid)
+                Server.send(str(['Update Profile Result', {'status': 'success', 'username_changed': False, 'password_changed': password_changed, 'new_password': final_password}]), room=sid)
         else:
             Server.send(str(['Update Profile Result', {'status': 'error', 'message': 'Invalid credentials'}]), room=sid)
 

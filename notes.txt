@@ -273,7 +273,6 @@ Finishing Settings Page
 
 Minor To-Dos:
 
-Hash Passwords
 fix profile page... make it look better, colors ect... pop up boxes are too weird looking (due to always using color-light), also the main content whatever of the profiel page goes of the right side... looks pretty bad. and yeah... i also don't like how profile pictures with transparent background get color-light... looks bad should just be white... :(
 have a report button for each post
 have ai go through all the "conditional database saftery adds" for example if I said in our chat to make sure all accoutns have this or that feature in it, whereas it should have used a termial command it hardcoded a conditional into the Server.py 🙄

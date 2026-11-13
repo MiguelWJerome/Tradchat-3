@@ -8,8 +8,11 @@ function Recv(message) {
 
   if (msg[0] === 'Update Profile Result') {
     if (msg[1].status === 'success') {
-      if (msg[1].username_changed) {
-        Alert("Username changed successfully! You will now be logged out. Please log in with your new credentials.", () => {
+      if (msg[1].username_changed || msg[1].password_changed) {
+        const alertMsg = msg[1].username_changed
+          ? "Username changed successfully! You will now be logged out. Please log in with your new credentials."
+          : "Password changed successfully! You will now be logged out. Please log in with your new password.";
+        Alert(alertMsg, () => {
           window.location.href = '/logout/';
         });
       } else {
@@ -17,7 +20,10 @@ function Recv(message) {
         if (typeof initialProfileData !== 'undefined') {
           initialProfileData.first_name = document.getElementById('prof-first').value;
           initialProfileData.last_name = document.getElementById('prof-last').value;
-          initialProfileData.password = document.getElementById('prof-password').value;
+          if (msg[1].new_password) {
+            initialProfileData.password = msg[1].new_password;
+            if (typeof localStorage !== 'undefined') localStorage['password'] = msg[1].new_password;
+          }
           initialProfileData.location = document.getElementById('prof-location').value;
           initialProfileData.email = document.getElementById('prof-email').value;
           initialProfileData.dob = document.getElementById('prof-dob').value;
