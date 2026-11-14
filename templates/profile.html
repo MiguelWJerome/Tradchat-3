@@ -4,6 +4,7 @@
 
 {% block styles %}
 <link rel="stylesheet" href="/static/css/profile.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 {% endblock %}
 
 {% block content %}
@@ -35,9 +36,11 @@
     <div class="profile-actions-stack">
       <button class="profile-side-btn">Posts</button>
       <button class="profile-side-btn" id="profile-map-btn">Map</button>
-      <button class="profile-side-btn">Message</button>
       {% if profile_username != username %}
+      <button class="profile-side-btn" id="profile-message-btn">Message</button>
       <button class="profile-side-btn" id="profile-report-btn">Report</button>
+      {% else %}
+      <button class="profile-side-btn" id="profile-message-btn" style="display: none;">Message</button>
       {% endif %}
     </div>
   </div>
@@ -150,15 +153,19 @@
 <div id="map-modal" class="map-modal-overlay" style="display: none;">
   <div class="map-modal-card">
     <button class="map-modal-close-btn" id="close-map-modal-btn">&times;</button>
-    <div class="map-modal-title">Location Map</div>
-    <div class="map-modal-body">
-      <a href="https://maps.google.com/?q={{ latitude }},{{ longitude }}" target="_blank" title="Click to open in Google Maps">
-        <div class="map-modal-iframe-wrap">
-          <iframe width="100%" height="100%" frameborder="0" style="border:0; pointer-events: none;" 
-                  src="https://maps.google.com/maps?q={{ latitude }},{{ longitude }}&z=7&output=embed" 
-                  allowfullscreen></iframe>
-        </div>
+    <div class="map-modal-header-row">
+      <div class="map-modal-title">Location Map</div>
+      <a href="https://maps.google.com/?q={{ latitude }},{{ longitude }}" target="_blank" rel="noopener noreferrer" class="map-modal-external-link" title="Open in Google Maps">
+        <span>Open in Google Maps</span> <i class="fa-solid fa-arrow-up-right-from-square"></i>
       </a>
+    </div>
+    <div class="map-modal-body">
+      <div class="map-modal-wrap">
+        <div id="profile-map"></div>
+        <div id="map-gesture-overlay" class="map-gesture-overlay" style="display: none;">
+          <span>Use Ctrl + scroll to zoom the map</span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -180,14 +187,101 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    // Map Modal Trigger
+    // Message Button Trigger
+    const msgBtn = document.getElementById('profile-message-btn');
+    if (msgBtn) {
+      msgBtn.addEventListener('click', function () {
+        window.location.href = '/home/?dm=' + encodeURIComponent('{{ profile_username }}');
+      });
+    }
+
+    // Map Modal Trigger & Leaflet Map
     const mapBtn = document.getElementById('profile-map-btn');
     const mapModal = document.getElementById('map-modal');
     const closeMapBtn = document.getElementById('close-map-modal-btn');
+    let mapInstance = null;
+    let mapMarker = null;
+
+    function initProfileMap() {
+      if (typeof L === 'undefined') {
+        const mapContainer = document.getElementById('profile-map');
+        if (mapContainer) {
+          mapContainer.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; background: #f1f5f9; color: #334155; text-align: center; padding: 20px;">
+              <i class="fa-solid fa-map-location-dot" style="font-size: 3rem; margin-bottom: 15px; color: #4A90E2;"></i>
+              <p style="font-weight: 600; font-size: 1.1rem; margin-bottom: 8px;">Location: {{ latitude }}, {{ longitude }}</p>
+              <a href="https://maps.google.com/?q={{ latitude }},{{ longitude }}" target="_blank" class="btn-soft" style="padding: 8px 16px; margin-top: 10px; display: inline-block; text-decoration: none;">View on Google Maps</a>
+            </div>
+          `;
+        }
+        return;
+      }
+
+      if (!mapInstance) {
+        const lat = parseFloat("{{ latitude }}") || 41.9029;
+        const lng = parseFloat("{{ longitude }}") || 12.4534;
+        const googleMapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
+
+        mapInstance = L.map('profile-map', {
+          center: [lat, lng],
+          zoom: 8,
+          scrollWheelZoom: false
+        });
+
+        // Google Maps Roadmap tile layer
+        L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          attribution: '© Google Maps'
+        }).addTo(mapInstance);
+
+        // Marker for the user's location
+        mapMarker = L.marker([lat, lng], { title: "Click to open in Google Maps" }).addTo(mapInstance);
+
+        // Gesture handling: Ctrl + Scroll zooming with hint
+        const mapContainer = document.getElementById('profile-map');
+        const gestureOverlay = document.getElementById('map-gesture-overlay');
+        let overlayTimeout = null;
+
+        mapContainer.addEventListener('wheel', function (e) {
+          if (e.ctrlKey) {
+            e.preventDefault();
+            if (e.deltaY < 0) {
+              mapInstance.zoomIn();
+            } else if (e.deltaY > 0) {
+              mapInstance.zoomOut();
+            }
+          } else {
+            if (gestureOverlay) {
+              gestureOverlay.style.display = 'flex';
+              clearTimeout(overlayTimeout);
+              overlayTimeout = setTimeout(function () {
+                gestureOverlay.style.display = 'none';
+              }, 1400);
+            }
+          }
+        }, { passive: false });
+
+        // Actual click on map or marker redirects to Google Maps (drag does not trigger click in Leaflet)
+        mapInstance.on('click', function () {
+          window.open(googleMapsUrl, '_blank');
+        });
+
+        mapMarker.on('click', function () {
+          window.open(googleMapsUrl, '_blank');
+        });
+      }
+
+      setTimeout(function () {
+        if (mapInstance) {
+          mapInstance.invalidateSize();
+        }
+      }, 150);
+    }
 
     if (mapBtn && mapModal && closeMapBtn) {
       mapBtn.addEventListener('click', function () {
         mapModal.style.display = 'flex';
+        initProfileMap();
       });
 
       closeMapBtn.addEventListener('click', function () {
@@ -284,6 +378,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/static/javascript/tradchat.js" defer></script>
 <script src="/static/javascript/socketio.js" defer></script>
 <script src="/static/javascript/jQuery.js" defer></script>

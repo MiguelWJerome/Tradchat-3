@@ -133,9 +133,14 @@ function recv(message) {
                 const urlParams = new URLSearchParams(window.location.search);
                 const msgParam = urlParams.get('msg');
                 if (msgParam) {
+                    const targetId = parseInt(msgParam);
                     setTimeout(() => {
-                        if (typeof window.scrollToMessageAndHighlight === 'function') {
-                            window.scrollToMessageAndHighlight(parseInt(msgParam));
+                        const $targetBubble = $(".message__bubble[aria-index='" + targetId + "']");
+                        if ($targetBubble.length && typeof window.scrollToMessageAndHighlight === 'function') {
+                            window.scrollToMessageAndHighlight(targetId);
+                        } else if (!$targetBubble.length && !window.__attempted_special_reply_fetch) {
+                            window.__attempted_special_reply_fetch = true;
+                            cl.send(JSON.stringify(['Fetch Special Reply Messages', { 'username': username, 'password': password, 'index': targetId, 'room': ROOM, 'limit': SPECIAL_REPLY_LIMIT }]));
                         }
                     }, 400);
                 }
@@ -226,6 +231,11 @@ function recv(message) {
                         for (let u of r.users) add_reaction($target, r.emoji, u);
                     }
                 }
+            }
+            if (typeof window.scrollToMessageAndHighlight === 'function') {
+                setTimeout(() => {
+                    window.scrollToMessageAndHighlight(data['index']);
+                }, 150);
             }
             toggle_overhead_animation(false);
             window.attached_to_bottom = false;
@@ -760,7 +770,15 @@ window.onOpenRoomDetails = function () {
 };
 
 $(document).ready(function () {
-    if (ROOM_TYPE === 'dm') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const dmParam = urlParams.get('dm');
+    const roomParam = urlParams.get('room');
+
+    if (dmParam) {
+        switch_dm(dmParam);
+    } else if (roomParam) {
+        switch_room(roomParam);
+    } else if (ROOM_TYPE === 'dm') {
         const dmParts = ROOM.split('.$@-@&.');
         const otherUser = dmParts[0] === username ? dmParts[1] : dmParts[0];
         switch_dm(otherUser);

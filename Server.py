@@ -501,6 +501,21 @@ def get_room_conversation_meta(room_name):
         'emoji': emoji
     }
 
+def sort_and_join_strings(str1, str2):
+    min_length = min(len(str1), len(str2))
+    for i in range(min_length):
+        char1 = str1[i].lower()
+        char2 = str2[i].lower()
+        if char1 < char2:
+            return f"{str2}.$@-@&.{str1}"
+        elif char1 > char2:
+            return f"{str1}.$@-@&.{str2}"
+    if len(str1) < len(str2):
+        return f"{str2}.$@-@&.{str1}"
+    elif len(str1) > len(str2):
+        return f"{str1}.$@-@&.{str2}"
+    return f"{str1}.$@-@&.{str2}"
+
 def get_dm_conversation_meta(dm_string, current_username):
     dm_parts = dm_string.split('.$@-@&.')
     partner_username = dm_parts[1] if dm_parts[0].lower() == current_username.lower() else dm_parts[0]
@@ -1459,7 +1474,42 @@ def home():
             is_solid_color = bool(theme_info[0][1]) if (theme_info and len(theme_info[0]) > 1 and theme_info[0][1]) else (theme.startswith('#') if theme else False)
             colors = get_theme_colors(theme, is_solid_color)
 
-            room = db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+            dm_param = request.args.get('dm')
+            room_param = request.args.get('room')
+
+            if dm_param:
+                target_user_query = db_sql("SELECT username FROM accounts WHERE LOWER(username) = LOWER(?);", 'accounts', params=[dm_param], chat_room=False)
+                target_user = target_user_query[0][0] if target_user_query else None
+                if target_user and target_user.lower() != username.lower():
+                    dm_room = sort_and_join_strings(username, target_user)
+                    u_id = find_account_id_or_password_or_gender(username, 'id')
+                    t_id = find_account_id_or_password_or_gender(target_user, 'id')
+
+                    u_dms_raw = db_sql("SELECT dms FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+                    u_dms = split(remove_go_spaces(u_dms_raw[0][0]).replace('u', '')) if (u_dms_raw and u_dms_raw[0][0]) else []
+                    if str(t_id) not in u_dms:
+                        u_dms.append(str(t_id))
+                        db_sql("UPDATE accounts SET dms = ? WHERE username = ?;", 'accounts', params=[join(u_dms), username], chat_room=False)
+
+                    t_dms_raw = db_sql("SELECT dms FROM accounts WHERE username = ?;", 'accounts', params=[target_user], chat_room=False)
+                    t_dms = split(remove_go_spaces(t_dms_raw[0][0]).replace('u', '')) if (t_dms_raw and t_dms_raw[0][0]) else []
+                    if str(u_id) not in t_dms:
+                        t_dms.append(str(u_id))
+                        db_sql("UPDATE accounts SET dms = ? WHERE username = ?;", 'accounts', params=[join(t_dms), target_user], chat_room=False)
+
+                    room = dm_room
+                    db_sql("UPDATE accounts SET room = ? WHERE username = ?;", 'accounts', params=[room, username], chat_room=False)
+                else:
+                    room = db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+            elif room_param:
+                room_check = db_sql("SELECT room_name, room_type, emoji FROM rooms WHERE room_name = ?;", 'rooms', params=[room_param], chat_room=False)
+                if room_check:
+                    room = room_check[0][0]
+                    db_sql("UPDATE accounts SET room = ? WHERE username = ?;", 'accounts', params=[room, username], chat_room=False)
+                else:
+                    room = db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
+            else:
+                room = db_sql("SELECT room FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)[0][0]
             
             if '.$@-@&.' in room:
                 room_type = 'dm'
