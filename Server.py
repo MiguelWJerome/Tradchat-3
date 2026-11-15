@@ -76,27 +76,25 @@ def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
 
     with lock:
         try:
-            conn = sqlite3.connect(db_path)
-            conn.execute("PRAGMA foreign_keys = ON;")
-            cursor = conn.cursor()
-            cursor.execute(sql, params)
-            
-            result = None
-            if remove_go_spaces(sql.lower()).strip().startswith("select"):
-                result = cursor.fetchall()
-            else:
-                conn.commit()
-                result = True
-                if chat_room or provide_id:
-                    result = cursor.lastrowid
-            
-            conn.close()
-            return result
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("PRAGMA foreign_keys = ON;")
+                cursor = conn.cursor()
+                cursor.execute(sql, params)
+                
+                result = None
+                if remove_go_spaces(sql.lower()).strip().startswith("select"):
+                    result = cursor.fetchall()
+                else:
+                    conn.commit()
+                    result = True
+                    if chat_room or provide_id:
+                        result = cursor.lastrowid
+                return result
         except Exception as e:
             print(f"DB ERROR: {e}")
             print(f"SQL: {sql[:100]}...")
             print(f"Params: {params}")
-            conn.close()
+            
             return []
 
 def check_room_access(room_name, username):
@@ -2365,6 +2363,7 @@ def Recv(message, sid):
 
     if msg[0] == 'Message':
         data = msg[1]
+        
         try:
             setting = data['setting']
             room = data['room']
@@ -2374,8 +2373,7 @@ def Recv(message, sid):
             user_message = data['message']
             reply_index = data['reply-index']
             upload = data['upload']
-        
-        except KeyError:
+        except (KeyError, TypeError, AttributeError):
             return # Dont bother to return a response to someone who is trying to alter the code
 
         if check_credentials(username, password):
@@ -2464,10 +2462,13 @@ def Recv(message, sid):
 
     elif msg[0] == 'Image Upload':
         data = msg[1]
-        upload_id = data['upload_id']
-        image_data = data['image'] # base64 string
-        username = data['username']
-        password = data['password']
+        try:
+            upload_id = data['upload_id']
+            image_data = data['image'] # base64 string
+            username = data['username']
+            password = data['password']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password):
             if find_account_id_or_password_or_gender(username, 'frozen'):
@@ -2594,12 +2595,14 @@ def Recv(message, sid):
 
     elif msg[0] == 'Fetch Room Messages' or msg[0] == 'Fetch DM Messages':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        room = data['room']
-        limit = data['limit']
-        offset = data['offset']
-
+        try:
+            username = data['username']
+            password = data['password']
+            room = data['room']
+            limit = data['limit']
+            offset = data['offset']
+        except (KeyError, TypeError, AttributeError):
+            return
         underhead = False
 
         if str(offset).startswith('>'):
@@ -2655,9 +2658,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Join Room':
         data = msg[1]
-        room = data['room']
-        username = data['username']
-        password = data['password']
+        try:
+            room = data['room']
+            username = data['username']
+            password = data['password']
+        except (KeyError, TypeError, AttributeError):
+            return
         
         if check_credentials(username, password):
             # DMs don't need room access check - but we must verify user is a participant
@@ -2679,11 +2685,14 @@ def Recv(message, sid):
 
     elif msg[0] == 'Switch Room':
         data = msg[1]
-        old_group = data['old-group']
-        new_room = data['room']
-        username = data['username']
-        password = data['password']
-        limit = data['limit']
+        try:
+            old_group = data['old-group']
+            new_room = data['room']
+            username = data['username']
+            password = data['password']
+            limit = data['limit']
+        except (KeyError, TypeError, AttributeError):
+            return
         
         if check_credentials(username, password):
             if check_room_access(new_room, username):
@@ -2730,11 +2739,14 @@ def Recv(message, sid):
 
     elif msg[0] == 'Switch DM':
         data = msg[1]
-        old_group = data['old-group']
-        new_dm = data['new-dm']
-        username = data['username']
-        password = data['password']
-        limit = data['limit']
+        try:
+            old_group = data['old-group']
+            new_dm = data['new-dm']
+            username = data['username']
+            password = data['password']
+            limit = data['limit']
+        except (KeyError, TypeError, AttributeError):
+            return
         
         if check_credentials(username, password) and check_dm_access(new_dm, username):
             process_room_leave(sid)
@@ -2760,20 +2772,26 @@ def Recv(message, sid):
 
     elif msg[0] == 'Leave Room':
         data = msg[1]
-        room = data['room']
-        username = data['username']
-        password = data['password']
-        
+        try:
+            room = data['room']
+            username = data['username']
+            password = data['password']
+        except (KeyError, TypeError, AttributeError):
+            return
+
         if check_credentials(username, password):
             process_room_leave(sid)
             Server.server.leave_room(sid, room)
 
     elif msg[0] == 'Get Rooms':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        roomtype = data['roomtype']
-        
+        try:
+            username = data['username']
+            password = data['password']
+            roomtype = data['roomtype']
+        except (KeyError, TypeError, AttributeError):
+            return
+
         if check_credentials(username, password):
                 all_rooms = db_sql("""SELECT room_name, room_type, description, owners, managers, curators, members, emoji FROM rooms WHERE deleted = 0;""", 'rooms', chat_room=False)
                 user_rooms = []
@@ -2815,10 +2833,13 @@ def Recv(message, sid):
 
 
     elif msg[0] == 'Get Dms':
-        data = msg[1]
-        username = data['username']
-        password = data['password']
-        
+        try:
+            data = msg[1]
+            username = data['username']
+            password = data['password']
+        except (KeyError, TypeError, AttributeError):
+            return
+
         if check_credentials(username, password):
             dms = []
             dms_ids = split(db_sql("""SELECT dms FROM accounts WHERE username = ?;""", 'accounts', params=[username], chat_room=False)[0][0])
@@ -2860,11 +2881,14 @@ def Recv(message, sid):
 
     elif msg[0] == 'Added Reaction':
         data = msg[1]
+        try:
         username = data['username']
         password = data['password']
         index = data['index']
         room = data['room']
         reaction = data['emoji']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password):
             user_id = str(find_account_id_or_password_or_gender(username, 'id'))
@@ -2906,11 +2930,14 @@ def Recv(message, sid):
 
     elif msg[0] == 'Removed Reaction':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        index = data['index']
-        room = data['room']
-        reaction = data['emoji']
+        try:
+            username = data['username']
+            password = data['password']
+            index = data['index']
+            room = data['room']
+            reaction = data['emoji']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password):
             user_id = str(find_account_id_or_password_or_gender(username, 'id'))
@@ -2952,12 +2979,15 @@ def Recv(message, sid):
 
     elif msg[0] == 'Fetch Special Reply Message':
         data = msg[1]
-        print(data)
-        username = data['username']
-        password = data['password']
-        index = data['index']
-        orgIndex = data['orgIndex']
-        room = data['room']
+        try:
+            print(data)
+            username = data['username']
+            password = data['password']
+            index = data['index']
+            orgIndex = data['orgIndex']
+            room = data['room']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password):
             if '.$@-@&.' in room:
@@ -3015,11 +3045,14 @@ def Recv(message, sid):
 
     elif msg[0] == 'Fetch Special Reply Messages':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        index = data['index']
-        room = data['room']
-        limit = data['limit']
+        try:
+            username = data['username']
+            password = data['password']
+            index = data['index']
+            room = data['room']
+            limit = data['limit']
+        except (KeyError, TypeError, AttributeError):
+            return
         
         if check_credentials(username, password):
             if '.$@-@&.' in room:
@@ -3086,8 +3119,11 @@ def Recv(message, sid):
 
     elif msg[0] == 'Secret Log In':
         data = msg[1]
-        raw_username = data.get('username', '')
-        provided_password = data.get('password', '')
+        try:
+            raw_username = data.get('username', '')
+            provided_password = data.get('password', '')
+        except (KeyError, TypeError, AttributeError):
+            return
 
         user_info = find_account_id_or_password_or_gender(raw_username, 'password', RGS=True, RU=True)
 
@@ -3103,8 +3139,11 @@ def Recv(message, sid):
             
     elif msg[0] == 'Log In':
         data = msg[1]
-        raw_username = data.get('username', '')
-        provided_password = data.get('password', '')
+        try:
+            raw_username = data.get('username', '')
+            provided_password = data.get('password', '')
+        except (KeyError, TypeError, AttributeError):
+            return
 
         user_info = find_account_id_or_password_or_gender(raw_username, 'password', RGS=True, RU=True)
 
@@ -3119,9 +3158,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Create DM':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        user = data['user']
+        try:
+            username = data['username']
+            password = data['password']
+            user = data['user']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password):
             # Parental lock check (bypassed for admin users)
@@ -3170,6 +3212,11 @@ def Recv(message, sid):
 
     elif msg[0] == 'Create Account':
         data = msg[1]
+        # Check that all fields are present
+        required_fields = ('username', 'password', 'first_name', 'last_name', 'email', 'dob', 'gender')
+        if not isinstance(data,dict) or not all(isinstance(data.get(k),str) for k in required_fields):
+            Server.send(str(['Create Account Results', '', 'Invalid Request']), room=sid)
+            return
         
         username = remove_go_spaces(data['username'])
 
@@ -3180,6 +3227,11 @@ def Recv(message, sid):
 
         if clean_username in existing_usernames:
             Server.send(str(['Create Account Results', data['username'], 'Username Exists']), room=sid)
+            return
+        
+        # Check that gender is valid
+        if gender not in ('male', 'female'):
+            Server.send(str(['Create Account Results', '', 'Invalid Request']),room=sid)
             return
 
         password = remove_go_spaces(data['password'])
@@ -3217,12 +3269,15 @@ def Recv(message, sid):
 
     elif msg[0] == 'Create Room':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        roomname = data['roomname']
-        description = data['description']
-        emoji = data['emoji']
-        roomtype = data['roomtype']
+        try:
+            username = data['username']
+            password = data['password']
+            roomname = data['roomname']
+            description = data['description']
+            emoji = data['emoji']
+            roomtype = data['roomtype']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password):
             # Check for ANY existing room with this name (even deleted ones)
@@ -3259,6 +3314,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Update Profile':
         data = msg[1]
+        # Check that all fields are present
+        required_fields = ('username', 'password', 'new_username', 'new_password', 'new_first_name', 'new_last_name', 'new_location', 'new_email', 'new_show_location')
+        if not isinstance(data,dict) or not all(isinstance(data.get(k),str) for k in required_fields):
+            Server.send(str(['Update Profile Results', '', 'Invalid Request']), room=sid)
+            return
+        
         old_username = data['username'].replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
         old_password = data['password'].replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
         new_username = data['new_username'].replace('&#39;', "'").replace('&#47;', "/").replace('&#34;', '"')
@@ -3276,14 +3337,14 @@ def Recv(message, sid):
             invalid_chars = r'\/:*?"<>|'
             found_invalid = [c for c in new_username if c in invalid_chars]
             if found_invalid:
-                Server.send(str(['Update Profile Result', {'status': 'error', 'message': f'Sorry but {" ".join(list(set(found_invalid)))} symbols are not allowed'}]), room=sid)
+                Server.send(str(['Update Profile Results', {'status': 'error', 'message': f'Sorry, but {" ".join(list(set(found_invalid)))} symbols are not allowed'}]), room=sid)
                 return
 
             # Check if new username is taken
             if new_username.lower() != old_username.lower():
                 existing = db_sql("SELECT id FROM accounts WHERE LOWER(username) = ?;", 'accounts', params=[new_username.lower()], chat_room=False)
                 if existing:
-                    Server.send(str(['Update Profile Result', {'status': 'error', 'message': 'Username already exists'}]), room=sid)
+                    Server.send(str(['Update Profile Results', {'status': 'error', 'message': 'Username already exists'}]), room=sid)
                     return
             
             # Parse new_location into city, state, country
@@ -3408,9 +3469,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Get Room Members':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        room = data['room']
+        try:
+            username = data['username']
+            password = data['password']
+            room = data['room']
+        except (KeyError, TypeError, AttributeError):
+            return
         
         if check_credentials(username, password) and check_room_access(room, username):
             room_info = db_sql("SELECT owners, managers, curators, members, room_type FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
@@ -3453,11 +3517,14 @@ def Recv(message, sid):
 
     elif msg[0] == 'Update Room Member':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        room = data['room']
-        target_username = data['target_username']
-        action = data['action'] # 'promote', 'demote', 'remove'
+        try:
+            username = data['username']
+            password = data['password']
+            room = data['room']
+            target_username = data['target_username']
+            action = data['action'] # 'promote', 'demote', 'remove'
+        except (KeyError, TypeError, AttributeError):
+            return
         
         if check_credentials(username, password) and check_room_access(room, username):
             room_info = db_sql("SELECT owners, managers, curators, members, room_type FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
@@ -3567,10 +3634,13 @@ def Recv(message, sid):
 
     elif msg[0] == 'Add Room Member':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        room = data['room']
-        new_username = data['new_username']
+        try:
+            username = data['username']
+            password = data['password']
+            room = data['room']
+            new_username = data['new_username']
+        except (KeyError, TypeError, AttributeError):
+            return
         
         if check_credentials(username, password) and check_room_access(room, username):
             room_info = db_sql("SELECT owners, managers, curators, members, room_type FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
@@ -3607,9 +3677,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Delete Room':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        room = data['room']
+        try:
+            username = data['username']
+            password = data['password']
+            room = data['room']
+        except (KeyError, TypeError, AttributeError):
+            return
         
         if check_credentials(username, password) and room.lower() != 'mainroom':
             room_info = db_sql("SELECT owners FROM rooms WHERE room_name = ?;", 'rooms', params=[room], chat_room=False)
@@ -3637,10 +3710,13 @@ def Recv(message, sid):
 
     elif msg[0] == 'Mark Unread':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        room = data['room']
-        index = data['index']
+        try:
+            username = data['username']
+            password = data['password']
+            room = data['room']
+            index = data['index']
+        except (KeyError, TypeError, AttributeError):
+            return
         
         if check_credentials(username, password):
             try:
@@ -3700,10 +3776,13 @@ def Recv(message, sid):
 
     elif msg[0] == 'Delete Message':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        index = data['index']
-        room = data['room']
+        try:
+            username = data['username']
+            password = data['password']
+            index = data['index']
+            room = data['room']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if not index: return # Safety check
 
@@ -3754,10 +3833,13 @@ def Recv(message, sid):
 
     elif msg[0] == 'Add GIF':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        giphy_id = data['giphy_id']
-        keywords = data['keywords']
+        try:
+            username = data['username']
+            password = data['password']
+            giphy_id = data['giphy_id']
+            keywords = data['keywords']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password):
             if find_account_id_or_password_or_gender(username, 'frozen'):
@@ -3809,9 +3891,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'GIF Search':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        query = data['query']
+        try:
+            username = data['username']
+            password = data['password']
+            query = data['query']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password):
             if find_account_id_or_password_or_gender(username, 'frozen'):
@@ -3838,9 +3923,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Delete Whitelisted GIF':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        giphy_id = data['giphy_id']
+        try:
+            username = data['username']
+            password = data['password']
+            giphy_id = data['giphy_id']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password):
             if is_admin(username):
@@ -3855,8 +3943,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Get Matching Keywords':
         data = msg[1]
-        username = data['username']
-        password = data['password']
+        try:
+            username = data['username']
+            password = data['password']
+        except (KeyError, TypeError, AttributeError):
+            return
+
         query = data.get('query', '')
 
         if check_credentials(username, password):
@@ -3887,9 +3979,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Get GIF Keywords':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        giphy_id = data['giphy_id']
+        try:
+            username = data['username']
+            password = data['password']
+            giphy_id = data['giphy_id']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password):
             try:
@@ -3908,10 +4003,13 @@ def Recv(message, sid):
 
     elif msg[0] == 'Update GIF Keywords':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        giphy_id = data['giphy_id']
-        keywords = data['keywords']
+        try:
+            username = data['username']
+            password = data['password']
+            giphy_id = data['giphy_id']
+            keywords = data['keywords']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password):
             if is_admin(username):
@@ -3954,8 +4052,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Search Usernames':
         data = msg[1]
-        username = data['username']
-        password = data['password']
+        try:
+            username = data['username']
+            password = data['password']
+        except (KeyError, TypeError, AttributeError):
+            return
+
         query = data.get('query', '')
 
         if check_credentials(username, password):
@@ -4024,8 +4126,11 @@ def Recv(message, sid):
 
     elif msg[0] == 'Get Members':
         data = msg[1]
-        username = data['username']
-        password = data['password']
+        try:
+            username = data['username']
+            password = data['password']
+        except (KeyError, TypeError, AttributeError):
+            return
         tab = data.get('tab', 'all')
         search_query = data.get('search_query', '')
         filters = data.get('filters', {})
@@ -4167,8 +4272,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Add Friend':
         data = msg[1]
-        username = data['username']
-        password = data['password']
+        try:
+            username = data['username']
+            password = data['password']
+        except (KeyError, TypeError, AttributeError):
+            return
+
         friend_username = data.get('friend_username')
         friend_id = data.get('friend_id')
 
@@ -4194,8 +4303,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Remove Friend':
         data = msg[1]
-        username = data['username']
-        password = data['password']
+        try:
+            username = data['username']
+            password = data['password']
+        except (KeyError, TypeError, AttributeError):
+            return
+
         friend_username = data.get('friend_username')
         friend_id = data.get('friend_id')
 
@@ -4221,9 +4334,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Admin Get User Conversations':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        target_user = data['target_user']
+        try:
+            username = data['username']
+            password = data['password']
+            target_user = data['target_user']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password) and is_admin(username):
             try:
@@ -4296,11 +4412,15 @@ def Recv(message, sid):
 
     elif msg[0] == 'Admin Get Conversation Messages':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        target_user = data['target_user']
-        convo_type = data['convo_type']
-        target_id = data['target_id']
+        try:
+            username = data['username']
+            password = data['password']
+            target_user = data['target_user']
+            convo_type = data['convo_type']
+            target_id = data['target_id']
+        except (KeyError, TypeError, AttributeError):
+            return
+
         before_id = data.get('before_id')
         filter_query = data.get('filter_query', '')
 
@@ -4456,9 +4576,12 @@ def Recv(message, sid):
 
     elif msg[0] == 'Get Target Admin Data':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        target_user = data['target_user']
+        try:
+            username = data['username']
+            password = data['password']
+            target_user = data['target_user']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password) and is_admin(username):
             try:
@@ -4487,10 +4610,13 @@ def Recv(message, sid):
 
     elif msg[0] == 'Update Freeze Status':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        target_user = data['target_user']
-        frozen = int(data['frozen'])
+        try:
+            username = data['username']
+            password = data['password']
+            target_user = data['target_user']
+            frozen = int(data['frozen'])
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password) and is_admin(username):
             try:
@@ -4526,10 +4652,13 @@ def Recv(message, sid):
 
     elif msg[0] == 'Update Parental Locks':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        target_user = data['target_user']
-        locks = data['locks']
+        try:
+            username = data['username']
+            password = data['password']
+            target_user = data['target_user']
+            locks = data['locks']
+        except (KeyError, TypeError, AttributeError):
+            return
 
         if check_credentials(username, password) and is_admin(username):
             try:
@@ -4605,8 +4734,11 @@ def Recv(message, sid):
 
     elif msg[0] == 'Get Admin Requests':
         data = msg[1]
-        username = data['username']
-        password = data['password']
+        try:
+            username = data['username']
+            password = data['password']
+        except (KeyError, TypeError, AttributeError):
+            return
         
         if check_credentials(username, password) and is_admin(username):
             try:
@@ -4629,10 +4761,13 @@ def Recv(message, sid):
 
     elif msg[0] == 'Create Admin Request':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        target_user = data['target_user']
-        action_type = data['action_type']
+        try:
+            username = data['username']
+            password = data['password']
+            target_user = data['target_user']
+            action_type = data['action_type']
+        except (KeyError, TypeError, AttributeError):
+            return
         
         if check_credentials(username, password) and is_admin(username):
             try:
@@ -4667,10 +4802,13 @@ def Recv(message, sid):
 
     elif msg[0] == 'Vote Admin Request':
         data = msg[1]
-        username = data['username']
-        password = data['password']
-        request_id = int(data['request_id'])
-        vote = data['vote']
+        try:
+            username = data['username']
+            password = data['password']
+            request_id = int(data['request_id'])
+            vote = data['vote']
+        except KeyError:
+            return
         
         if check_credentials(username, password) and is_admin(username):
             try:

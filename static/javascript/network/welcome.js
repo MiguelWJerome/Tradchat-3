@@ -75,8 +75,8 @@ function signUpPressed() {
     let dob = document.getElementById('dob-input');
     let gender = document.querySelector('input[name="gender"]:checked')?.value || '';
     
-    // Check if all fields are filled
-    if (username.value === '' || password.value === '' || firstName.value === '' || lastName.value === '' || email.value === '' || dob.value === '' || gender === '') {
+    // Check if all fields are filled AND check if gender is valid
+    if (username.value === '' || password.value === '' || firstName.value === '' || lastName.value === '' || email.value === '' || dob.value === '' || gender === '' || (gender !== 'male' && gender !== 'female')) {
         // Trigger form validation by using reportValidity on any required field
         let signupForm = document.getElementById('signup-submit');
         signupForm.click();
