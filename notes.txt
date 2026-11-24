@@ -269,6 +269,7 @@ About Us
 In the future group pages in the navbar
 Seriously consider OCI over AWS
 Finishing Settings Page
+HAVE A BUG REPORT STATION (there will be tons of bugs, users need a page to report them)
 
 
 Minor To-Dos:
