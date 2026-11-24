@@ -119,6 +119,9 @@
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: var(--font-body);
+    text-decoration: none;
+    box-sizing: border-box;
+    display: block;
 }
 
 .profile-side-btn:hover {

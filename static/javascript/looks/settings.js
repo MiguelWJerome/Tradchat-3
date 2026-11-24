@@ -895,3 +895,139 @@ window.togglePostsDot = function(show) {
   });
 })();
 
+/* =========================================================================
+   SETTINGS POST COMPOSER ENGINE (Create Posts from Settings -> Posts Tab)
+   ========================================================================= */
+(function() {
+  let attachedComposerFiles = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const fileInput = document.getElementById('composerFileInput');
+    if (fileInput) {
+      fileInput.addEventListener('change', handleComposerFiles);
+    }
+  });
+
+  const FEED_ALLOWED_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'webm', 'mov']);
+
+  function handleComposerFiles(e) {
+    const files = Array.from(e.target.files);
+    const validFiles = [];
+    const rejectedFiles = [];
+
+    files.forEach(file => {
+      const ext = file.name ? file.name.split('.').pop().toLowerCase() : '';
+      const isAllowedExt = FEED_ALLOWED_EXTENSIONS.has(ext);
+      const isAllowedMime = !file.type || file.type.startsWith('image/') || file.type.startsWith('video/');
+
+      if (isAllowedExt && isAllowedMime) {
+        validFiles.push(file);
+      } else {
+        rejectedFiles.push(file.name || 'unnamed file');
+      }
+    });
+
+    if (rejectedFiles.length > 0) {
+      alert(`Only pictures (PNG, JPG, GIF, WEBP) and videos (MP4, WEBM, MOV) are allowed.\n\nThe following file(s) were rejected:\n- ${rejectedFiles.join('\n- ')}`);
+      e.target.value = '';
+    }
+
+    if (validFiles.length > 0) {
+      attachedComposerFiles = attachedComposerFiles.concat(validFiles);
+      renderComposerPreviews();
+    }
+  }
+
+  function renderComposerPreviews() {
+    const container = document.getElementById('composerPreviews');
+    if (!container) return;
+
+    if (attachedComposerFiles.length === 0) {
+      container.style.display = 'none';
+      container.innerHTML = '';
+      return;
+    }
+
+    container.style.display = 'flex';
+    container.innerHTML = '';
+
+    attachedComposerFiles.forEach((file, idx) => {
+      const item = document.createElement('div');
+      item.className = 'composer-preview-item';
+
+      if (file.type.startsWith('video/')) {
+        const vid = document.createElement('video');
+        vid.src = URL.createObjectURL(file);
+        item.appendChild(vid);
+      } else {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        item.appendChild(img);
+      }
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'composer-preview-remove';
+      removeBtn.innerHTML = '&times;';
+      removeBtn.onclick = () => {
+        attachedComposerFiles.splice(idx, 1);
+        renderComposerPreviews();
+      };
+      item.appendChild(removeBtn);
+
+      container.appendChild(item);
+    });
+  }
+
+  window.publishPost = async function() {
+    const textElem = document.getElementById('composerText');
+    const content = textElem ? textElem.value.trim() : '';
+    const publishBtn = document.getElementById('composerPublishBtn');
+
+    if (!content && attachedComposerFiles.length === 0) {
+      alert('Please enter a caption or attach media.');
+      return;
+    }
+
+    if (publishBtn) {
+      publishBtn.disabled = true;
+      publishBtn.textContent = 'Posting...';
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('content', content);
+      attachedComposerFiles.forEach(file => {
+        formData.append('files', file);
+      });
+
+      const res = await fetch('/api/feed/posts/', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+
+      if (data.status === 'success') {
+        if (textElem) textElem.value = '';
+        attachedComposerFiles = [];
+        renderComposerPreviews();
+        alert('Post published successfully to the community feed!');
+        window.location.href = '/feed/';
+      } else {
+        alert(data.message || 'Failed to publish post.');
+        if (publishBtn) {
+          publishBtn.disabled = false;
+          publishBtn.textContent = 'Post';
+        }
+      }
+    } catch (err) {
+      console.error('Error publishing post:', err);
+      alert('Error connecting to server. Please try again.');
+      if (publishBtn) {
+        publishBtn.disabled = false;
+        publishBtn.textContent = 'Post';
+      }
+    }
+  };
+})();
+
+

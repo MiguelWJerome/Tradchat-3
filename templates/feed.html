@@ -1,176 +1,190 @@
 {% extends "tradchat.html" %}
 
-{% block title %}TradChat — Feed{% endblock %}
+{% block title %}TradChat — Community Feed{% endblock %}
 
 {% block styles %}
-<style>
-  .feed-main {
-    display: flex;
-    justify-content: center;
-    padding: 30px 20px;
-    min-height: calc(100vh - 80px);
-  }
-
-  .feed-container {
-    width: 100%;
-    max-width: 760px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  .feed-header-card {
-    background: rgba(232, 228, 220, 0.92);
-    border: 2px solid var(--color-border, #9E9589);
-    border-radius: 12px;
-    padding: 24px 28px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    backdrop-filter: blur(8px);
-  }
-
-  .feed-title-wrap h1 {
-    font-family: var(--font-display, 'Bebas Neue', sans-serif);
-    font-size: 2rem;
-    color: var(--color-dark);
-    margin: 0 0 6px 0;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .feed-title-wrap p {
-    margin: 0;
-    font-size: 0.95rem;
-    color: var(--color-dark);
-    opacity: 0.8;
-  }
-
-  .feed-badge {
-    background: var(--color-medium);
-    color: var(--color-dark);
-    font-weight: 700;
-    font-size: 0.8rem;
-    padding: 6px 14px;
-    border-radius: 999px;
-    border: 1px solid var(--color-dark);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .feed-card {
-    background: #ffffff;
-    border: 2px solid var(--color-border, #ccc);
-    border-radius: 12px;
-    padding: 24px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-  }
-
-  .feed-card:hover {
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
-  }
-
-  .feed-author-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .feed-avatar {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid var(--color-medium);
-  }
-
-  .feed-author-info {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .feed-author-name {
-    font-weight: 700;
-    font-size: 1rem;
-    color: var(--color-dark);
-  }
-
-  .feed-post-time {
-    font-size: 0.8rem;
-    color: #777;
-  }
-
-  .feed-content {
-    font-size: 1rem;
-    line-height: 1.55;
-    color: #222;
-  }
-
-  .feed-empty-state {
-    background: rgba(255, 255, 255, 0.85);
-    border: 2px dashed var(--color-border, #ccc);
-    border-radius: 12px;
-    padding: 50px 20px;
-    text-align: center;
-    color: var(--color-dark);
-  }
-
-  .feed-empty-state i {
-    font-size: 3rem;
-    margin-bottom: 16px;
-    color: var(--color-medium);
-  }
-
-  .feed-empty-state h3 {
-    margin: 0 0 8px 0;
-    font-size: 1.3rem;
-    font-weight: 700;
-  }
-
-  .feed-empty-state p {
-    margin: 0;
-    font-size: 0.95rem;
-    opacity: 0.75;
-  }
-</style>
+<link rel="stylesheet" href="/static/css/feed.css">
 {% endblock %}
 
 {% block content %}
-<main class="feed-main">
-  <div class="feed-container">
-    <div class="feed-header-card">
-      <div class="feed-title-wrap">
-        <h1>Community Feed</h1>
-        <p>Recent community posts, discussions, and activity.</p>
+<main class="feed-page-wrapper">
+
+  <!-- =============================================================
+   * Dual-Column Stage (Posts Stream on left, Contextual Comments on right)
+   * ============================================================= -->
+  <div class="feed-stage-layout">
+
+    <!-- Posts Stream Column -->
+    <div class="feed-stream-column" id="feedPostsStream">
+      {% if filter_user %}
+      <div class="user-posts-header">
+        <h2 class="user-posts-title"><i class="fa-solid fa-user-circle"></i> {{ target_author_name or filter_user }}'s Posts</h2>
+        <span class="user-posts-subtitle">All posts by this user, ordered newest first</span>
       </div>
-      <div class="feed-badge">Live</div>
+      {% endif %}
+      {% for post in posts %}
+      <article class="feed-post-card" id="post-card-{{ post.id }}" data-post-id="{{ post.id }}" data-author-name="{{ post.author.name }}">
+        
+        <!-- Post Author Header -->
+        <div class="post-header-row">
+          <div class="post-author-block">
+            <img src="{{ post.author.pfp }}" alt="{{ post.author.name }}" class="post-avatar" onerror="this.src='/static/graphics/defaultMale.png'">
+            <div class="post-author-meta">
+              <div class="post-author-name-wrap">
+                <span class="post-author-name">{{ post.author.name }}</span>
+                {% if post.author.is_friend %}
+                <span class="friend-badge">Friend</span>
+                {% endif %}
+              </div>
+              <span class="post-timestamp">{{ post.created_at }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Post Text Caption (with ...See More toggle) -->
+        {% if post.content %}
+        <div class="post-caption-wrap">
+          <span class="post-caption-text {% if post.content|length > 180 %}collapsed{% endif %}" id="caption-text-{{ post.id }}">
+            {{ post.content }}
+          </span>
+          {% if post.content|length > 180 %}
+          <button type="button" class="post-see-more-btn" onclick="toggleCaption({{ post.id }});">...See More</button>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- 1:1 Media Container (with Carousel & Expand button) -->
+        {% if post.media and post.media|length > 0 %}
+        <div class="feed-media-container" id="carousel-container-{{ post.id }}" data-current-index="0" data-total-slides="{{ post.media|length }}">
+          
+          {% for m in post.media %}
+          <div class="carousel-slide {% if loop.first %}active{% endif %}" data-slide-index="{{ loop.index0 }}" data-media-type="{{ m.type }}" data-media-url="{{ m.url }}">
+            {% if m.type == 'video' %}
+            <video class="carousel-media-element" controls playsinline preload="metadata">
+              <source src="{{ m.url }}">
+              Your browser does not support video playback.
+            </video>
+            {% else %}
+            <img src="{{ m.url }}" alt="Post attachment" class="carousel-media-element" onclick="openLightbox('{{ m.url }}', 'image');">
+            {% endif %}
+          </div>
+          {% endfor %}
+
+          <!-- Expand Button with 4 Arrows Pointing Out SVG -->
+          <button type="button" class="media-expand-btn" title="Expand media" onclick="expandCurrentMedia({{ post.id }});">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <polyline points="9 21 3 21 3 15"></polyline>
+              <line x1="21" y1="3" x2="14" y2="10"></line>
+              <line x1="3" y1="21" x2="10" y2="14"></line>
+            </svg>
+          </button>
+
+          <!-- Carousel Navigation Arrows (ONLY if multiple photos/media) -->
+          {% if post.media|length > 1 %}
+          <button type="button" class="carousel-arrow arrow-left disabled" title="Previous photo" onclick="navigateCarousel({{ post.id }}, -1);">&#10216;</button>
+          <button type="button" class="carousel-arrow arrow-right" title="Next photo" onclick="navigateCarousel({{ post.id }}, 1);">&#10217;</button>
+          {% endif %}
+        </div>
+
+        <!-- Carousel Pagination Dots (ONLY if multiple photos/media) -->
+        {% if post.media|length > 1 %}
+        <div class="carousel-dots-row" id="carousel-dots-{{ post.id }}">
+          {% for m in post.media %}
+          <span class="carousel-dot {% if loop.first %}active{% endif %}" onclick="goToCarouselSlide({{ post.id }}, {{ loop.index0 }});"></span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endif %}
+
+        <!-- Post Action Bar (Heart/Love, Thumbs Down/Dislike, and Comments) -->
+        <div class="post-actions-bar">
+          <button type="button" class="post-action-btn {% if post.user_reaction == 'love' %}loved{% endif %}" id="post-love-btn-{{ post.id }}" onclick="togglePostLove({{ post.id }});" title="Love">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            </svg>
+            <span id="post-love-count-{{ post.id }}">{{ post.loves_count }}</span>
+          </button>
+
+          <button type="button" class="post-action-btn {% if post.user_reaction == 'dislike' %}disliked{% endif %}" id="post-dislike-btn-{{ post.id }}" onclick="togglePostDislike({{ post.id }});" title="Dislike">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path>
+            </svg>
+            <span id="post-dislike-count-{{ post.id }}">{{ post.dislikes_count }}</span>
+          </button>
+
+          <button type="button" class="post-action-btn" id="post-comments-toggle-btn-{{ post.id }}" onclick="togglePostComments({{ post.id }});" title="Comments">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span id="post-comments-count-{{ post.id }}">{{ post.comments_count }}</span>
+          </button>
+        </div>
+
+      </article>
+      {% else %}
+      <div class="feed-empty-state">
+        <i class="fa-regular fa-newspaper" style="font-size: 2.5rem; color: var(--color-medium); margin-bottom: 12px; display: block;"></i>
+        {% if filter_user %}
+        <h3>No Posts Yet</h3>
+        <p>{{ target_author_name or filter_user }} hasn't shared any posts yet.</p>
+        {% else %}
+        <h3>No Posts in Feed Yet</h3>
+        <p>Be the first to share an update, photo, or video with the community!</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      <!-- Infinite Scroll Trigger -->
+      <div id="infiniteScrollTrigger" class="feed-scroll-loader" style="display: none;">
+        <span>Loading more community updates...</span>
+      </div>
     </div>
 
-    <!-- Pinned Announcement Card -->
-    <div class="feed-card">
-      <div class="feed-author-row">
-        <img src="/static/graphics/defaultMale.png" alt="Admin" class="feed-avatar">
-        <div class="feed-author-info">
-          <span class="feed-author-name">TradChat Team</span>
-          <span class="feed-post-time">Official Announcement</span>
+    <!-- Contextual Side-by-Side Comments Panel -->
+    <aside class="feed-comments-panel" id="feedCommentsPanel">
+      <div class="comments-panel-header">
+        <h3 class="comments-panel-title" id="commentsPanelTitle">Replies</h3>
+        <button type="button" class="comments-panel-close-btn" title="Close replies" onclick="closeCommentsPanel();">&times;</button>
+      </div>
+
+      <!-- Scrollable list of comments and threaded replies -->
+      <div class="comments-panel-body" id="commentsPanelBody"></div>
+
+      <!-- Sticky Input Bar for Submitting Comment/Reply -->
+      <div class="comments-input-bar">
+        <div id="replyingTargetChip" class="replying-target-chip" style="display: none;">
+          <span id="replyingTargetText">Replying to @user</span>
+          <button type="button" onclick="cancelReplyTarget();">&times;</button>
+        </div>
+        <div class="comments-input-row">
+          <input type="text" id="commentInputField" class="comments-input-field" placeholder="Write a reply..." onkeydown="if(event.key === 'Enter') submitActiveComment();">
+          <button type="button" class="comments-send-btn" title="Send" onclick="submitActiveComment();">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
         </div>
       </div>
-      <div class="feed-content">
-        Welcome to the community Feed! Stay tuned for upcoming posts, media sharing, and community highlights right here.
-      </div>
-    </div>
+    </aside>
 
-    <!-- Empty State / Upcoming -->
-    <div class="feed-empty-state">
-      <i class="fa-regular fa-newspaper"></i>
-      <h3>More Posts Coming Soon</h3>
-      <p>Follow community channels and friends to see their latest updates here.</p>
-    </div>
   </div>
+
 </main>
+
+<!-- Fullscreen Lightbox Modal -->
+<div id="feedLightbox" class="feed-lightbox-backdrop" onclick="closeLightbox(event);">
+  <button type="button" class="feed-lightbox-close-btn" title="Close" onclick="closeLightbox();">&times;</button>
+  <div class="feed-lightbox-content" id="feedLightboxContent"></div>
+</div>
+
+<!-- Initial Posts Payload -->
+<script id="initial-posts-data" type="application/json">
+{{ posts|tojson }}
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/javascript/feed.js"></script>
 {% endblock %}

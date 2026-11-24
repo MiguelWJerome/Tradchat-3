@@ -1,0 +1,956 @@
+/* ==============================================================================
+ * TRADCHAT FEED SYSTEM STYLES
+ * Aligned with TradChat Design Tokens & Julianne O'Connor's Wireframe Specs
+ * ============================================================================== */
+
+/* Allow full page vertical scrolling on the feed page */
+html {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  height: auto !important;
+}
+
+body {
+  overflow: visible !important;
+  overflow-x: visible !important;
+  overflow-y: visible !important;
+  height: auto !important;
+  min-height: 100vh !important;
+}
+
+.app-shell {
+  height: auto !important;
+  min-height: 100vh !important;
+  overflow: visible !important;
+}
+
+/* Fixed top navbar overtop the feed */
+.navbar {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  z-index: 9999 !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25) !important;
+}
+
+.feed-page-wrapper {
+  max-width: 1380px;
+  margin: 0 auto;
+  margin-top: 80px !important; /* Offset for fixed 80px navbar */
+  padding: 24px 16px 80px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: calc(100vh - 80px);
+}
+
+/* -------------------------------------------------------------
+ * Create Post Composer Card
+ * ------------------------------------------------------------- */
+.feed-composer-card {
+  width: 100%;
+  max-width: 620px;
+  background: #ffffff;
+  border: 2px solid var(--color-border, #9E9589);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  margin-bottom: 24px;
+  transition: box-shadow var(--transition);
+}
+
+.feed-composer-card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.09);
+}
+
+.composer-top-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.composer-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-medium);
+  flex-shrink: 0;
+}
+
+.composer-textarea {
+  width: 100%;
+  min-height: 54px;
+  max-height: 160px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: 0.96rem;
+  color: var(--color-dark);
+  background: #f8f7f4;
+  resize: none;
+  outline: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.composer-textarea:focus {
+  background: #ffffff;
+  border-color: var(--color-dark);
+}
+
+/* Composer Media Previews */
+.composer-previews-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 8px 0 4px 0;
+  margin-top: 8px;
+}
+
+.composer-preview-item {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #111;
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.composer-preview-item img,
+.composer-preview-item video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.composer-preview-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.composer-bottom-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+.composer-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.composer-media-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-soft, 999px);
+  border: 1px solid var(--color-border);
+  background: #fdfdfd;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-dark);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.composer-media-btn:hover {
+  background: #eceae5;
+  border-color: var(--color-dark);
+}
+
+.composer-publish-btn {
+  background: var(--color-dark);
+  color: var(--color-light, #fff);
+  border: 2px solid var(--color-dark);
+  padding: 6px 18px;
+  border-radius: var(--radius-soft, 999px);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.composer-publish-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.composer-publish-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* -------------------------------------------------------------
+ * Dual-Column Feed Stage (Posts Stream + Side Comments Panel)
+ * ------------------------------------------------------------- */
+.feed-stage-layout {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 28px;
+  width: 100%;
+  transition: all 0.25s ease;
+}
+
+/* Main stream of posts */
+.feed-stream-column {
+  width: 100%;
+  max-width: 620px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  flex-shrink: 0;
+}
+
+/* -------------------------------------------------------------
+ * Post Card (Per Julianne's Wireframe)
+ * ------------------------------------------------------------- */
+.feed-post-card {
+  background: #ffffff;
+  border: 2px solid var(--color-border, #ccc);
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.feed-post-card.active-focused-post {
+  border-color: var(--color-dark);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+.post-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.post-author-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.post-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-medium);
+}
+
+.post-author-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.post-author-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.post-author-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--color-dark);
+}
+
+.friend-badge {
+  background: #eef2eb;
+  color: #2e6631;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(46, 102, 49, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.post-timestamp {
+  font-size: 0.78rem;
+  color: #777;
+  margin-top: 2px;
+}
+
+/* Post Caption & Expandable Text */
+.post-caption-wrap {
+  font-size: 0.98rem;
+  line-height: 1.52;
+  color: #222;
+  word-break: break-word;
+}
+
+.post-caption-text.collapsed {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.post-see-more-btn {
+  background: none;
+  border: none;
+  color: var(--color-dark);
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+  text-decoration: underline;
+}
+
+/* -------------------------------------------------------------
+ * 1:1 Media Viewport & Multi-Photo Carousel
+ * Per Julianne's rule: Never crop to fill. Fill color-dark in back
+ * ------------------------------------------------------------- */
+.feed-media-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #000000; /* Pure black fill behind media as requested */
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.carousel-slide {
+  display: none;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.carousel-slide.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.carousel-media-element {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* Preserves entire photo/movie without losing any part */
+  cursor: pointer;
+}
+
+/* Carousel Navigation Arrows */
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  color: #111;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 5;
+  transition: opacity 0.2s, background 0.2s;
+  font-size: 1.1rem;
+  backdrop-filter: blur(4px);
+}
+
+.carousel-arrow:hover:not(.disabled) {
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.carousel-arrow.arrow-left {
+  left: 12px;
+}
+
+.carousel-arrow.arrow-right {
+  right: 12px;
+}
+
+/* Boundary arrow: dim / transparent & does nothing */
+.carousel-arrow.disabled {
+  opacity: 0.25;
+  pointer-events: none;
+  cursor: default;
+}
+
+/* Expand Button (4 arrows pointing out SVG) */
+.media-expand-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 6;
+  transition: background 0.15s, transform 0.15s;
+  backdrop-filter: blur(4px);
+}
+
+.media-expand-btn:hover {
+  background: rgba(0, 0, 0, 0.88);
+  transform: scale(1.08);
+}
+
+/* Carousel Pagination Dots (Below or at bottom of media) */
+.carousel-dots-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  padding-top: 4px;
+}
+
+.carousel-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.carousel-dot.active {
+  background: var(--color-dark, #222);
+  transform: scale(1.35);
+}
+
+/* -------------------------------------------------------------
+ * Post Action Bar (Heart / Love and Comments)
+ * ------------------------------------------------------------- */
+.post-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.post-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-dark);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.post-action-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.post-action-btn svg {
+  transition: transform 0.15s ease, fill 0.15s ease;
+}
+
+.post-action-btn:active svg {
+  transform: scale(1.2);
+}
+
+.post-action-btn.loved svg {
+  fill: #e0245e;
+  stroke: #e0245e;
+}
+
+.post-action-btn.loved {
+  color: #e0245e;
+}
+
+.post-action-btn.disliked svg {
+  fill: var(--color-dark, #222);
+  stroke: var(--color-dark, #222);
+}
+
+.post-action-btn.disliked {
+  color: var(--color-dark, #222);
+  font-weight: 700;
+}
+
+.post-action-btn.comments-active {
+  background: var(--color-panel, #DAD4CA);
+  color: var(--color-dark, #2C2416);
+  border-color: var(--color-dark, #2C2416);
+  font-weight: 700;
+}
+
+.post-action-btn.comments-active svg {
+  stroke: var(--color-dark, #2C2416);
+  fill: rgba(44, 36, 22, 0.18);
+}
+
+/* -------------------------------------------------------------
+ * Contextual Side-by-Side Comments Panel
+ * ------------------------------------------------------------- */
+.feed-comments-panel {
+  width: 420px;
+  background: #ffffff;
+  border: 2px solid var(--color-border, #9E9589);
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+  position: sticky;
+  top: 96px;
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  z-index: 900;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
+  will-change: transform;
+}
+
+.feed-comments-panel.hidden {
+  display: none;
+}
+
+@keyframes feedCommentGlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.comments-panel-body.gliding {
+  animation: feedCommentGlideIn 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.comments-panel-header {
+  background: var(--color-panel, #DAD4CA);
+  padding: 14px 18px;
+  border-bottom: 2px solid var(--color-border, #9E9589);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.comments-panel-title {
+  font-family: var(--font-display, serif);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--color-dark);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comments-panel-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  color: var(--color-dark);
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.comments-panel-close-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.comments-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Single Comment Item */
+.comment-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.comment-main-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.comment-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--color-medium);
+  flex-shrink: 0;
+}
+
+.comment-bubble {
+  background: #f8f6f0;
+  border: 1px solid var(--color-border, #d5cfc5);
+  border-radius: 10px;
+  padding: 10px 12px;
+  flex: 1;
+}
+
+.comment-bubble-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.comment-author-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--color-dark);
+}
+
+.comment-text {
+  font-size: 0.9rem;
+  color: #222;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.comment-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: 46px;
+  font-size: 0.78rem;
+  color: #666;
+}
+
+.comment-action-link {
+  background: transparent;
+  border: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-dark);
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.comment-action-link:hover {
+  text-decoration: underline;
+}
+
+.comment-heart-btn.loved {
+  color: #e0245e;
+}
+
+.comment-heart-btn.loved svg {
+  fill: #e0245e;
+  stroke: #e0245e;
+}
+
+/* Nested Replies Thread */
+.comment-replies-thread {
+  margin-left: 36px;
+  padding-left: 12px;
+  border-left: 2px solid var(--color-border, #ccc);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.comment-replies-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--color-dark);
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 4px 0;
+  text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 46px;
+}
+
+.comment-replies-toggle-btn:hover {
+  text-decoration: underline;
+}
+
+/* Sticky Bottom Comment Input Bar */
+.comments-input-bar {
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.replying-target-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-panel, #DAD4CA);
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--color-dark);
+  width: fit-content;
+}
+
+.replying-target-chip button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0;
+  line-height: 1;
+}
+
+.comments-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.comments-input-field {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  font-family: var(--font-body);
+  outline: none;
+  background: #fbfaf8;
+}
+
+.comments-input-field:focus {
+  border-color: var(--color-dark);
+  background: #fff;
+}
+
+.comments-send-btn {
+  background: var(--color-dark);
+  color: var(--color-light, #fff);
+  border: none;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.comments-send-btn:hover {
+  opacity: 0.9;
+}
+
+/* -------------------------------------------------------------
+ * Fullscreen Lightbox Modal (Faded Black Backdrop)
+ * ------------------------------------------------------------- */
+.feed-lightbox-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.feed-lightbox-backdrop.open {
+  display: flex;
+}
+
+.feed-lightbox-content {
+  width: 80vw;
+  height: 80vh;
+  max-width: 80vw;
+  max-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.feed-lightbox-content img,
+.feed-lightbox-content video,
+.lightbox-img,
+.lightbox-video {
+  width: 100%;
+  height: 100%;
+  max-width: 80vw;
+  max-height: 80vh;
+  border-radius: 8px;
+  object-fit: contain;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.feed-lightbox-close-btn {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.feed-lightbox-close-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* -------------------------------------------------------------
+ * Infinite Scroll Trigger & Skeleton Placeholder
+ * ------------------------------------------------------------- */
+.feed-scroll-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
+  width: 100%;
+  color: #888;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* User Posts View Header */
+.user-posts-header {
+  width: 100%;
+  max-width: 620px;
+  background: #ffffff;
+  border: 2px solid var(--color-border, #9E9589);
+  border-radius: 12px;
+  padding: 18px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-posts-title {
+  font-family: var(--font-heading);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-dark);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-posts-title i {
+  color: var(--color-medium);
+  font-size: 1.3rem;
+}
+
+.user-posts-subtitle {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: #777;
+  font-weight: 500;
+}
+
+/* Empty state */
+.feed-empty-state {
+  background: #ffffff;
+  border: 2px dashed var(--color-border, #ccc);
+  border-radius: 12px;
+  padding: 44px 20px;
+  text-align: center;
+}
+
+/* =============================================================
+ * 📱 ARCHITECTURAL NOTES FOR UPCOMING MOBILE REHAUL (BY JULIANNE & TEAM):
+ * 1. On screens <= 768px:
+ *    - The .feed-comments-panel should transition from a desktop side-dock
+ *      to a bottom-sheet modal with touch drag-handle (swipe down to dismiss).
+ *    - The .feed-stage-layout should become a single column (flex-direction: column).
+ *    - The 1:1 media carousel should support touch swipe gestures (touchstart/touchmove).
+ *    - Keep touch targets >= 44px for the heart, comment icon, and reply buttons.
+ * ============================================================= */
+@media (max-width: 960px) {
+  .feed-stage-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+  .feed-comments-panel {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 80vh;
+    border-radius: 16px 16px 0 0;
+    z-index: 1000;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2);
+  }
+}

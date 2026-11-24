@@ -349,7 +349,163 @@ def init_all():
     conn.commit()
     conn.close()
 
-    # 10. Profile Pictures Sanitization
+    # 10. FEED.DB
+    print("[*] Seeding feed.db...")
+    feed_path = os.path.join(BASE_DIR, "feed.db")
+    if os.path.exists(feed_path):
+        os.remove(feed_path)
+    conn = sqlite3.connect(feed_path)
+    cur = conn.cursor()
+    cur.execute("PRAGMA foreign_keys = ON;")
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            content TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            deleted INTEGER DEFAULT 0
+        );
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS post_media (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER NOT NULL,
+            media_type TEXT NOT NULL,
+            media_url TEXT NOT NULL,
+            display_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE
+        );
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS post_reactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            reaction_type TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(post_id, user_id),
+            FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE
+        );
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            parent_comment_id INTEGER DEFAULT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            deleted INTEGER DEFAULT 0,
+            FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE,
+            FOREIGN KEY(parent_comment_id) REFERENCES comments(id) ON DELETE CASCADE
+        );
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS comment_reactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            comment_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            reaction_type TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(comment_id, user_id),
+            FOREIGN KEY(comment_id) REFERENCES comments(id) ON DELETE CASCADE
+        );
+    """)
+
+    # Indices for performance
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_post_media_post ON post_media(post_id, display_order);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_post_reactions_post ON post_reactions(post_id);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_comment_id);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_comment_reactions_comment ON comment_reactions(comment_id);")
+
+    # Sample Posts
+    # Account IDs from test_accounts:
+    # 1: Server, 2: Admin, 3: Alex, 4: Sam, 5: Jordan
+    posts_data = [
+        # Post 1: Alex - multi-image post
+        (1, 3, "St. Joseph's parish morning restore project is coming along beautifully. Took some photos of the altar restoration work!", "2026-09-10 09:30:00", "2026-09-10 09:30:00", 0),
+        # Post 2: Sam - video post
+        (2, 4, "Organ rehearsal for this upcoming Sunday high mass. Acoustic in this nave is unmatched.", "2026-09-10 11:15:00", "2026-09-10 11:15:00", 0),
+        # Post 3: Jordan - discussion post with threaded comments
+        (3, 5, "Book discussion for Thursday: chapters 3 & 4 of Introduction to the Devout Life. Who will be joining in the study group?", "2026-09-10 13:45:00", "2026-09-10 13:45:00", 0),
+        # Post 4: Admin - official announcement
+        (4, 2, "Welcome to the new TradChat Community Feed! Feel free to share updates, parish news, pictures, and videos with the community.", "2026-09-10 15:00:00", "2026-09-10 15:00:00", 0)
+    ]
+    for p in posts_data:
+        cur.execute("INSERT INTO posts (id, user_id, content, created_at, updated_at, deleted) VALUES (?, ?, ?, ?, ?, ?);", p)
+
+    # Post Media (multiple images for post 1, video for post 2)
+    media_data = [
+        # Post 1: two pictures
+        (1, 1, 'image', '/static/graphics/Mass.jpg', 0, '2026-09-10 09:30:00'),
+        (2, 1, 'image', '/static/themes/High-Mass/background.jpg', 1, '2026-09-10 09:30:00'),
+        # Post 2: video
+        (3, 2, 'video', '/static/uploads/sample_choir.mp4', 0, '2026-09-10 11:15:00')
+    ]
+    for m in media_data:
+        cur.execute("INSERT INTO post_media (id, post_id, media_type, media_url, display_order, created_at) VALUES (?, ?, ?, ?, ?, ?);", m)
+
+    # Post Reactions
+    # Post 1 loved by Alex (3), Sam (4), Jordan (5)
+    # Post 2 loved by Alex (3), disliked by Jordan (5)
+    # Post 3 loved by Sam (4), Admin (2)
+    # Post 4 loved by Alex (3), Sam (4), Jordan (5), Admin (2)
+    reactions_data = [
+        (1, 3, 'love', '2026-09-10 09:35:00'),
+        (1, 4, 'love', '2026-09-10 09:40:00'),
+        (1, 5, 'love', '2026-09-10 10:00:00'),
+        (2, 3, 'love', '2026-09-10 11:20:00'),
+        (2, 5, 'dislike', '2026-09-10 11:25:00'),
+        (3, 4, 'love', '2026-09-10 14:00:00'),
+        (3, 2, 'love', '2026-09-10 14:10:00'),
+        (4, 2, 'love', '2026-09-10 15:01:00'),
+        (4, 3, 'love', '2026-09-10 15:05:00'),
+        (4, 4, 'love', '2026-09-10 15:10:00'),
+        (4, 5, 'love', '2026-09-10 15:15:00')
+    ]
+    for r in reactions_data:
+        cur.execute("INSERT INTO post_reactions (post_id, user_id, reaction_type, created_at) VALUES (?, ?, ?, ?);", r)
+
+    # Comments (including nested replies)
+    # On Post 3 (Jordan's study group):
+    # - Comment 1 (Alex): "I'll be there! Bringing the study notes as well."
+    #   - Reply 2 (Jordan -> Alex): "Great, can you print two extra copies for Mark and David?"
+    #     - Reply 3 (Alex -> Jordan): "Already got them printed and ready."
+    # - Comment 4 (Sam): "I might be 15 minutes late due to choir practice, but saving my seat!"
+    #   - Reply 5 (Jordan -> Sam): "No worries Sam, we'll save you a spot right up front."
+    comments_data = [
+        (1, 3, 3, None, "I'll be there! Bringing the study notes as well.", "2026-09-10 14:05:00", 0),
+        (2, 3, 5, 1, "Great, can you print two extra copies for Mark and David?", "2026-09-10 14:12:00", 0),
+        (3, 3, 3, 2, "Already got them printed and ready.", "2026-09-10 14:15:00", 0),
+        (4, 3, 4, None, "I might be 15 minutes late due to choir practice, but saving my seat!", "2026-09-10 14:30:00", 0),
+        (5, 3, 5, 4, "No worries Sam, we'll save you a spot right up front.", "2026-09-10 14:35:00", 0)
+    ]
+    for c in comments_data:
+        cur.execute("INSERT INTO comments (id, post_id, user_id, parent_comment_id, content, created_at, deleted) VALUES (?, ?, ?, ?, ?, ?, ?);", c)
+
+    # Comment Reactions
+    comment_reactions_data = [
+        (1, 5, 'love', '2026-09-10 14:08:00'), # Jordan loved Alex's comment
+        (1, 4, 'love', '2026-09-10 14:10:00'), # Sam loved Alex's comment
+        (4, 5, 'love', '2026-09-10 14:32:00')  # Jordan loved Sam's comment
+    ]
+    for cr in comment_reactions_data:
+        cur.execute("INSERT INTO comment_reactions (comment_id, user_id, reaction_type, created_at) VALUES (?, ?, ?, ?);", cr)
+
+    conn.commit()
+    conn.close()
+
+    # 11. Profile Pictures Sanitization
     print("[*] Updating static/profile-pictures/...")
     def_male = os.path.join(BASE_DIR, "static", "graphics", "defaultMale.png")
     def_female = os.path.join(BASE_DIR, "static", "graphics", "defaultFemale.png")

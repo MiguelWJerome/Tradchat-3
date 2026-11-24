@@ -476,7 +476,56 @@
   font-weight: 500;
 }
 
-/* Card Action Button */
+/* Card Action Button & Container */
+.member-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.member-card-actions .member-action-btn,
+.member-card-actions .member-you-badge {
+  flex: 1;
+}
+
+.member-you-badge {
+  display: block;
+  text-align: center;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #777;
+  background: rgba(0,0,0,0.05);
+  border-radius: 20px;
+}
+
+.member-posts-btn {
+  flex: 1;
+  border: 2px solid var(--color-dark);
+  background: transparent;
+  color: var(--color-dark);
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  border-radius: 20px;
+  transition: all var(--transition-speed) ease;
+  white-space: nowrap;
+}
+
+.member-posts-btn:hover {
+  background: var(--color-dark);
+  color: var(--color-light);
+}
+
 .member-action-btn {
   width: 100%;
   border: 2px solid var(--color-dark);

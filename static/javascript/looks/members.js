@@ -148,12 +148,12 @@ window.renderMembers = function (members) {
       ? `<div class="friend-badge" title="Friend!"><i class="fa-solid fa-star"></i></div>` 
       : '';
 
-    // Build Friend button
+    // Build Friend and Posts buttons
     let buttonHtml = '';
     const isSelf = window.USER_CREDENTIALS && window.USER_CREDENTIALS.username && (member.username.toLowerCase() === window.USER_CREDENTIALS.username.toLowerCase());
 
     if (isSelf) {
-      buttonHtml = `<span class="member-you-badge" style="display: block; text-align: center; padding: 6px 12px; font-size: 0.95rem; font-weight: 600; color: #777; background: rgba(0,0,0,0.05); border-radius: 20px;">You</span>`;
+      buttonHtml = `<span class="member-you-badge">You</span>`;
     } else {
       let buttonClass = 'member-action-btn';
       if (isFriend) {
@@ -163,6 +163,9 @@ window.renderMembers = function (members) {
         buttonHtml = `<button class="${buttonClass}" data-id="${member.id}" data-username="${member.username}"><i class="fa-solid fa-user-plus"></i> <span>Add Friend</span></button>`;
       }
     }
+
+    const postsBtnHtml = `<a href="/feed/?user=${encodeURIComponent(member.username)}" class="member-posts-btn" title="View ${member.first_name}'s posts"><i class="fa-regular fa-newspaper"></i> <span>Posts</span></a>`;
+    const actionsHtml = `<div class="member-card-actions">${buttonHtml}${postsBtnHtml}</div>`;
 
     // Create avatar initials placeholder in case image load fails
     const nameInitials = ((member.first_name[0] || '') + (member.last_name[0] || '')).toUpperCase();
@@ -208,8 +211,8 @@ window.renderMembers = function (members) {
             </div>
           </div>
 
-          <!-- Add / Remove Friend Action Button or You Badge -->
-          ${buttonHtml}
+          <!-- Add / Remove Friend Action Button & User Posts Button -->
+          ${actionsHtml}
         </div>
       </div>
     `;

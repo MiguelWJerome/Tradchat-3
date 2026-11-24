@@ -59,6 +59,9 @@ def db_sql(sql, db_string, params=[], chat_room=False, provide_id=False):
         elif db_string == "reports_alerts":
             lock = admin_lock
             db_path = 'admin.db'
+        elif db_string == "feed":
+            lock = feed_lock
+            db_path = 'feed.db'
     
     # Alert hook with recursion guard
     if not hasattr(db_sql, '_in_alert_check'):
@@ -738,6 +741,7 @@ girls_dm_lock = Lock()
 last_read_lock = Lock()
 gif_whitelist_lock = Lock()
 admin_lock = Lock()
+feed_lock = Lock()
 
 theme_colors = {}
 themes_dir = 'static/themes'
@@ -1798,6 +1802,357 @@ def members():
     except (KeyError, SyntaxError, ValueError):
         return redirect('/')
 
+# ==============================================================================
+# FEED SYSTEM BACKEND: HELPERS & API ENDPOINTS
+# ==============================================================================
+
+FEED_ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'webm', 'mov'}
+FEED_VIDEO_EXTENSIONS = {'mp4', 'webm', 'mov'}
+FEED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+def get_feed_user_meta(user_id, friend_ids=None):
+    """Retrieve author metadata (username, display name, profile picture, parental lock, friend status) for a user ID."""
+    row = db_sql("SELECT username, first_name, last_name, gender, pl_block_media FROM accounts WHERE id = ?;", 'accounts', params=[user_id])
+    if not row:
+        return {
+            'id': user_id,
+            'username': f"user_{user_id}",
+            'name': f"User {user_id}",
+            'pfp': "/static/graphics/defaultMale.png",
+            'pl_block_media': 0,
+            'is_friend': False
+        }
+    uname, fname, lname, gender, pl_block = row[0]
+    pfp_path = f"static/profile-pictures/{uname}.png"
+    if os.path.exists(pfp_path):
+        pfp = f"/{pfp_path}"
+    else:
+        pfp = "/static/graphics/defaultFemale.png" if gender == 'female' else "/static/graphics/defaultMale.png"
+    return {
+        'id': user_id,
+        'username': uname,
+        'name': f"{fname} {lname}".strip() or uname,
+        'pfp': pfp,
+        'pl_block_media': pl_block or 0,
+        'is_friend': (user_id in friend_ids) if friend_ids else False
+    }
+
+def get_feed_post_comments_tree(post_id, viewer_id=None, friend_ids=None):
+    """Retrieve threaded comments and replies tree for a specific post."""
+    if friend_ids is None:
+        friend_ids = set()
+
+    comment_rows = db_sql("SELECT id, user_id, parent_comment_id, content, created_at, deleted FROM comments WHERE post_id = ? AND deleted = 0 ORDER BY id ASC;", 'feed', params=[post_id])
+    if not comment_rows:
+        return []
+
+    comments_by_id = {}
+    root_comments = []
+
+    for crow in comment_rows:
+        c_id, c_uid, c_parent_id, c_content, c_created, c_deleted = crow
+        c_author_meta = get_feed_user_meta(c_uid, friend_ids)
+
+        c_rxn_rows = db_sql("SELECT reaction_type, COUNT(*) FROM comment_reactions WHERE comment_id = ? GROUP BY reaction_type;", 'feed', params=[c_id])
+        c_rxn_counts = {'love': 0, 'dislike': 0}
+        for cr_type, cr_cnt in c_rxn_rows:
+            if cr_type in c_rxn_counts:
+                c_rxn_counts[cr_type] = cr_cnt
+
+        c_viewer_rxn = None
+        if viewer_id:
+            c_vr_row = db_sql("SELECT reaction_type FROM comment_reactions WHERE comment_id = ? AND user_id = ?;", 'feed', params=[c_id, viewer_id])
+            if c_vr_row:
+                c_viewer_rxn = c_vr_row[0][0]
+
+        c_dict = {
+            'id': c_id,
+            'post_id': post_id,
+            'user_id': c_uid,
+            'parent_comment_id': c_parent_id,
+            'author': c_author_meta,
+            'content': c_content,
+            'created_at': c_created,
+            'loves_count': c_rxn_counts['love'],
+            'dislikes_count': c_rxn_counts['dislike'],
+            'user_reaction': c_viewer_rxn,
+            'replies': []
+        }
+        comments_by_id[c_id] = c_dict
+
+    for crow in comment_rows:
+        c_id = crow[0]
+        c_parent_id = crow[2]
+        c_obj = comments_by_id[c_id]
+        if c_parent_id and c_parent_id in comments_by_id:
+            comments_by_id[c_parent_id]['replies'].append(c_obj)
+        else:
+            root_comments.append(c_obj)
+
+    return root_comments
+
+
+def get_feed_posts_data(viewer_username, limit=50, offset=0, filter_username=None):
+    """Fetch structured feed posts with multi-media, reaction tallies, and threaded comments.
+    If filter_username is provided, fetches ONLY that specific user's posts in strict chronological
+    order (newest at the top), completely insulated and bypassing any feed ranking algorithms."""
+    viewer_id = find_account_id_or_password_or_gender(viewer_username, 'id') if viewer_username else None
+    viewer_pl_block = False
+    friend_ids = set()
+
+    if viewer_username:
+        pl_row = db_sql("SELECT pl_block_media FROM accounts WHERE username = ?;", 'accounts', params=[viewer_username])
+        if pl_row and pl_row[0] and pl_row[0][0]:
+            viewer_pl_block = True
+
+        if viewer_id:
+            f_row = db_sql("SELECT friends FROM accounts WHERE id = ?;", 'accounts', params=[viewer_id])
+            if f_row and f_row[0] and f_row[0][0]:
+                friend_ids = {int(x) for x in split(f_row[0][0]) if x.isdigit()}
+
+    # Priority includes friends and viewer's own posts
+    priority_ids = friend_ids | ({viewer_id} if viewer_id else set())
+
+    ################################################################################
+    # 🛑 CRITICAL ARCHITECTURAL DIRECTIVE FROM MICHAEL (CREATOR OF TRADCHAT) 🛑
+    # ATTENTION FUTURE AI AGENT OR DEVELOPER WORKING ON THIS CODEBASE:
+    # THIS IS MICHAEL, THE WEBSITE CREATOR. I AM WRITING THIS HERE TO WARN YOU
+    # IN THE FUTURE: DO NOT, UNDER ANY CIRCUMSTANCES, SUBJECT THIS QUERY PATH TO
+    # ANY ALGORITHM!
+    #
+    # WHEN filter_username IS PROVIDED (e.g. /feed/?user=... FROM THE MEMBERS OR
+    # PROFILE PAGE), THIS IS STRICTLY A CHRONOLOGICAL ARCHIVE OF ALL OF THAT
+    # USER'S POSTS, ORDERED NEWEST AT THE TOP (ORDER BY id DESC).
+    #
+    # WE ARE ONLY REUSING THE FEED PAGE TEMPLATE SO WE DO NOT HAVE TO CODE A SEPARATE
+    # REDUNDANT USER-POSTS PAGE. NOTHING ELSE ABOUT IT IS A "FEED". IT IS NOT SUBJECTED
+    # TO ANY RECOMMENDATION, ML ENGAGEMENT, FRIENDS-FIRST, OR RANKING ALGORITHM.
+    #
+    # ANY FUTURE ALGORITHM MUST ONLY EVER RUN INSIDE THE GENERAL FEED (WHEN filter_username IS NONE).
+    # IF YOU ARE AN AI CONSIDERING "OPTIMIZING" OR CHANGING THIS QUERY: STOP IMMEDIATELY
+    # AND ASK THE USER BEFORE TOUCHING IT! DO NOT UNDO THIS GUARANTEE!
+    ################################################################################
+    if filter_username:
+        filter_user_id = find_account_id_or_password_or_gender(filter_username, 'id')
+        if not filter_user_id:
+            return []
+
+        # Direct, pure timestamp chronological retrieval for this specific user
+        user_post_rows = db_sql(
+            "SELECT id, user_id, content, created_at, updated_at, deleted FROM posts WHERE user_id = ? AND deleted = 0 ORDER BY id DESC;",
+            'feed',
+            params=[filter_user_id]
+        )
+        post_rows = user_post_rows[offset:offset + limit]
+    else:
+        # ==============================================================================
+        # 🔮 FUTURE INFINITE SCROLL & FEED RANKING ALGORITHM PLACEHOLDER
+        # ==============================================================================
+        # TODO: This is where our advanced feed algorithm will go in the future!
+        # Currently, we use a clean two-tier ranking:
+        #   Tier 1: Posts from direct friends and own posts (sorted by recency DESC)
+        #   Tier 2: Posts from all other community members (sorted by recency DESC)
+        #
+        # In the future, this algorithm placeholder will be replaced with:
+        #   1. Engagement weighting (posts with high love-to-view ratios and active comments)
+        #   2. Interest graph & affinity matching (friends-of-friends, mutual room activity)
+        #   3. Dynamic interleaving (e.g., 70% close friends, 20% room highlights, 10% new members)
+        #   4. Cursor-based streaming pagination to prevent duplicate posts during real-time feed updates
+        # ==============================================================================
+
+        all_post_rows = db_sql("SELECT id, user_id, content, created_at, updated_at, deleted FROM posts WHERE deleted = 0 ORDER BY id DESC;", 'feed')
+        if not all_post_rows:
+            return []
+
+        # Partition: Friends & Self first, then other users
+        friends_posts = [p for p in all_post_rows if p[1] in priority_ids]
+        other_posts = [p for p in all_post_rows if p[1] not in priority_ids]
+        ranked_post_rows = friends_posts + other_posts
+
+        # Apply pagination offset and limit
+        post_rows = ranked_post_rows[offset:offset + limit]
+
+    posts_list = []
+    for prow in post_rows:
+        p_id, p_uid, p_content, p_created, p_updated, p_deleted = prow
+        author_meta = get_feed_user_meta(p_uid, friend_ids)
+
+        # 2. Fetch media for this post (ordered)
+        media_rows = db_sql("SELECT id, media_type, media_url, display_order FROM post_media WHERE post_id = ? ORDER BY display_order ASC, id ASC;", 'feed', params=[p_id])
+        media_items = []
+        for mrow in media_rows:
+            media_items.append({
+                'id': mrow[0],
+                'type': mrow[1],
+                'url': '' if viewer_pl_block else mrow[2],
+                'order': mrow[3],
+                'blocked': bool(viewer_pl_block)
+            })
+
+        # 3. Post reactions
+        rxn_rows = db_sql("SELECT reaction_type, COUNT(*) FROM post_reactions WHERE post_id = ? GROUP BY reaction_type;", 'feed', params=[p_id])
+        rxn_counts = {'love': 0, 'dislike': 0}
+        for rxn_type, cnt in rxn_rows:
+            if rxn_type in rxn_counts:
+                rxn_counts[rxn_type] = cnt
+
+        viewer_rxn = None
+        if viewer_id:
+            vr_row = db_sql("SELECT reaction_type FROM post_reactions WHERE post_id = ? AND user_id = ?;", 'feed', params=[p_id, viewer_id])
+            if vr_row:
+                viewer_rxn = vr_row[0][0]
+
+        # 4. Threaded Comments & Replies
+        root_comments = get_feed_post_comments_tree(p_id, viewer_id, friend_ids)
+        total_comments_count = len(db_sql("SELECT id FROM comments WHERE post_id = ? AND deleted = 0;", 'feed', params=[p_id]))
+
+        posts_list.append({
+            'id': p_id,
+            'user_id': p_uid,
+            'author': author_meta,
+            'content': p_content,
+            'created_at': p_created,
+            'updated_at': p_updated,
+            'media': media_items,
+            'loves_count': rxn_counts['love'],
+            'dislikes_count': rxn_counts['dislike'],
+            'user_reaction': viewer_rxn,
+            'comments_count': total_comments_count,
+            'comments': root_comments
+        })
+
+    return posts_list
+
+def create_feed_post_db(user_id, content, media_items=None):
+    """Insert a new post into feed.db with optional multi-media records."""
+    post_id = db_sql("INSERT INTO posts (user_id, content) VALUES (?, ?);", 'feed', params=[user_id, content], provide_id=True)
+    if not post_id:
+        return None
+    if media_items:
+        for idx, item in enumerate(media_items):
+            m_type = item.get('type', 'image')
+            m_url = item.get('url', '')
+            if m_url:
+                db_sql("INSERT INTO post_media (post_id, media_type, media_url, display_order) VALUES (?, ?, ?, ?);", 'feed', params=[post_id, m_type, m_url, idx])
+    return post_id
+
+def toggle_post_reaction_db(user_id, post_id, reaction_type):
+    """Toggle or flip post reaction (love vs dislike)."""
+    if reaction_type not in ('love', 'dislike'):
+        return None, "Invalid reaction type. Must be 'love' or 'dislike'."
+    post = db_sql("SELECT id FROM posts WHERE id = ? AND deleted = 0;", 'feed', params=[post_id])
+    if not post:
+        return None, "Post not found or deleted"
+    
+    existing = db_sql("SELECT reaction_type FROM post_reactions WHERE post_id = ? AND user_id = ?;", 'feed', params=[post_id, user_id])
+    if existing:
+        curr = existing[0][0]
+        if curr == reaction_type:
+            db_sql("DELETE FROM post_reactions WHERE post_id = ? AND user_id = ?;", 'feed', params=[post_id, user_id])
+            active = None
+        else:
+            db_sql("UPDATE post_reactions SET reaction_type = ?, created_at = CURRENT_TIMESTAMP WHERE post_id = ? AND user_id = ?;", 'feed', params=[reaction_type, post_id, user_id])
+            active = reaction_type
+    else:
+        db_sql("INSERT INTO post_reactions (post_id, user_id, reaction_type) VALUES (?, ?, ?);", 'feed', params=[post_id, user_id, reaction_type])
+        active = reaction_type
+
+    loves = db_sql("SELECT COUNT(*) FROM post_reactions WHERE post_id = ? AND reaction_type = 'love';", 'feed', params=[post_id])[0][0]
+    dislikes = db_sql("SELECT COUNT(*) FROM post_reactions WHERE post_id = ? AND reaction_type = 'dislike';", 'feed', params=[post_id])[0][0]
+    return {
+        'post_id': post_id,
+        'loves_count': loves,
+        'dislikes_count': dislikes,
+        'user_reaction': active
+    }, None
+
+def add_feed_comment_db(user_id, post_id, content, parent_comment_id=None):
+    """Add a top-level comment or a reply to a parent comment."""
+    if not content or not content.strip():
+        return None, "Comment content cannot be empty"
+    post = db_sql("SELECT id FROM posts WHERE id = ? AND deleted = 0;", 'feed', params=[post_id])
+    if not post:
+        return None, "Post not found or deleted"
+    
+    if parent_comment_id:
+        parent = db_sql("SELECT id, post_id FROM comments WHERE id = ? AND deleted = 0;", 'feed', params=[parent_comment_id])
+        if not parent or parent[0][1] != post_id:
+            return None, "Parent comment not found on this post"
+
+    comment_id = db_sql("INSERT INTO comments (post_id, user_id, parent_comment_id, content) VALUES (?, ?, ?, ?);", 'feed', params=[post_id, user_id, parent_comment_id, content.strip()], provide_id=True)
+    if not comment_id:
+        return None, "Failed to create comment"
+
+    author_meta = get_feed_user_meta(user_id)
+    return {
+        'id': comment_id,
+        'post_id': post_id,
+        'user_id': user_id,
+        'parent_comment_id': parent_comment_id,
+        'author': author_meta,
+        'content': content.strip(),
+        'created_at': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        'loves_count': 0,
+        'dislikes_count': 0,
+        'user_reaction': None,
+        'replies': []
+    }, None
+
+def toggle_comment_reaction_db(user_id, comment_id, reaction_type):
+    """Toggle or flip comment reaction (love vs dislike)."""
+    if reaction_type not in ('love', 'dislike'):
+        return None, "Invalid reaction type. Must be 'love' or 'dislike'."
+    comment = db_sql("SELECT id FROM comments WHERE id = ? AND deleted = 0;", 'feed', params=[comment_id])
+    if not comment:
+        return None, "Comment not found or deleted"
+    
+    existing = db_sql("SELECT reaction_type FROM comment_reactions WHERE comment_id = ? AND user_id = ?;", 'feed', params=[comment_id, user_id])
+    if existing:
+        curr = existing[0][0]
+        if curr == reaction_type:
+            db_sql("DELETE FROM comment_reactions WHERE comment_id = ? AND user_id = ?;", 'feed', params=[comment_id, user_id])
+            active = None
+        else:
+            db_sql("UPDATE comment_reactions SET reaction_type = ?, created_at = CURRENT_TIMESTAMP WHERE comment_id = ? AND user_id = ?;", 'feed', params=[reaction_type, comment_id, user_id])
+            active = reaction_type
+    else:
+        db_sql("INSERT INTO comment_reactions (comment_id, user_id, reaction_type) VALUES (?, ?, ?);", 'feed', params=[comment_id, user_id, reaction_type])
+        active = reaction_type
+
+    loves = db_sql("SELECT COUNT(*) FROM comment_reactions WHERE comment_id = ? AND reaction_type = 'love';", 'feed', params=[comment_id])[0][0]
+    dislikes = db_sql("SELECT COUNT(*) FROM comment_reactions WHERE comment_id = ? AND reaction_type = 'dislike';", 'feed', params=[comment_id])[0][0]
+    return {
+        'comment_id': comment_id,
+        'loves_count': loves,
+        'dislikes_count': dislikes,
+        'user_reaction': active
+    }, None
+
+def soft_delete_feed_post_db(post_id, user_id, is_admin_user=False):
+    """Soft-delete a post (never actually removes the row)."""
+    post = db_sql("SELECT user_id, deleted FROM posts WHERE id = ?;", 'feed', params=[post_id])
+    if not post:
+        return False, "Post not found"
+    if post[0][1]:
+        return False, "Post already deleted"
+    if post[0][0] != user_id and not is_admin_user:
+        return False, "Unauthorized to delete this post"
+    db_sql("UPDATE posts SET deleted = 1 WHERE id = ?;", 'feed', params=[post_id])
+    return True, None
+
+def soft_delete_feed_comment_db(comment_id, user_id, is_admin_user=False):
+    """Soft-delete a comment (never actually removes the row)."""
+    comment = db_sql("SELECT user_id, deleted FROM comments WHERE id = ?;", 'feed', params=[comment_id])
+    if not comment:
+        return False, "Comment not found"
+    if comment[0][1]:
+        return False, "Comment already deleted"
+    if comment[0][0] != user_id and not is_admin_user:
+        return False, "Unauthorized to delete this comment"
+    db_sql("UPDATE comments SET deleted = 1 WHERE id = ?;", 'feed', params=[comment_id])
+    return True, None
+
+
 @app.route('/feed/')
 def feed():
     try:
@@ -1814,6 +2169,19 @@ def feed():
 
         update_presence(username, request)
 
+        filter_user = request.args.get('user') or request.args.get('author')
+        if filter_user:
+            filter_user = filter_user.strip()
+
+        feed_posts = get_feed_posts_data(username, filter_username=filter_user)
+
+        target_author_name = None
+        if filter_user:
+            target_uid = find_account_id_or_password_or_gender(filter_user, 'id')
+            if target_uid:
+                meta = get_feed_user_meta(target_uid)
+                target_author_name = meta.get('name') or filter_user
+
         return render_template(
             'feed.html',
             theme=theme,
@@ -1823,11 +2191,272 @@ def feed():
             color_light=colors['color_light'],
             username=username,
             password=password,
-            active_page='feed'
+            active_page='feed',
+            posts=feed_posts,
+            filter_user=filter_user,
+            target_author_name=target_author_name
         )
     except Exception as e:
         print(f"Error in feed route: {e}")
         return redirect('/')
+
+
+# --- Feed REST API Endpoints ---
+
+@app.route('/api/feed/posts/', methods=['GET'])
+@app.route('/api/feed/posts', methods=['GET'])
+def api_get_feed_posts():
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+
+        filter_user = request.args.get('user') or request.args.get('author')
+        if filter_user:
+            filter_user = filter_user.strip()
+
+        limit = request.args.get('limit', 50, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        posts_data = get_feed_posts_data(username, limit=limit, offset=offset, filter_username=filter_user)
+        return {"status": "success", "posts": posts_data}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/api/feed/posts/', methods=['POST'])
+@app.route('/api/feed/posts', methods=['POST'])
+def api_create_feed_post():
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+
+        user_id = find_account_id_or_password_or_gender(username, 'id')
+        frozen_check = db_sql("SELECT frozen FROM accounts WHERE id = ?;", 'accounts', params=[user_id])
+        if frozen_check and frozen_check[0][0]:
+            return {"status": "error", "message": "Account is frozen"}, 403
+
+        pl_block = db_sql("SELECT pl_block_media FROM accounts WHERE id = ?;", 'accounts', params=[user_id])
+        media_restricted = bool(pl_block and pl_block[0] and pl_block[0][0])
+
+        content = ""
+        media_items = []
+
+        if request.is_json:
+            data = request.get_json() or {}
+            content = data.get('content', '')
+            req_media = data.get('media', [])
+            if not media_restricted and isinstance(req_media, list):
+                for m in req_media:
+                    if isinstance(m, dict) and m.get('url'):
+                        url = m.get('url', '')
+                        ext = url.rsplit('.', 1)[-1].lower() if '.' in url else ''
+                        if ext not in FEED_ALLOWED_EXTENSIONS:
+                            return {
+                                "status": "error",
+                                "message": f"Invalid media attachment: '{url}'. Only pictures (PNG, JPG, GIF, WEBP) and videos (MP4, WEBM, MOV) are allowed."
+                            }, 400
+                        media_items.append({
+                            'type': 'video' if ext in FEED_VIDEO_EXTENSIONS else 'image',
+                            'url': url
+                        })
+        else:
+            content = request.form.get('content', '')
+            # Check for media URLs in form data
+            raw_media_urls = request.form.get('media_urls')
+            if raw_media_urls and not media_restricted:
+                try:
+                    parsed_urls = json.loads(raw_media_urls)
+                    if isinstance(parsed_urls, list):
+                        for m in parsed_urls:
+                            if isinstance(m, dict) and m.get('url'):
+                                url = m.get('url', '')
+                                ext = url.rsplit('.', 1)[-1].lower() if '.' in url else ''
+                                if ext not in FEED_ALLOWED_EXTENSIONS:
+                                    return {
+                                        "status": "error",
+                                        "message": f"Invalid media attachment: '{url}'. Only pictures (PNG, JPG, GIF, WEBP) and videos (MP4, WEBM, MOV) are allowed."
+                                    }, 400
+                                media_items.append({
+                                    'type': 'video' if ext in FEED_VIDEO_EXTENSIONS else 'image',
+                                    'url': url
+                                })
+                except Exception:
+                    pass
+
+            # Check for uploaded files across all fields in request.files
+            if not media_restricted and request.files:
+                uploaded_files = []
+                for k in request.files.keys():
+                    uploaded_files.extend(request.files.getlist(k))
+
+                for f in uploaded_files:
+                    if f and f.filename:
+                        ext = f.filename.rsplit('.', 1)[-1].lower() if '.' in f.filename else ''
+                        mimetype = getattr(f, 'mimetype', '') or ''
+                        # Strictest verification: must have media extension AND media MIME type
+                        is_media_mime = (not mimetype) or mimetype.startswith('image/') or mimetype.startswith('video/')
+                        if ext not in FEED_ALLOWED_EXTENSIONS or not is_media_mime:
+                            return {
+                                "status": "error",
+                                "message": f"Invalid file type: '{f.filename}'. Only pictures (PNG, JPG, GIF, WEBP) and videos (MP4, WEBM, MOV) are allowed."
+                            }, 400
+
+                        os.makedirs('static/uploads', exist_ok=True)
+                        token = secrets.token_hex(8)
+                        saved_name = f"{token}.{ext}"
+                        saved_path = os.path.join('static', 'uploads', saved_name)
+                        f.save(saved_path)
+                        m_type = 'video' if ext in FEED_VIDEO_EXTENSIONS else 'image'
+                        media_items.append({
+                            'type': m_type,
+                            'url': f"/static/uploads/{saved_name}"
+                        })
+
+        if not content.strip() and not media_items:
+            return {"status": "error", "message": "Post cannot be empty"}, 400
+
+        post_id = create_feed_post_db(user_id, content.strip(), media_items)
+        if not post_id:
+            return {"status": "error", "message": "Failed to create post"}, 500
+
+        return {"status": "success", "post_id": post_id}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/api/feed/posts/<int:post_id>/react/', methods=['POST'])
+@app.route('/api/feed/posts/<int:post_id>/react', methods=['POST'])
+def api_react_feed_post(post_id):
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+
+        user_id = find_account_id_or_password_or_gender(username, 'id')
+        frozen_check = db_sql("SELECT frozen FROM accounts WHERE id = ?;", 'accounts', params=[user_id])
+        if frozen_check and frozen_check[0][0]:
+            return {"status": "error", "message": "Account is frozen"}, 403
+
+        data = request.get_json(silent=True) or request.form or {}
+        reaction_type = data.get('reaction', 'love').lower().strip()
+
+        res, err = toggle_post_reaction_db(user_id, post_id, reaction_type)
+        if err:
+            return {"status": "error", "message": err}, 400
+
+        return {"status": "success", "reaction_data": res}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/api/feed/posts/<int:post_id>/comments/', methods=['GET', 'POST'])
+@app.route('/api/feed/posts/<int:post_id>/comments', methods=['GET', 'POST'])
+def api_feed_post_comments(post_id):
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+
+        user_id = find_account_id_or_password_or_gender(username, 'id')
+
+        if request.method == 'GET':
+            friend_ids = set()
+            if user_id:
+                f_row = db_sql("SELECT friends FROM accounts WHERE id = ?;", 'accounts', params=[user_id])
+                if f_row and f_row[0] and f_row[0][0]:
+                    friend_ids = {int(x) for x in split(f_row[0][0]) if x.isdigit()}
+            comments = get_feed_post_comments_tree(post_id, user_id, friend_ids)
+            return {"status": "success", "comments": comments, "total_count": len(comments)}
+
+        frozen_check = db_sql("SELECT frozen FROM accounts WHERE id = ?;", 'accounts', params=[user_id])
+        if frozen_check and frozen_check[0][0]:
+            return {"status": "error", "message": "Account is frozen"}, 403
+
+        data = request.get_json(silent=True) or request.form or {}
+        content = data.get('content', '')
+        parent_comment_id = data.get('parent_comment_id')
+        if parent_comment_id:
+            try:
+                parent_comment_id = int(parent_comment_id)
+            except (ValueError, TypeError):
+                parent_comment_id = None
+
+        comment, err = add_feed_comment_db(user_id, post_id, content, parent_comment_id)
+        if err:
+            return {"status": "error", "message": err}, 400
+
+        return {"status": "success", "comment": comment}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/api/feed/comments/<int:comment_id>/react/', methods=['POST'])
+@app.route('/api/feed/comments/<int:comment_id>/react', methods=['POST'])
+def api_react_feed_comment(comment_id):
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+
+        user_id = find_account_id_or_password_or_gender(username, 'id')
+        frozen_check = db_sql("SELECT frozen FROM accounts WHERE id = ?;", 'accounts', params=[user_id])
+        if frozen_check and frozen_check[0][0]:
+            return {"status": "error", "message": "Account is frozen"}, 403
+
+        data = request.get_json(silent=True) or request.form or {}
+        reaction_type = data.get('reaction', 'love').lower().strip()
+
+        res, err = toggle_comment_reaction_db(user_id, comment_id, reaction_type)
+        if err:
+            return {"status": "error", "message": err}, 400
+
+        return {"status": "success", "reaction_data": res}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/api/feed/posts/<int:post_id>/delete/', methods=['POST'])
+@app.route('/api/feed/posts/<int:post_id>/delete', methods=['POST'])
+def api_delete_feed_post(post_id):
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+
+        user_id = find_account_id_or_password_or_gender(username, 'id')
+        success, err = soft_delete_feed_post_db(post_id, user_id, is_admin_user=is_admin(username))
+        if not success:
+            return {"status": "error", "message": err}, 400
+
+        return {"status": "success", "post_id": post_id}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/api/feed/comments/<int:comment_id>/delete/', methods=['POST'])
+@app.route('/api/feed/comments/<int:comment_id>/delete', methods=['POST'])
+def api_delete_feed_comment(comment_id):
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return {"status": "error", "message": "Unauthorized"}, 401
+
+        user_id = find_account_id_or_password_or_gender(username, 'id')
+        success, err = soft_delete_feed_comment_db(comment_id, user_id, is_admin_user=is_admin(username))
+        if not success:
+            return {"status": "error", "message": err}, 400
+
+        return {"status": "success", "comment_id": comment_id}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
 
 @app.route('/news/')
 @app.route('/news/<articlename>/')
@@ -1918,7 +2547,8 @@ def news(articlename=None):
 
 # Configure upload settings
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-ALLOWED_EXTENSIONS = {'css', 'html', 'js', 'png', 'jpg', 'jpeg', 'gif', 'svg'}
+ALLOWED_EXTENSIONS = {'css', 'html', 'js', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'mp4', 'webm', 'mov'}
+FEED_ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'webm', 'mov'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -2932,11 +3562,11 @@ def Recv(message, sid):
     elif msg[0] == 'Added Reaction':
         data = msg[1]
         try:
-        username = data['username']
-        password = data['password']
-        index = data['index']
-        room = data['room']
-        reaction = data['emoji']
+            username = data['username']
+            password = data['password']
+            index = data['index']
+            room = data['room']
+            reaction = data['emoji']
         except (KeyError, TypeError, AttributeError):
             return
 

@@ -34,7 +34,7 @@
     </div>
     
     <div class="profile-actions-stack">
-      <button class="profile-side-btn">Posts</button>
+      <a href="/feed/?user={{ profile_username }}" class="profile-side-btn" id="profile-posts-btn">Posts</a>
       <button class="profile-side-btn" id="profile-map-btn">Map</button>
       {% if profile_username != username %}
       <button class="profile-side-btn" id="profile-message-btn">Message</button>

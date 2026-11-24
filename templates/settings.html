@@ -121,10 +121,44 @@
       </div>
 
 
-      <!-- Placeholders for other tabs -->
+      <!-- Posts Tab Content (Create and manage posts) -->
       <div class="tab-pane" id="pane-posts">
-        <h2>Posts</h2>
-        <p class="placeholder-text">Content for Posts will go here.</p>
+        <div class="settings-posts-container">
+          <div class="settings-posts-header">
+            <h2>Create a Post</h2>
+            <p class="settings-posts-subtitle">Share updates, photos, or videos to the community feed.</p>
+          </div>
+
+          <!-- Create Post Composer Card -->
+          <div class="feed-composer-card">
+            <div class="composer-top-row">
+              <img src="/static/profile-pictures/{{ username }}.png" onerror="this.src='/static/graphics/defaultMale.png'" alt="{{ username }}" class="composer-avatar">
+              <textarea id="composerText" class="composer-textarea" placeholder="Share a photo, video, or update with your friends..."></textarea>
+            </div>
+
+            <!-- Thumbnail preview strip for attached media -->
+            <div id="composerPreviews" class="composer-previews-strip" style="display: none;"></div>
+
+            <div class="composer-bottom-bar">
+              <div class="composer-actions">
+                <!-- Hidden file input for multi-file selection -->
+                <input type="file" id="composerFileInput" accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime" multiple style="display: none;">
+                <button type="button" class="composer-media-btn" onclick="document.getElementById('composerFileInput').click();">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                  </svg>
+                  Attach Media
+                </button>
+              </div>
+
+              <button type="button" id="composerPublishBtn" class="composer-publish-btn" onclick="publishPost();">
+                Post
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="tab-pane" id="pane-theme">
         <div class="theme-grid" id="theme-grid-container">
