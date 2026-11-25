@@ -437,6 +437,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   width: 100%;
+  cursor: pointer;
+  transition: opacity 0.15s ease, text-decoration 0.15s ease;
+}
+
+.member-name:hover {
+  text-decoration: underline;
+  opacity: 0.85;
 }
 
 .member-username {
@@ -445,6 +452,13 @@
   font-weight: 600;
   margin-bottom: 12px;
   letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: opacity 0.15s ease, text-decoration 0.15s ease;
+}
+
+.member-username:hover {
+  text-decoration: underline;
+  opacity: 0.85;
 }
 
 /* User demographic rows */

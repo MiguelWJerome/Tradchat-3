@@ -259,6 +259,40 @@ body {
   gap: 12px;
 }
 
+/* Post Author and Comment Profile Links */
+.post-author-avatar-link,
+.comment-avatar-link {
+  display: block;
+  flex-shrink: 0;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.post-author-avatar-link:hover,
+.comment-avatar-link:hover {
+  opacity: 0.88;
+  transform: scale(1.04);
+}
+
+.post-author-name-link,
+.comment-author-name-link,
+.comments-title-author-link,
+.user-posts-title-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.post-author-name-link:hover,
+.comment-author-name-link:hover,
+.comments-title-author-link:hover,
+.user-posts-title-link:hover {
+  text-decoration: underline;
+  color: var(--color-accent, #C0392B);
+}
+
 .post-avatar {
   width: 46px;
   height: 46px;

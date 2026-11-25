@@ -1,0 +1,262 @@
+/* =============================================================
+ * TradChat Policies Stylesheet
+ * Integrates directly with TradChat's dynamic theme variables
+ * Styled with home-page translucent frosted glass aesthetic
+ * ============================================================= */
+
+.policy-page-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 80px);
+  padding: 44px 24px;
+  box-sizing: border-box;
+}
+
+.policy-card {
+  /* Matching home page translucent frosted-glass aesthetic */
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(255, 255, 255, 0.75);
+  border-radius: 26px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  max-width: 860px;
+  padding: 50px 56px;
+  box-sizing: border-box;
+  animation: fadeInPolicy 0.25s ease-out;
+}
+
+@keyframes fadeInPolicy {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header */
+.policy-header {
+  margin-bottom: 6px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-dark) 10%, transparent);
+}
+
+.policy-title {
+  font-family: var(--font-body);
+  font-size: 2.3rem;
+  font-weight: 700;
+  color: var(--color-dark);
+  margin: 0 0 10px 0;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.policy-subtitle {
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  color: color-mix(in srgb, var(--color-dark) 70%, transparent);
+  font-weight: 400;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Policy Items List */
+.policy-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.policy-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  padding: 26px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-dark) 10%, transparent);
+}
+
+/* Pill-shaped badge matching wireframe capsule design */
+.policy-num-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-dark) 18%, transparent);
+  background: color-mix(in srgb, var(--color-light) 65%, rgba(255, 255, 255, 0.75));
+  color: color-mix(in srgb, var(--color-dark) 85%, transparent);
+  font-weight: 600;
+  font-size: 0.88rem;
+  font-family: var(--font-body);
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+  margin-top: 2px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.policy-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.policy-item-title {
+  font-family: var(--font-body);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-dark);
+  margin: 0;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.policy-item-text {
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  color: color-mix(in srgb, var(--color-dark) 72%, transparent);
+  margin: 0;
+  line-height: 1.55;
+}
+
+/* Footer & Contact Block (Rounded Color-Light Box) */
+.policy-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 30px;
+  padding: 22px 28px;
+  background: var(--color-light);
+  border: 1px solid color-mix(in srgb, var(--color-dark) 14%, transparent);
+  border-radius: 20px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.policy-contact-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.policy-contact-heading {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-dark);
+}
+
+.policy-contact-desc {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: color-mix(in srgb, var(--color-dark) 75%, transparent);
+}
+
+.policy-contact-link {
+  color: var(--color-dark);
+  text-decoration: underline;
+  font-weight: 600;
+  transition: color var(--transition, 0.18s ease);
+}
+
+.policy-contact-link:hover {
+  color: var(--color-accent, #C0392B);
+}
+
+/* Back to Home Button (pill shape matching wireframe) */
+.policy-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: var(--color-dark);
+  color: var(--color-light);
+  border: 2px solid var(--color-dark);
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all var(--transition, 0.18s ease);
+  white-space: nowrap;
+}
+
+.policy-back-btn:hover {
+  background: color-mix(in srgb, var(--color-dark) 88%, transparent);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.policy-back-btn:active {
+  transform: translateY(0);
+}
+
+/* Responsive adjustments */
+@media (max-width: 820px) {
+  .policy-card {
+    padding: 38px 32px;
+    border-radius: 22px;
+  }
+
+  .policy-title {
+    font-size: 2rem;
+  }
+
+  .policy-item-title {
+    font-size: 1.15rem;
+  }
+
+  .policy-item-text {
+    font-size: 0.98rem;
+  }
+
+  .policy-item {
+    gap: 18px;
+    padding: 22px 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .policy-page-wrapper {
+    padding: 24px 14px;
+  }
+
+  .policy-card {
+    padding: 28px 20px;
+    border-radius: 18px;
+  }
+
+  .policy-title {
+    font-size: 1.75rem;
+  }
+
+  .policy-subtitle {
+    font-size: 0.95rem;
+  }
+
+  .policy-item {
+    gap: 14px;
+    padding: 18px 0;
+  }
+
+  .policy-footer {
+    padding: 18px 16px;
+    border-radius: 16px;
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+    gap: 16px;
+  }
+
+  .policy-back-btn {
+    width: 100%;
+  }
+}

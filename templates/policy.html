@@ -1,0 +1,77 @@
+{% extends "tradchat.html" %}
+
+{% block title %}TradChat — Policies{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/css/policy.css">
+{% endblock %}
+
+{% block content %}
+<main class="policy-page-wrapper">
+  <div class="policy-card">
+    
+    <!-- Header Block -->
+    <header class="policy-header">
+      <h1 class="policy-title">Tradchat policies</h1>
+      <p class="policy-subtitle">A few shared guidelines for our time together on TradChat.</p>
+    </header>
+
+    <!-- Policy List -->
+    <div class="policy-list">
+      
+      <!-- Item 01 -->
+      <article class="policy-item">
+        <span class="policy-num-badge">01</span>
+        <div class="policy-content">
+          <h2 class="policy-item-title">Keep language respectful</h2>
+          <p class="policy-item-text">No vulgar language</p>
+        </div>
+      </article>
+
+      <!-- Item 02 -->
+      <article class="policy-item">
+        <span class="policy-num-badge">02</span>
+        <div class="policy-content">
+          <h2 class="policy-item-title">Lead with charity</h2>
+          <p class="policy-item-text">Be charitable towards others</p>
+        </div>
+      </article>
+
+      <!-- Item 03 -->
+      <article class="policy-item">
+        <span class="policy-num-badge">03</span>
+        <div class="policy-content">
+          <h2 class="policy-item-title">Message &amp; post archives</h2>
+          <p class="policy-item-text">All messages/posts will be archived for parents use only</p>
+        </div>
+      </article>
+
+      <!-- Item 04 -->
+      <article class="policy-item">
+        <span class="policy-num-badge">04</span>
+        <div class="policy-content">
+          <h2 class="policy-item-title">Who TradChat is for</h2>
+          <p class="policy-item-text">TradChat is for traditional, traditional Catholic children only (no Stay-at-Home or Novus Ordo)</p>
+        </div>
+      </article>
+
+    </div>
+
+    <!-- Footer Block -->
+    <footer class="policy-footer">
+      <div class="policy-contact-block">
+        <span class="policy-contact-heading">Questions, concerns or problems?</span>
+        <span class="policy-contact-desc">
+          Contact us at <a href="mailto:tradchatforkids@gmail.com" class="policy-contact-link">tradchatforkids@gmail.com</a>
+        </span>
+      </div>
+
+      <a href="/home/" class="policy-back-btn" id="policyBackHomeBtn" title="Return to home">
+        <i class="fa-solid fa-arrow-left"></i>
+        <span>Back to home</span>
+      </a>
+    </footer>
+
+  </div>
+</main>
+{% endblock %}

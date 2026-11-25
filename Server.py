@@ -2805,6 +2805,43 @@ def report_page():
         return redirect('/')
 
 
+@app.route('/policy/')
+@app.route('/policy')
+def policy():
+    try:
+        username = session.get('username')
+        password = session.get('password')
+        if not username or not check_credentials(username, password):
+            return redirect('/')
+
+        theme_info = db_sql("SELECT theme, is_solid_color FROM accounts WHERE username = ?;", 'accounts', params=[username], chat_room=False)
+        theme = theme_info[0][0] if theme_info else 'classic'
+        is_solid_color = bool(theme_info[0][1]) if (theme_info and len(theme_info[0]) > 1 and theme_info[0][1]) else (theme.startswith('#') if theme else False)
+        colors = get_theme_colors(theme, is_solid_color)
+
+        has_unseen_actions = False
+        if is_admin(username):
+            res = db_sql("SELECT sub_tabs FROM unseen_admin_actions WHERE LOWER(username) = LOWER(?);", 'accounts', params=[username], chat_room=False)
+            sub_tabs = res[0][0] if res else ''
+            unseen_sub_tabs_list = [t for t in sub_tabs.split('$$') if t] if sub_tabs else []
+            has_unseen_actions = len(unseen_sub_tabs_list) > 0
+
+        return render_template(
+            'policy.html',
+            theme=theme,
+            is_solid_color=is_solid_color,
+            color_dark=colors['color_dark'],
+            color_medium=colors['color_medium'],
+            color_light=colors['color_light'],
+            active_page='policy',
+            is_admin_user=is_admin(username),
+            has_unseen_actions=has_unseen_actions
+        )
+    except Exception as e:
+        print(f"Error loading policy page: {e}")
+        return redirect('/')
+
+
 @app.route('/admin/reports/', methods=['GET'])
 def get_admin_reports():
     try:

@@ -9,9 +9,9 @@ $(document).ready(function () {
     $('#filter-drawer').toggleClass('open');
   });
 
-  // Handle click on member avatars to navigate to profile page
-  $(document).on('click', '.member-avatar-wrap', function () {
-    const user = $(this).attr('data-username');
+  // Handle click on member avatars, names, or usernames to navigate to profile page
+  $(document).on('click', '.member-avatar-wrap, .member-name, .member-username', function () {
+    const user = $(this).closest('.member-card').find('.member-avatar-wrap').attr('data-username') || $(this).attr('data-username');
     if (user) {
       window.location.href = `/profile/${encodeURIComponent(user)}/`;
     }

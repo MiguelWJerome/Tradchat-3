@@ -366,7 +366,9 @@ function setActivePost(postId, shouldScroll = false) {
   if (panel && isCommentsPanelOpen) {
     panel.classList.remove('hidden');
     const title = document.getElementById('commentsPanelTitle');
-    if (title) title.textContent = `Replies to ${post.author.name}`;
+    if (title) {
+      title.innerHTML = `Replies to <a href="/profile/${encodeURIComponent(post.author.username)}/" class="comments-title-author-link" title="View ${escapeHtml(post.author.name)}'s profile">${escapeHtml(post.author.name)}</a>`;
+    }
     renderCommentsForActivePost(postId, post.author.name);
   }
 }
@@ -468,10 +470,14 @@ function renderCommentItemHtml(comment) {
   return `
     <div class="comment-item" id="comment-node-${comment.id}">
       <div class="comment-main-row">
-        <img src="${comment.author.pfp}" alt="${escapeHtml(comment.author.name)}" class="comment-avatar" onerror="this.src='/static/graphics/defaultMale.png'">
+        <a href="/profile/${encodeURIComponent(comment.author.username)}/" class="comment-avatar-link" title="View ${escapeHtml(comment.author.name)}'s profile">
+          <img src="${comment.author.pfp}" alt="${escapeHtml(comment.author.name)}" class="comment-avatar" onerror="this.src='/static/graphics/defaultMale.png'">
+        </a>
         <div class="comment-bubble">
           <div class="comment-bubble-header">
-            <span class="comment-author-name">${escapeHtml(comment.author.name)}</span>
+            <a href="/profile/${encodeURIComponent(comment.author.username)}/" class="comment-author-name-link" title="View ${escapeHtml(comment.author.name)}'s profile">
+              <span class="comment-author-name">${escapeHtml(comment.author.name)}</span>
+            </a>
             ${comment.author.is_friend ? '<span class="friend-badge">Friend</span>' : ''}
           </div>
           <div class="comment-text">${escapeHtml(comment.content)}</div>
@@ -991,10 +997,14 @@ function appendPostCardToFeed(post) {
   card.innerHTML = `
     <div class="post-header-row">
       <div class="post-author-block">
-        <img src="${post.author.pfp}" alt="${escapeHtml(post.author.name)}" class="post-avatar" onerror="this.src='/static/graphics/defaultMale.png'">
+        <a href="/profile/${encodeURIComponent(post.author.username)}/" class="post-author-avatar-link" title="View ${escapeHtml(post.author.name)}'s profile">
+          <img src="${post.author.pfp}" alt="${escapeHtml(post.author.name)}" class="post-avatar" onerror="this.src='/static/graphics/defaultMale.png'">
+        </a>
         <div class="post-author-meta">
           <div class="post-author-name-wrap">
-            <span class="post-author-name">${escapeHtml(post.author.name)}</span>
+            <a href="/profile/${encodeURIComponent(post.author.username)}/" class="post-author-name-link" title="View ${escapeHtml(post.author.name)}'s profile">
+              <span class="post-author-name">${escapeHtml(post.author.name)}</span>
+            </a>
             ${post.author.is_friend ? '<span class="friend-badge">Friend</span>' : ''}
           </div>
           <span class="post-timestamp">${post.created_at}</span>

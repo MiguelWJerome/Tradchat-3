@@ -132,7 +132,9 @@
           <!-- Create Post Composer Card -->
           <div class="feed-composer-card">
             <div class="composer-top-row">
-              <img src="/static/profile-pictures/{{ username }}.png" onerror="this.src='/static/graphics/defaultMale.png'" alt="{{ username }}" class="composer-avatar">
+              <a href="/profile/{{ username }}/" class="composer-avatar-link" title="View your profile">
+                <img src="/static/profile-pictures/{{ username }}.png" onerror="this.src='/static/graphics/defaultMale.png'" alt="{{ username }}" class="composer-avatar" style="cursor: pointer;">
+              </a>
               <textarea id="composerText" class="composer-textarea" placeholder="Share a photo, video, or update with your friends..."></textarea>
             </div>
 

@@ -18,7 +18,11 @@
     <div class="feed-stream-column" id="feedPostsStream">
       {% if filter_user %}
       <div class="user-posts-header">
-        <h2 class="user-posts-title"><i class="fa-solid fa-user-circle"></i> {{ target_author_name or filter_user }}'s Posts</h2>
+        <h2 class="user-posts-title">
+          <a href="/profile/{{ filter_user }}/" class="user-posts-title-link" title="View {{ target_author_name or filter_user }}'s profile">
+            <i class="fa-solid fa-user-circle"></i> {{ target_author_name or filter_user }}'s Posts
+          </a>
+        </h2>
         <span class="user-posts-subtitle">All posts by this user, ordered newest first</span>
       </div>
       {% endif %}
@@ -28,10 +32,14 @@
         <!-- Post Author Header -->
         <div class="post-header-row">
           <div class="post-author-block">
-            <img src="{{ post.author.pfp }}" alt="{{ post.author.name }}" class="post-avatar" onerror="this.src='/static/graphics/defaultMale.png'">
+            <a href="/profile/{{ post.author.username }}/" class="post-author-avatar-link" title="View {{ post.author.name }}'s profile">
+              <img src="{{ post.author.pfp }}" alt="{{ post.author.name }}" class="post-avatar" onerror="this.src='/static/graphics/defaultMale.png'">
+            </a>
             <div class="post-author-meta">
               <div class="post-author-name-wrap">
-                <span class="post-author-name">{{ post.author.name }}</span>
+                <a href="/profile/{{ post.author.username }}/" class="post-author-name-link" title="View {{ post.author.name }}'s profile">
+                  <span class="post-author-name">{{ post.author.name }}</span>
+                </a>
                 {% if post.author.is_friend %}
                 <span class="friend-badge">Friend</span>
                 {% endif %}
