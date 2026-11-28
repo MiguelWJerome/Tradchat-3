@@ -260,14 +260,13 @@ The admins can publish news articles, events, and ads here
 Major To-Dos:
 
 News Page
-Policy Page
 Revamp Welcome Page
 Set up event system
 get gif database full
-About Us
+About Us Page
 In the future group pages in the navbar
-Seriously consider OCI over AWS
 Finishing Settings Page
+Have Tradchat 2 games work on Tradchat 3
 HAVE A BUG REPORT STATION (there will be tons of bugs, users need a page to report them)
 
 
@@ -275,6 +274,8 @@ Minor To-Dos:
 
 have a report button for each post
 have ai go through all the "conditional database saftery adds" for example if I said in our chat to make sure all accoutns have this or that feature in it, whereas it should have used a termial command it hardcoded a conditional into the Server.py 🙄
+-okay i findially remembered what this comment meant so i'll write it down here before i forget it. So basically every time I added a feautre or coloumn to a databse (espically accounts.) We would have to insert them into all preexisitng accounts.
+- instead of using a termial command to do it the ai would write coinditioals into server.py... which are harlmess but just uselles code extra processing every time the server starts up... 
 finish publish on the admin page
 make the block gaming parental control works and make parental control "block media" also block posts once posts are made
 promote people past a stage when you're choosing room roles
@@ -298,8 +299,4 @@ set up trophies and awards
 think about having the parents control parental locks with a code
 keep messasges in memory and encypt sql at rest
 Dark Mode (make it so you can toggle between light and dark mode)
-Make a button in the settings that says "Request Age Change" and when clicked it sends a message to the admins
-make the user experience for older people and parents way better
-
-
-
+Make a button in the settings that says "Request Age Change" and when clicked it sends a message to the admin

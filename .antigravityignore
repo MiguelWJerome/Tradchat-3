@@ -40,5 +40,6 @@ logs/
 *.log
 tmp/
 temp/
+notes.txt
 .DS_Store
 Thumbs.db

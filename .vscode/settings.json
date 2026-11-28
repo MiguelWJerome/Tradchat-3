@@ -40,5 +40,14 @@
     },
     "workbench.editor.animations": false,
     "editor.smoothScrolling": false,
-    "workbench.list.smoothScrolling": false
+    "workbench.list.smoothScrolling": false,
+    "[plaintext]": {
+        "editor.inlineSuggest.enabled": false,
+        "editor.quickSuggestions": {
+            "other": "off",
+            "comments": "off",
+            "strings": "off"
+        },
+        "editor.suggestOnTriggerCharacters": false
+    }
 }

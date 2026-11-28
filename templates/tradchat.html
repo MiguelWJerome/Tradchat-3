@@ -183,11 +183,16 @@
       <!-- Right side: Profile account section -->
       <div class="navbar-button-group" id="navbarAccount">
         <!-- Profile account with settings -->
+        {% set current_nav_user = session.get('username') or username %}
         <button class="navbar-profile-button {% if active_page == 'settings' %}active{% endif %}" onclick="window.location.href='/settings/'">
+          {% if current_nav_user %}
+          <img src="/static/profile-pictures/{{ current_nav_user }}.png" alt="{{ current_nav_user }}" class="navbar-profile-avatar" onerror="this.src='/static/graphics/defaultMale.png'">
+          {% else %}
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="8" r="4"/>
             <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
           </svg>
+          {% endif %}
           <span>Settings</span>
         </button>
       </div>
@@ -215,11 +220,15 @@
         <div class="dropdown-section">
           <h3>Account</h3>
           <button class="dropdown-item profile-dropdown {% if active_page == 'settings' %}active{% endif %}" onclick="window.location.href='/settings/'">
+            {% if current_nav_user %}
+            <img src="/static/profile-pictures/{{ current_nav_user }}.png" alt="{{ current_nav_user }}" class="navbar-profile-avatar" onerror="this.src='/static/graphics/defaultMale.png'">
+            {% else %}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="8" r="4"/>
               <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
             </svg>
-            Settings
+            {% endif %}
+            <span>Settings</span>
           </button>
         </div>
       </div>

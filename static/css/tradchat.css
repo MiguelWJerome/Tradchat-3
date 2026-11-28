@@ -188,17 +188,39 @@ img {
 }
 
 .navbar-profile-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     background-color: transparent;
     color: var(--color-light);
     border: 2px solid var(--color-medium);
-    padding: 10px 20px;
-    /* Reduced from 12px 24px */
-    border-radius: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
     font-size: 13px;
-    /* Reduced from 16px */
     font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-speed);
+}
+
+.navbar-profile-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1.5px solid var(--color-light);
+    flex-shrink: 0;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.navbar-profile-button:hover .navbar-profile-avatar,
+.navbar-profile-button.active .navbar-profile-avatar {
+    border-color: var(--color-dark);
+}
+
+.profile-dropdown .navbar-profile-avatar {
+    width: 20px;
+    height: 20px;
 }
 
 .navbar-profile-button:hover,
